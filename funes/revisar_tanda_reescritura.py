@@ -15,8 +15,9 @@ Dos capas, y la segunda es la que no existia antes:
 2. **Por tanda** — el coseno promedio par a par entre los textos nuevos. Esta
    es la unica capa que puede ver el problema que nos trajo hasta aca: un texto
    que "habla de todo un poco" pasa cualquier validacion por libro y solo se
-   delata en el agregado, cuando se lo compara con sus hermanos. La referencia
-   del catalogo actual es 0,38 y es demasiado alta.
+   delata en el agregado, cuando se lo compara con sus hermanos. El 0,38 del
+   abstracto NO es la referencia para `experiencia` (mide otra cosa): la
+   referencia es la `experiencia` v3 sobre muestras al azar, que da 0,59-0,63.
 
 Para poder comparar manzanas con manzanas, el coseno nuevo se mide contra el de
 los MISMOS libros con su texto viejo (que ya esta vectorizado en la base, asi

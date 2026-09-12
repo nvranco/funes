@@ -300,7 +300,10 @@ corregí antes de guardar:
 7. **¿Alguna confianza `alta`/`media` sin fuentes?** O citás, o es `baja`.
 
 Después de aplicarse, cada tanda se mide entera: se calcula el **coseno promedio
-entre tus textos de `experiencia`**. La referencia del catálogo actual es 0,38 y
-es demasiado alta. Si tu tanda sale por encima de eso, los textos son
-intercambiables entre sí y la tanda se rechaza aunque cada libro por separado
-cumpla todas las reglas de arriba.
+entre tus textos de `experiencia`**. La referencia **no** es el 0,38 del
+`abstracto` — ese campo mide otra cosa (de qué trata, no qué es leerlo) y no es
+el control correcto acá. El control real es la `experiencia` de la versión
+anterior (`v3`/`abs2`) sobre muestras al azar del catálogo: da 0,59-0,63. Bajar
+de ahí ya es una mejora real. **No fuerces el texto para llegar a 0,38**:
+ningún campo de este catálogo, ni el mejor escrito hasta ahora, bajó tanto —
+forzarlo produce textos raros por rareza, no textos distintivos.
