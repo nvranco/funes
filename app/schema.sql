@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS funes_libros (
     titulo              TEXT NOT NULL,
     autor               TEXT NOT NULL DEFAULT '',
     abstracto           TEXT NOT NULL DEFAULT '',
-    embedding           REAL[],              -- 1536 dims; NULL hasta vectorizar
+    embedding_abstracto REAL[],              -- 1536 dims; NULL hasta vectorizar
     isbn                TEXT,
     fecha_publicacion   TEXT,                -- tal cual la trae la fuente ("MM/YYYY"); no inventamos dia
     categoria           TEXT,
@@ -401,6 +401,30 @@ ALTER TABLE funes_sesiones ADD COLUMN IF NOT EXISTS q4b TEXT NOT NULL DEFAULT ''
 ALTER TABLE funes_libros ADD COLUMN IF NOT EXISTS sinopsis TEXT;
 ALTER TABLE funes_libros ADD COLUMN IF NOT EXISTS experiencia TEXT;
 ALTER TABLE funes_libros ADD COLUMN IF NOT EXISTS embedding_experiencia REAL[];
+
+-- Los tres textos de un libro pasan a tener cada uno su vector, con el mismo
+-- nombre que el texto del que sale. `embedding` se llamaba asi cuando era el
+-- unico que habia (salia de `abstracto`, ver importar_ateneo_bbdd); con tres
+-- en juego, un nombre generico obliga a recordar cual era. El rename es
+-- condicional para que corra una sola vez: schema.sql se ejecuta en cada
+-- arranque.
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_name = 'funes_libros' AND column_name = 'embedding')
+       AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name = 'funes_libros' AND column_name = 'embedding_abstracto') THEN
+        ALTER TABLE funes_libros RENAME COLUMN embedding TO embedding_abstracto;
+    END IF;
+END $$;
+
+-- El vector de la sinopsis, que hasta ahora no existia: la reescritura v3
+-- escribio el TEXTO de 1.102 libros y nunca se vectorizo, asi que el ancla
+-- siguio comparandose contra el abstracto. Va en columna propia y no pisando
+-- a `embedding_abstracto` para que el cambio sea un flag y no una migracion:
+-- con los dos guardados se puede medir el ancla contra uno y contra el otro
+-- sobre el mismo catalogo desplegado, y volver atras sin re-vectorizar nada.
+-- Mismo criterio que _calcular_centrados, que guarda el crudo y el centrado.
+ALTER TABLE funes_libros ADD COLUMN IF NOT EXISTS embedding_sinopsis REAL[];
 -- Vocabulario cerrado (tema, tono, exigencia, ritmo...) para poder filtrar por
 -- algo que el catalogo hoy no tiene: en divulgacion, 87 de 187 libros tienen
 -- subgenero "EN GENERAL", asi que no hay con que separar un libro de hongos de
@@ -431,7 +455,7 @@ CREATE TABLE IF NOT EXISTS funes_leidos (
     PRIMARY KEY (sesion_id, libro_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_funes_libros_macro ON funes_libros(macro) WHERE embedding IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_funes_libros_macro ON funes_libros(macro) WHERE embedding_abstracto IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_funes_sesiones_fecha ON funes_sesiones(creado_en);
 
 -- Funes por libreria: /funes/{slug} ofrece el mismo recomendador pero acotado
@@ -461,18 +485,18 @@ CREATE INDEX IF NOT EXISTS idx_funes_recomendaciones_sesion ON funes_recomendaci
 -- macros) encontro otros 3 con el mismo problema: el propio abstracto admite
 -- que no se sabe que libro es.
 --
--- Se excluyen del recomendador poniendo el embedding en NULL -el mismo filtro
--- que _libros() ya usa para "todavia no vectorizado", WHERE embedding IS NOT
--- NULL-, no se borran: si algun dia se identifica el libro real, alcanza con
+-- Se excluyen del recomendador poniendo sus vectores en NULL -el mismo filtro
+-- que _libros() ya usa para "todavia no vectorizado", WHERE embedding_abstracto
+-- IS NOT NULL-, no se borran: si algun dia se identifica el libro real, alcanza con
 -- corregir titulo/autor y volver a correr funes/reescribir_abstractos.py
 -- sobre ese id. El WHERE de abajo deja de matchear en cuanto corre una vez,
 -- asi que las corridas siguientes son no-op.
 UPDATE funes_libros
-SET embedding = NULL, embedding_experiencia = NULL,
+SET embedding_abstracto = NULL, embedding_experiencia = NULL,
     confianza_abstracto = 'baja',
     nota = 'Excluido del recomendador (piloto sept. 2026): el titulo no se '
            'pudo identificar con certeza y el abstracto es una hipotesis, no '
            'una descripcion real del libro.'
 WHERE id IN ('los-extranos-de-m', 'la-gilada', 'educacion-fisica-infantil',
              'ciencia-ficcion-espacio')
-  AND embedding IS NOT NULL;
+  AND embedding_abstracto IS NOT NULL;

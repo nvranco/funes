@@ -98,7 +98,7 @@ async def main() -> None:
                       p.precio AS precio_llm, p.fuente
                FROM funes_libros l
                LEFT JOIN funes_precios p ON p.libro_id = l.id
-               WHERE l.embedding IS NOT NULL
+               WHERE l.embedding_abstracto IS NOT NULL
                ORDER BY (p.precio IS NULL), random()
                LIMIT $1""",
             CUANTOS,

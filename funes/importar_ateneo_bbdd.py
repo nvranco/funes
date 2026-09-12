@@ -72,7 +72,7 @@ async def main() -> None:
             await db.pool().execute(
                 """
                 INSERT INTO funes_libros
-                    (id, titulo, autor, abstracto, embedding, isbn, editorial,
+                    (id, titulo, autor, abstracto, embedding_abstracto, isbn, editorial,
                      fecha_publicacion, categoria, genero, subgenero, nro_paginas,
                      confianza_abstracto, nota, fuente)
                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'ateneo-kaggle')

@@ -59,7 +59,7 @@ def libro(id_: str, titulo: str, macro: str, paginas=None,
     que le importa, y el resto queda como un libro al que le falta el dato, que
     es la situacion que hay que probar tanto como la contraria."""
     return {"id": id_, "titulo": titulo, "autor": "N N", "macro": macro,
-            "nro_paginas": paginas, "abstracto": "", "embedding": None,
+            "nro_paginas": paginas, "abstracto": "", "embedding_abstracto": None,
             "genero": genero, "subgenero": subgenero,
             "rasgos": {"tema": tema} if tema else {}}
 
@@ -171,7 +171,7 @@ def probar_filtros() -> None:
     print("\ncentrado de vectores")
     ok(not nucleo._CENTRAR, "el centrado esta apagado (medido: empeora, ver el comentario)")
     falsos = [dict(libro(f"c{i}", f"T {i}", "literatura"),
-                   embedding=__import__("array").array("f", [1.0 + i, 2.0, 3.0]),
+                   embedding_abstracto=__import__("array").array("f", [1.0 + i, 2.0, 3.0]),
                    _norma=((1.0 + i) ** 2 + 13) ** 0.5) for i in range(3)]
     nucleo._calcular_centrados(falsos)
     ok(all("_centrado" in l for l in falsos), "cada libro queda con su vector centrado")
@@ -199,12 +199,12 @@ def probar_filtros() -> None:
     print("\ncada consulta contra el vector que le corresponde")
     arr2 = __import__("array").array
     l = dict(libro("dos", "Con los dos", "literatura"), autor="A A")
-    l["embedding"] = arr2("f", [1.0, 0.0, 0.0])
+    l["embedding_abstracto"] = arr2("f", [1.0, 0.0, 0.0])
     l["_norma"] = 1.0
     l["embedding_experiencia"] = arr2("f", [0.0, 1.0, 0.0])
     l["_norma_experiencia"] = 1.0
     viejo = dict(libro("uno", "Sin reescribir", "literatura"), autor="B B")
-    viejo["embedding"] = arr2("f", [1.0, 0.0, 0.0])
+    viejo["embedding_abstracto"] = arr2("f", [1.0, 0.0, 0.0])
     viejo["_norma"] = 1.0
 
     # El mecanismo se prueba en los dos estados sin asumir cual es el de
@@ -288,7 +288,7 @@ def probar_filtros() -> None:
     arr = __import__("array").array
     def con_vector(id_, autor, vec):
         l = dict(libro(id_, f"T {id_}", "literatura"), autor=autor)
-        l["embedding"] = arr("f", vec)
+        l["embedding_abstracto"] = arr("f", vec)
         l["_norma"] = sum(x * x for x in vec) ** 0.5
         return l
     a = con_vector("a", "Agatha Christie", [1.0, 0.0, 0.0])
@@ -863,7 +863,7 @@ async def probar_rebusqueda() -> None:
     ok(bool(afuera), "hay libros fuera de la lista corta (si no, no se prueba nada)")
     objetivo = afuera[len(afuera) // 2]
 
-    vec = array.array("f", objetivo["embedding"])
+    vec = array.array("f", objetivo["embedding_abstracto"])
     correccion = {"vector": vec, "norma": sum(x * x for x in vec) ** 0.5,
                   "texto": "(fabricada)"}
     vector, norma = nucleo._preparar_consulta(

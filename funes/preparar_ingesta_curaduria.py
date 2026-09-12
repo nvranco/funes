@@ -520,7 +520,7 @@ async def aplicar() -> None:
           f"{await db.pool().fetchval('SELECT count(*) FROM funes_ingesta') - (despues - antes)} pisados)")
     for f in await db.pool().fetch(
             "SELECT coalesce(macro_manual, macro) m, count(*) n, "
-            "count(rasgos) r, count(embedding) e FROM funes_libros GROUP BY 1 ORDER BY 2 DESC"):
+            "count(rasgos) r, count(embedding_abstracto) e FROM funes_libros GROUP BY 1 ORDER BY 2 DESC"):
         print(f"   {f['m']:12} {f['n']:5} libros | {f['r']:5} con rasgos | {f['e']:5} vectorizados")
     # La macro se recalcula en el proximo arranque (schema.sql), pero como se
     # escribio macro_manual en todas las filas nuevas, el COALESCE las respeta.

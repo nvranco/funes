@@ -32,7 +32,7 @@ async def main() -> None:
         for libro in libros:
             resultado = await db.pool().execute(
                 """
-                INSERT INTO funes_libros (id, titulo, autor, abstracto, embedding, fuente)
+                INSERT INTO funes_libros (id, titulo, autor, abstracto, embedding_abstracto, fuente)
                 VALUES ($1, $2, $3, $4, $5, 'manual')
                 ON CONFLICT (id) DO NOTHING
                 """,

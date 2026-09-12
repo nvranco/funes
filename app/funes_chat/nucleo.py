@@ -81,11 +81,13 @@ _ALFA_CENTRADO = 1.0
 # atrape") y da como referencia un contenido ("Sapiens")- y contra un solo
 # parrafo que mezcla las dos, cada consulta compite tambien con la mitad que
 # no le corresponde. Los libros que todavia no tienen `experiencia` caen al
-# `embedding` de siempre (no hay `embedding_sinopsis`: esa mitad del diseño
-# original nunca se llego a construir), asi que un catalogo a medio reescribir
-# funciona igual, sin romperse. El ancla y la correccion siguen comparandose
-# contra `embedding` pase lo que pase con este flag -ver _puntaje-, otra
-# consecuencia del mismo hueco.
+# vector del abstracto, asi que un catalogo a medio reescribir no se rompe —
+# pero tampoco "funciona igual": el que tiene vector propio compite en su eje
+# y el que no compite en otro, y eso favorece sistematicamente a los
+# reescritos (medido: los 10 titulos mas recomendados en el contrafactual del
+# piloto eran los 10 de la mitad ya reescrita, que es el 29% del catalogo).
+# La otra mitad del diseño -que el ancla compare contra la sinopsis- vive en
+# _ANCLA_CONTRA_SINOPSIS, aca abajo.
 #
 # Estuvo apagado con esta razon: contra los 24 lectores del banco (el juez
 # offline), el puntaje quedaba igual (3,11 contra 3,12) pero el acierto en la
@@ -116,6 +118,27 @@ _ALFA_CENTRADO = 1.0
 # vivo contra el piloto que sigue corriendo (comparando por fecha de deploy,
 # no contra el juez) antes de confiar en esto a ciegas.
 _DOS_VECTORES = True
+
+# La otra mitad del mismo diseño: que el ancla (q4) y la correccion compitan
+# contra `sinopsis` —contenido contra contenido— en vez de contra el abstracto,
+# que mezcla de que trata con que es leerlo.
+#
+# APAGADO, y el orden importa. El texto de la sinopsis existe desde la
+# reescritura v3 (1.102 libros) pero nunca se habia vectorizado: no habia
+# columna donde ponerlo, asi que el ancla siguio comparandose contra el
+# abstracto todo este tiempo. Ahora hay columna (embedding_sinopsis) y los dos
+# vectores conviven, asi que esto pasa a ser un flag y no una migracion: se
+# puede medir el ancla contra uno y contra el otro sobre el mismo catalogo, y
+# volver atras sin re-vectorizar nada.
+#
+# Se prende cuando el catalogo este completo en v5a, y SOLO. La leccion que
+# dejo el piloto es justamente esa: cada vez que dos cambios viajaron juntos,
+# la medicion quedo sin interpretar (el juez midio _CENTRAR y _DOS_VECTORES
+# con el otro apagado, y por eso su veredicto no servia para la config real).
+# Hay una medicion vieja que dice que reemplazar el vector del abstracto por
+# el de la sinopsis empeora -juez 3,21 a 2,96-, pero se tomo con el perfil
+# todavia comparando contra el abstracto, que ya no es el caso.
+_ANCLA_CONTRA_SINOPSIS = False
 
 # Si q1 puede recortar el catalogo por subgenero ademas de orientar el vector.
 # Hoy solo lo declara historia (ver PREGUNTAS["q1"]).
@@ -1067,11 +1090,11 @@ async def cantidad_libros() -> int | None:
         if MACRO_UNICA:
             _cant_cache = await db.pool().fetchval(
                 "SELECT count(*) FROM funes_libros "
-                "WHERE embedding IS NOT NULL AND macro = $1", MACRO_UNICA
+                "WHERE embedding_abstracto IS NOT NULL AND macro = $1", MACRO_UNICA
             )
         else:
             _cant_cache = await db.pool().fetchval(
-                "SELECT count(*) FROM funes_libros WHERE embedding IS NOT NULL"
+                "SELECT count(*) FROM funes_libros WHERE embedding_abstracto IS NOT NULL"
             )
         _cant_cache_en = ahora
     except Exception:
@@ -1123,9 +1146,10 @@ async def _libros() -> list[dict]:
         # strings cortos por libro sobre una cache que ya trae el abstracto
         # entero, asi que el costo es despreciable.
         filas = await db.pool().fetch(
-            "SELECT id, titulo, autor, abstracto, embedding, macro, nro_paginas, "
-            "       genero, subgenero, embedding_experiencia, sinopsis, experiencia, rasgos "
-            "FROM funes_libros WHERE embedding IS NOT NULL"
+            "SELECT id, titulo, autor, abstracto, sinopsis, experiencia, macro, "
+            "       nro_paginas, genero, subgenero, rasgos, "
+            "       embedding_abstracto, embedding_sinopsis, embedding_experiencia "
+            "FROM funes_libros WHERE embedding_abstracto IS NOT NULL"
         )
         if not filas:
             raise ErrorFunesChat("No hay libros vectorizados en funes_libros.")
@@ -1135,12 +1159,16 @@ async def _libros() -> list[dict]:
             libro = dict(fila)
             # array('f') en vez de list[float]: REAL en Postgres ya es float32,
             # asi que no se pierde precision y la cache pasa de ~65 MB a ~8 MB.
-            libro["embedding"] = array.array("f", libro["embedding"])
+            libro["embedding_abstracto"] = array.array("f", libro["embedding_abstracto"])
             # La norma no cambia nunca: precalcularla una vez saca una pasada
             # completa sobre 1536 floats de cada comparacion del ranking.
-            libro["_norma"] = sum(x * x for x in libro["embedding"]) ** 0.5
+            libro["_norma"] = sum(x * x for x in libro["embedding_abstracto"]) ** 0.5
             # El vector de la experiencia solo existe para los libros ya
             # reescritos; el resto sigue con el de siempre.
+            if libro.get("embedding_sinopsis"):
+                libro["embedding_sinopsis"] = array.array("f", libro["embedding_sinopsis"])
+                libro["_norma_sinopsis"] = (
+                    sum(x * x for x in libro["embedding_sinopsis"]) ** 0.5)
             if libro.get("embedding_experiencia"):
                 libro["embedding_experiencia"] = array.array("f", libro["embedding_experiencia"])
                 libro["_norma_experiencia"] = (
@@ -1185,7 +1213,7 @@ def _calcular_centrados(libros: list[dict]) -> None:
     macro, asi que lo que hay que sacarle es lo que comparten los libros con los
     que realmente compite."""
     _MEDIAS.clear()
-    dims = len(libros[0]["embedding"]) if libros else 0
+    dims = len(libros[0]["embedding_abstracto"]) if libros else 0
     por_macro: dict[str, list[dict]] = {}
     for libro in libros:
         por_macro.setdefault(libro["macro"] or "", []).append(libro)
@@ -1193,7 +1221,7 @@ def _calcular_centrados(libros: list[dict]) -> None:
     for macro, grupo in por_macro.items():
         media = array.array("f", [0.0]) * dims
         for libro in grupo:
-            for i, x in enumerate(libro["embedding"]):
+            for i, x in enumerate(libro["embedding_abstracto"]):
                 media[i] += x
         n = len(grupo)
         for i in range(dims):
@@ -1201,7 +1229,7 @@ def _calcular_centrados(libros: list[dict]) -> None:
         _MEDIAS[macro] = media
         for libro in grupo:
             centrado = array.array("f",
-                                   (x - _ALFA_CENTRADO * m for x, m in zip(libro["embedding"], media)))
+                                   (x - _ALFA_CENTRADO * m for x, m in zip(libro["embedding_abstracto"], media)))
             libro["_centrado"] = centrado
             libro["_norma_centrada"] = sum(x * x for x in centrado) ** 0.5
 
@@ -1226,19 +1254,36 @@ async def buscar_libro(libro_id: str) -> dict | None:
 
 
 def _coseno_con_norma(vector: list[float], norma_vector: float, libro: dict,
-                      campo: str = "embedding") -> float:
-    """Similitud de coseno reusando las normas ya calculadas: la del libro se
-    computa una sola vez al cargar la cache (_libros) y la del vector de
-    consulta una sola vez por ranking. El ranking recorre el catalogo entero,
-    asi que recalcularlas en cada comparacion cuesta el triple."""
+                      campo: str = "abstracto") -> float:
+    """Similitud de coseno contra el vector del libro que le corresponde a esta
+    consulta, reusando las normas ya calculadas: la del libro se computa una
+    sola vez al cargar la cache (_libros) y la del vector de consulta una sola
+    vez por ranking. El ranking recorre el catalogo entero, asi que
+    recalcularlas en cada comparacion cuesta el triple.
+
+    `campo` dice contra QUE texto del libro compite esta mitad de la consulta:
+
+      "experiencia"  el perfil (q1-q3) y el ajuste (las profundas), que hablan
+                     de como se lee — solo si _DOS_VECTORES esta puesto.
+      "sinopsis"     el ancla (q4) y la correccion, que hablan de contenido —
+                     solo si _ANCLA_CONTRA_SINOPSIS esta puesto.
+      "abstracto"    el de siempre, y el que queda cuando alguno de los dos
+                     textos nuevos todavia no existe para este libro.
+
+    Cada rama cae al abstracto si el libro no tiene ese vector: un catalogo a
+    medio reescribir no se rompe. Ojo con leer eso como "funciona igual" —
+    no lo hace: el que tiene el vector propio compite en su eje y el que no
+    compite en otro, y eso favorece sistematicamente a los reescritos."""
     # Los dos lados tienen que estar en el mismo espacio: si la consulta viene
     # centrada (_preparar_consulta), el libro tambien.
     if campo == "experiencia" and _DOS_VECTORES and libro.get("_norma_experiencia"):
         otro, norma_libro = libro["embedding_experiencia"], libro["_norma_experiencia"]
+    elif campo == "sinopsis" and _ANCLA_CONTRA_SINOPSIS and libro.get("_norma_sinopsis"):
+        otro, norma_libro = libro["embedding_sinopsis"], libro["_norma_sinopsis"]
     elif _CENTRAR and "_centrado" in libro:
         otro, norma_libro = libro["_centrado"], libro["_norma_centrada"]
     else:
-        otro, norma_libro = libro["embedding"], libro["_norma"]
+        otro, norma_libro = libro["embedding_abstracto"], libro["_norma"]
     if norma_vector == 0 or norma_libro == 0:
         return 0.0
     return sum(x * y for x, y in zip(vector, otro)) / (norma_vector * norma_libro)
@@ -1947,7 +1992,8 @@ def _puntaje(vector, norma: float, ancla, libro: dict, ajuste=None,
     if peso_ancla:
         # El ancla va contra la sinopsis: la referencia que trae el lector es
         # un contenido ("Sapiens", "Clarice Lispector"), no una forma de leer.
-        total += peso_ancla * _coseno_con_norma(ancla["vector"], ancla["norma"], libro)
+        total += peso_ancla * _coseno_con_norma(
+            ancla["vector"], ancla["norma"], libro, "sinopsis")
     if peso_ajuste:
         total += peso_ajuste * _coseno_con_norma(
             ajuste["vector"], ajuste["norma"], libro, "experiencia")
@@ -1957,7 +2003,7 @@ def _puntaje(vector, norma: float, ancla, libro: dict, ajuste=None,
         # habla de CONTENIDO ("queria algo sobre castas", "esperaba mas humor"),
         # no de como se lee.
         total += peso_correccion * _coseno_con_norma(
-            correccion["vector"], correccion["norma"], libro)
+            correccion["vector"], correccion["norma"], libro, "sinopsis")
     return total
 
 
@@ -1967,7 +2013,8 @@ def _similitud_entre_libros(a: dict, b: dict) -> float:
     if _CENTRAR and "_centrado" in a and "_centrado" in b:
         va, na, vb, nb = a["_centrado"], a["_norma_centrada"], b["_centrado"], b["_norma_centrada"]
     else:
-        va, na, vb, nb = a["embedding"], a["_norma"], b["embedding"], b["_norma"]
+        va, na, vb, nb = (a["embedding_abstracto"], a["_norma"],
+                          b["embedding_abstracto"], b["_norma"])
     if na == 0 or nb == 0:
         return 0.0
     return sum(x * y for x, y in zip(va, vb)) / (na * nb)
@@ -2004,14 +2051,15 @@ def _puntaje_detalle(vector, norma: float, ancla, libro: dict, ajuste=None,
     puso de referencia, o a lo que contesto en las preguntas profundas. Se
     calcula solo sobre los K candidatos, no sobre el pool entero."""
     perfil = _coseno_con_norma(vector, norma, libro, "experiencia")
-    suyo = _coseno_con_norma(ancla["vector"], ancla["norma"], libro) if ancla else None
+    suyo = (_coseno_con_norma(ancla["vector"], ancla["norma"], libro, "sinopsis")
+            if ancla else None)
     propio = (_coseno_con_norma(ajuste["vector"], ajuste["norma"], libro, "experiencia")
               if ajuste else None)
     # Desde que la re-busqueda compite contra todo el pool, la correccion puede
     # traer un libro que la lista corta no tenia. Ese es justo el caso que hay
     # que poder explicar despues, y sin esta columna el desglose mostraria tres
     # cosenos que no alcanzan para justificar al ganador.
-    arreglo = (_coseno_con_norma(correccion["vector"], correccion["norma"], libro)
+    arreglo = (_coseno_con_norma(correccion["vector"], correccion["norma"], libro, "sinopsis")
                if correccion else None)
     return {
         "perfil": round(perfil, 6),

@@ -35,13 +35,13 @@ os.environ.setdefault("ADMIN_TOKEN", "x")
 # en las dos bases y el filtro por tema no descartaba nada en produccion, sin
 # ningun error, porque la columna llegaba vacia.
 COLUMNAS = [
-    "id", "titulo", "autor", "abstracto", "embedding", "isbn", "fecha_publicacion",
+    "id", "titulo", "autor", "abstracto", "embedding_abstracto", "isbn", "fecha_publicacion",
     "categoria", "genero", "subgenero", "nro_paginas", "confianza_abstracto",
     "nota", "fuente", "macro", "macro_manual",
     # Lo que dejo la reescritura de abstractos. `rasgos` es el que usa el filtro
     # duro por tema de divulgacion; los otros tres viajan con el para que las
     # dos bases digan lo mismo.
-    "sinopsis", "experiencia", "embedding_experiencia", "rasgos",
+    "sinopsis", "experiencia", "embedding_sinopsis", "embedding_experiencia", "rasgos",
     "version_reescritura",
 ]
 LOTE = 50
@@ -159,7 +159,7 @@ async def main() -> None:
 
         total = await destino.fetchval("SELECT count(*) FROM funes_libros")
         con_emb = await destino.fetchval(
-            "SELECT count(*) FROM funes_libros WHERE embedding IS NOT NULL"
+            "SELECT count(*) FROM funes_libros WHERE embedding_abstracto IS NOT NULL"
         )
         # rasgos aparte: es de lo que depende el filtro por tema, y su modo de
         # falla es silencioso (columna vacia, cero errores, filtro que no filtra).
