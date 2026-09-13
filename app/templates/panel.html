@@ -178,10 +178,10 @@
 
       <div>
         <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Visitas</h2>
-        {# Mismo alto fijo que Calidad de al lado (alto_seccion=235 en su
-           macro): las dos tarjetas terminan de llenar el espacio que le
-           sobraba a esta columna contra la de Actividad. #}
-        <div class="bg-papel border border-borde rounded-xl2 p-3 flex flex-col" style="height: 235px">
+        {# Mismo alto fijo que Recomendaciones de al lado (alto_seccion=230 en
+           su macro): las dos tarjetas se reparten lo que le sobraba a esta
+           columna contra la de Actividad, sin pasarse. #}
+        <div class="bg-papel border border-borde rounded-xl2 p-3 flex flex-col" style="height: 230px">
           <div class="flex-1 flex items-end justify-between gap-1">
             {% for d in visitas_semana %}
             <div class="flex-1 flex flex-col items-center justify-end h-full gap-1">
@@ -209,8 +209,8 @@
          de Funes, al lado del de visitas de arriba para que se puedan
          comparar las dos señales del ciclo actual. #}
       <div>
-        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Calidad</h2>
-        {{ grafico_calidad(dashboard_funes, TONOS, alto_seccion=235, alto_barras=160, mostrar_titulo=false, mostrar_grilla=false) }}
+        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Recomendaciones</h2>
+        {{ grafico_calidad(dashboard_funes, TONOS, alto_seccion=230, alto_barras=140, mostrar_titulo=false, mostrar_grilla=false) }}
       </div>
       {% endif %}
 

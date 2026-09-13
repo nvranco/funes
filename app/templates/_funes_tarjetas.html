@@ -64,8 +64,14 @@
    la tarjeta de Actividad de al lado (grid-cols-2, desktop); en mobile y en
    el panel del librero (una sola columna, nada al lado con que igualar) se
    deja sin pisar y la tarjeta toma su alto natural. #}
+{# Con alto_seccion fijo, el area de barras pasa a flex-1 (se estira sola
+   hasta llenar lo que sobra) en vez de un alto_barras hardcodeado: dos
+   numeros fijos que tienen que sumar exacto es fragil, se desalinea cada
+   vez que cambia el titulo/bajada/resumen de abajo. Sin alto_seccion (mobile,
+   funes_metricas.html) no hay de donde estirarse, asi que ahi si hace falta
+   el alto explicito de alto_barras. #}
 {% macro grafico_calidad(dashboard, TONOS, alto_seccion=none, alto_barras=260, mostrar_titulo=true, mostrar_grilla=true) %}
-<section class="bg-papel border border-borde rounded-xl2 p-4 relative grafico-calidad-card"
+<section class="bg-papel border border-borde rounded-xl2 p-4 relative grafico-calidad-card flex flex-col"
          {% if alto_seccion %}style="height: {{ alto_seccion }}px"{% endif %}>
   {% if mostrar_titulo %}
   <h2 class="text-xs font-bold uppercase tracking-wide text-gris">Calidad</h2>
@@ -74,7 +80,8 @@
   {# La grilla es un overlay aparte (pointer-events-none, detrás en el DOM) y
      no lineas metidas entre las barras: asi no compite con el mousemove que
      arma el tooltip sobre .barra-dia. #}
-  <div class="relative" style="height: {{ alto_barras }}px">
+  <div class="relative {{ 'flex-1 min-h-0' if alto_seccion else '' }}"
+       {% if not alto_seccion %}style="height: {{ alto_barras }}px"{% endif %}>
     {% if mostrar_grilla %}
     <div class="absolute inset-0 pointer-events-none">
       {% for pct in (0, 25, 50, 75, 100) %}
