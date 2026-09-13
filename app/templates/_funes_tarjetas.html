@@ -13,8 +13,8 @@
 {% set TONOS = {'verde': 'rgb(122 158 120)', 'rojo': 'rgb(190 110 85)',
                 'gris': 'rgb(180 165 140)', 'sin_datos': 'rgb(200 190 175)'} %}
 
-{% macro tarjeta(id, titulo, pregunta, dato, nota='', viejos=0, mostrar_barra=true) -%}
-  {% set tono = TONOS[dato.estado] %}
+{% macro tarjeta(id, titulo, pregunta, dato, nota='', viejos=0, mostrar_barra=true, mostrar_margen=true, usar_color=true) -%}
+  {% set tono = TONOS[dato.estado] if usar_color else 'inherit' %}
   <div class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col">
     <div class="flex items-baseline justify-between gap-2">
       <p class="text-xs font-bold uppercase tracking-wide text-gris">{{ id }}</p>
@@ -28,12 +28,12 @@
     <p class="text-xs text-gris leading-snug mt-0.5 min-h-[2.1rem]">{{ pregunta }}</p>
 
     {% if dato.pct is none %}
-      <p class="text-4xl font-bold mt-4" style="color: {{ TONOS.sin_datos }}">—</p>
+      <p class="text-4xl font-bold mt-4" style="color: {{ TONOS.sin_datos if usar_color else 'inherit' }}">—</p>
       <p class="text-xs text-gris">todavía no hay datos</p>
     {% else %}
       <p class="text-5xl font-bold mt-4 tabular-nums leading-none" style="color: {{ tono }}">
         {{ '%.0f'|format(dato.pct) }}<span class="text-2xl">%</span>
-        <span class="text-lg font-normal text-gris">± {{ '%.0f'|format(dato.margen) }}</span>
+        {% if mostrar_margen %}<span class="text-lg font-normal text-gris">± {{ '%.0f'|format(dato.margen) }}</span>{% endif %}
       </p>
       <p class="text-xs text-gris tabular-nums mt-1.5">
         {{ dato.exitos }} de {{ dato.n }}{% if viejos %} · {{ viejos }} viejos afuera{% endif %}

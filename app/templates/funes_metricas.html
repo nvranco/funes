@@ -47,21 +47,19 @@
         <p class="text-xs text-gris mt-1">Conversaciones</p>
       </div>
       <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
-        <p class="text-3xl font-bold tabular-nums"
-           style="color: {{ TONOS[dashboard.finalizacion.estado] }}">
+        <p class="text-3xl font-bold tabular-nums">
           {{ '%.0f'|format(dashboard.finalizacion.pct) if dashboard.finalizacion.pct is not none else '—' }}{% if dashboard.finalizacion.pct is not none %}%{% endif %}
         </p>
         <p class="text-xs text-gris mt-1">Terminan la charla</p>
       </div>
       <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
-        <p class="text-3xl font-bold tabular-nums"
-           style="color: {{ TONOS[dashboard.precision.estado] }}">
+        <p class="text-3xl font-bold tabular-nums">
           {{ '%.0f'|format(dashboard.precision.pct) if dashboard.precision.pct is not none else '—' }}{% if dashboard.precision.pct is not none %}%{% endif %}
         </p>
         <p class="text-xs text-gris mt-1">Llegan a un acierto</p>
       </div>
       <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
-        <p class="text-3xl font-bold tabular-nums" style="color: rgb(var(--celeste))">
+        <p class="text-3xl font-bold tabular-nums">
           {{ '%.0f'|format(cobertura.matched / cobertura.total * 100) if cobertura.total else '—' }}{% if cobertura.total %}%{% endif %}
         </p>
         <p class="text-xs text-gris mt-1">Catálogo cubierto</p>
@@ -91,10 +89,10 @@
       </div>
       {{ tarjeta('Finalización', 'Terminan la conversación',
                  'De los que contestaron la primera pregunta, cuántos vieron un libro',
-                 dashboard.finalizacion, mostrar_barra=false) }}
+                 dashboard.finalizacion, mostrar_barra=false, mostrar_margen=false, usar_color=false) }}
       {{ tarjeta('Precisión', 'Llegan a un libro que sirve',
                  'De las conversaciones calificadas, cuántas llegaron a un acierto',
-                 dashboard.precision, mostrar_barra=false) }}
+                 dashboard.precision, mostrar_barra=false, mostrar_margen=false, usar_color=false) }}
       <div class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col">
         <p class="text-xs font-bold uppercase tracking-wide text-gris">Cobertura</p>
         <p class="text-base font-semibold mt-1 leading-tight">Funes conoce tu catálogo</p>
@@ -103,7 +101,7 @@
           <p class="text-4xl font-bold mt-4" style="color: {{ TONOS.sin_datos }}">—</p>
           <p class="text-xs text-gris">todavía no hay libros publicados</p>
         {% else %}
-          <p class="text-5xl font-bold mt-4 tabular-nums leading-none" style="color: rgb(var(--celeste))">
+          <p class="text-5xl font-bold mt-4 tabular-nums leading-none">
             {{ '%.0f'|format(cobertura.matched / cobertura.total * 100) }}<span class="text-2xl">%</span>
           </p>
           <p class="text-xs text-gris tabular-nums mt-1.5">{{ cobertura.matched }} de {{ cobertura.total }}</p>
@@ -159,7 +157,7 @@
         {# min-h-0 en un hijo flex es necesario para que se achique por debajo
            de su contenido natural: sin esto, el alto fijo del padre no
            alcanza a activar el scroll interno, el contenido lo desborda. #}
-        <div class="flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-1">
+        <div class="flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-1" id="log-actividad">
           {% for e in dashboard.eventos %}
           <div class="text-xs leading-snug pb-2.5 border-b border-borde/60 last:border-0">
             <p class="text-[10px] text-gris tabular-nums">{{ e.creado_en.strftime('%d/%m %H:%M') }}</p>
@@ -206,6 +204,12 @@
     });
     barra.addEventListener('mouseleave', () => tip.classList.add('hidden'));
   });
+
+  // El log ordena lo mas viejo arriba y lo mas nuevo abajo, como un chat:
+  // arranca ya scrolleado al final para que lo ultimo se vea sin que haga
+  // falta bajar a mano.
+  const logActividad = document.getElementById('log-actividad');
+  if (logActividad) logActividad.scrollTop = logActividad.scrollHeight;
 })();
 </script>
 {% endblock %}

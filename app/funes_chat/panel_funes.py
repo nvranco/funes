@@ -132,12 +132,16 @@ async def _timeline(libreria_id: int, hoy: datetime.date) -> list[dict]:
 
 
 async def _eventos(libreria_id: int, limite: int = EVENTOS_LIMITE) -> list[dict]:
-    """Una fila por conversacion que empezo (q1 <> ''), mas recientes primero:
-    o abandono antes de ver un libro, o la recomendacion que "gano" esa
-    conversacion. Cuando hay veredicto, gana el mejor -mismo criterio "la
-    valoracion superior pisa a las inferiores" que usa _timeline()-; cuando
-    ninguna se califico, se muestra la ULTIMA que se le mostro al lector (la
-    de mayor `orden`), que es lo mas parecido a "en que quedo la charla"."""
+    """Una fila por conversacion que empezo (q1 <> ''): o abandono antes de
+    ver un libro, o la recomendacion que "gano" esa conversacion. Cuando hay
+    veredicto, gana el mejor -mismo criterio "la valoracion superior pisa a
+    las inferiores" que usa _timeline()-; cuando ninguna se califico, se
+    muestra la ULTIMA que se le mostro al lector (la de mayor `orden`), que
+    es lo mas parecido a "en que quedo la charla".
+
+    Se trae de la base mas reciente primero (para que el LIMIT recorte las
+    ultimas N y no las primeras N de siempre) y se da vuelta antes de
+    devolver: en pantalla es un log tipo chat, lo ultimo abajo del todo."""
     filas = await db.pool().fetch(
         f"""
         WITH candidatos AS (
@@ -181,4 +185,5 @@ async def _eventos(libreria_id: int, limite: int = EVENTOS_LIMITE) -> list[dict]
             "veredicto_label": label,
             "veredicto_color": color,
         })
+    eventos.reverse()
     return eventos
