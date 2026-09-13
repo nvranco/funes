@@ -130,43 +130,50 @@
     <div class="min-w-0 space-y-6 mt-6 lg:mt-0">
       {# Bateria basica: la misma para todas las librerias. Libros publicados
          es nuevo (existia el dato, cant_libros, pero no tenia tarjeta propia
-         -antes solo se usaba para decidir el estado vacio). #}
-      <div class="grid grid-cols-3 gap-3">
-        <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
-          <p class="text-2xl font-bold flex items-center justify-center gap-1">
-            <span data-contador="{{ cant_libros }}">0</span><span class="text-sm">📖</span>
-          </p>
-          <p class="text-xs text-gris mt-1">{{ et.libro if cant_libros == 1 else et.libros }} publicado{{ 's' if cant_libros != 1 else '' }}</p>
+         -antes solo se usaba para decidir el estado vacio). Catalogo/libros
+         van estirados en su propia fila -son los dos numeros "de fondo" del
+         inventario- y el resto (comportamiento del ciclo) abajo. #}
+      <div>
+        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Resumen</h2>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+            <p class="text-2xl font-bold flex items-center justify-center gap-1">
+              <span data-contador="{{ cant_libros }}">0</span><span class="text-sm">📖</span>
+            </p>
+            <p class="text-xs text-gris mt-1">{{ et.libro if cant_libros == 1 else et.libros }} publicado{{ 's' if cant_libros != 1 else '' }}</p>
+          </div>
+          <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+            <p class="text-2xl font-bold flex items-center justify-center gap-1">
+              <span data-contador="{{ cant_catalogos }}">0</span><span class="text-sm">🗂️</span>
+            </p>
+            <p class="text-xs text-gris mt-1">Catálogo{{ 's' if cant_catalogos != 1 else '' }} publicado{{ 's' if cant_catalogos != 1 else '' }}</p>
+          </div>
         </div>
-        <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
-          <p class="text-2xl font-bold flex items-center justify-center gap-1">
-            <span data-contador="{{ cant_catalogos }}">0</span><span class="text-sm">🗂️</span>
-          </p>
-          <p class="text-xs text-gris mt-1">Catálogo{{ 's' if cant_catalogos != 1 else '' }} publicado{{ 's' if cant_catalogos != 1 else '' }}</p>
+        <div class="grid {{ 'grid-cols-3' if cobertura else 'grid-cols-2' }} gap-3 mt-3">
+          <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+            <p class="text-2xl font-bold flex items-center justify-center gap-1">
+              <span data-contador="{{ vistas_ciclo }}">0</span><span class="text-sm">👀</span>
+            </p>
+            <p class="text-xs text-gris mt-1">Visita{{ 's' if vistas_ciclo != 1 else '' }} registrada{{ 's' if vistas_ciclo != 1 else '' }}</p>
+          </div>
+          <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+            <p class="text-2xl font-bold flex items-center justify-center gap-1">
+              <span data-contador="{{ clics_ciclo }}">0</span><span class="text-sm">💬</span>
+            </p>
+            <p class="text-xs text-gris mt-1">Consulta{{ 's' if clics_ciclo != 1 else '' }} por WhatsApp</p>
+          </div>
+          {% if cobertura %}
+          {# Ampliada: solo con Funes prendido. cobertura.matched es "cuantos
+             de mis libros puede recomendar Funes" (nucleo.cobertura_libreria),
+             no un conteo aparte — mismo numero que ya se ve en el dashboard. #}
+          <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+            <p class="text-2xl font-bold flex items-center justify-center gap-1">
+              <span data-contador="{{ cobertura.matched }}">0</span><span class="text-sm">🔮</span>
+            </p>
+            <p class="text-xs text-gris mt-1">{{ et.libro if cobertura.matched == 1 else et.libros }} recomendado{{ 's' if cobertura.matched != 1 else '' }}</p>
+          </div>
+          {% endif %}
         </div>
-        <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
-          <p class="text-2xl font-bold flex items-center justify-center gap-1">
-            <span data-contador="{{ vistas_ciclo }}">0</span><span class="text-sm">👀</span>
-          </p>
-          <p class="text-xs text-gris mt-1">Visita{{ 's' if vistas_ciclo != 1 else '' }} registrada{{ 's' if vistas_ciclo != 1 else '' }}</p>
-        </div>
-        <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
-          <p class="text-2xl font-bold flex items-center justify-center gap-1">
-            <span data-contador="{{ clics_ciclo }}">0</span><span class="text-sm">💬</span>
-          </p>
-          <p class="text-xs text-gris mt-1">Consulta{{ 's' if clics_ciclo != 1 else '' }} por WhatsApp</p>
-        </div>
-        {% if cobertura %}
-        {# Ampliada: solo con Funes prendido. cobertura.matched es "cuantos
-           de mis libros puede recomendar Funes" (nucleo.cobertura_libreria),
-           no un conteo aparte — mismo numero que ya se ve en el dashboard. #}
-        <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
-          <p class="text-2xl font-bold flex items-center justify-center gap-1">
-            <span data-contador="{{ cobertura.matched }}">0</span><span class="text-sm">🔮</span>
-          </p>
-          <p class="text-xs text-gris mt-1">{{ et.libro if cobertura.matched == 1 else et.libros }} recomendado{{ 's' if cobertura.matched != 1 else '' }}</p>
-        </div>
-        {% endif %}
       </div>
 
       <div class="bg-papel border border-borde rounded-xl2 p-3">
