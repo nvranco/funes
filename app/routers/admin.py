@@ -6,7 +6,7 @@ la ruta existe (decisión D2, aplicada también acá).
 
 import secrets
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, Body, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -22,6 +22,122 @@ templates = Jinja2Templates(directory="app/templates")
 def _validar_token(token: str) -> None:
     if not secrets.compare_digest(token, ADMIN_TOKEN):
         raise HTTPException(status_code=404)
+
+
+# Toda columna que no este aca NO viaja en una sincronizacion, y en el destino
+# queda como estaba (NULL en las nuevas). Mismo listado y misma advertencia que
+# funes/migrar_catalogo_a_railway.py, del que este endpoint es la variante por
+# HTTP: en vez de necesitar una URL de Postgres publica (un proxy TCP nuevo,
+# expuesto a internet) para conectarse directo a la base de Railway, este
+# endpoint corre DENTRO de la app en produccion y escribe en su propia base
+# interna -el catalogo viaja como JSON sobre la conexion HTTPS que la app ya
+# tiene, protegido por el mismo ADMIN_TOKEN que el resto de estas rutas.
+COLUMNAS_CATALOGO = [
+    "id", "titulo", "autor", "abstracto", "embedding_abstracto", "isbn", "fecha_publicacion",
+    "categoria", "genero", "subgenero", "nro_paginas", "confianza_abstracto",
+    "nota", "fuente", "macro", "macro_manual",
+    "sinopsis", "experiencia", "embedding_sinopsis", "embedding_experiencia", "rasgos",
+    "version_reescritura",
+]
+
+
+def _es_recorte_titulo(nuevo: str, viejo: str) -> bool:
+    """Si `nuevo` es `viejo` al que le cortaron el final — mismo guardian que
+    el script de migracion: un titulo curado a mano en destino ("DeMente. El
+    cerebro, un hueso duro de roer") no se deja pisar por una version scrapeada
+    y truncada ("Demente") que venga en el lote."""
+    from app.funes_chat import nucleo
+
+    a, b = nucleo._normalizar_texto(nuevo), nucleo._normalizar_texto(viejo)
+    return bool(a) and b.startswith(a) and len(b) > len(a) + 4
+
+
+@router.post("/admin/{token}/funes/sync-catalogo")
+async def funes_sync_catalogo(token: str, payload: dict = Body(...)):
+    """Aplica un lote de filas de funes_libros por UPSERT (ON CONFLICT DO
+    UPDATE), igual que funes/migrar_catalogo_a_railway.py pero recibiendo el
+    lote en el body en vez de leerlo de otra conexion a Postgres. Pensado para
+    correrse en tandas chicas desde un script local (ver
+    funes/migrar_catalogo_via_endpoint.py) para no mandar un body gigante de
+    una sola vez."""
+    _validar_token(token)
+    libros = payload.get("libros")
+    if not isinstance(libros, list) or not libros:
+        raise HTTPException(status_code=400, detail="Body debe traer {'libros': [...]} con al menos uno.")
+    for l in libros:
+        if not isinstance(l, dict) or not l.get("id"):
+            raise HTTPException(status_code=400, detail="Cada libro necesita al menos 'id'.")
+
+    ids = [l["id"] for l in libros]
+    existentes = {
+        f["id"]: f["titulo"]
+        for f in await db.pool().fetch(
+            "SELECT id, titulo FROM funes_libros WHERE id = ANY($1::text[])", ids
+        )
+    }
+
+    marcadores = ", ".join(f"${i}" for i in range(1, len(COLUMNAS_CATALOGO) + 1))
+    set_ = ", ".join(f"{c} = EXCLUDED.{c}" for c in COLUMNAS_CATALOGO if c != "id")
+    sql = (
+        f"INSERT INTO funes_libros ({', '.join(COLUMNAS_CATALOGO)}) VALUES ({marcadores}) "
+        f"ON CONFLICT (id) DO UPDATE SET {set_}"
+    )
+
+    nuevos = 0
+    preservados = []
+    filas = []
+    for l in libros:
+        id_ = l["id"]
+        titulo_nuevo = l.get("titulo") or ""
+        if id_ in existentes:
+            if _es_recorte_titulo(titulo_nuevo, existentes[id_]):
+                titulo_nuevo = existentes[id_]
+                preservados.append(id_)
+        else:
+            nuevos += 1
+        filas.append(tuple(
+            titulo_nuevo if c == "titulo" else l.get(c) for c in COLUMNAS_CATALOGO
+        ))
+
+    await db.pool().executemany(sql, filas)
+    return {
+        "recibidos": len(libros),
+        "nuevos": nuevos,
+        "actualizados": len(libros) - nuevos,
+        "titulos_preservados": preservados,
+    }
+
+
+@router.get("/admin/{token}/funes/sync-catalogo/estado")
+async def funes_sync_catalogo_estado(token: str):
+    """Resumen para verificar que una sincronizacion impacto bien, sin tener
+    que conectarse a la base directamente."""
+    _validar_token(token)
+    total = await db.pool().fetchval("SELECT count(*) FROM funes_libros")
+    con_abstracto = await db.pool().fetchval(
+        "SELECT count(*) FROM funes_libros WHERE embedding_abstracto IS NOT NULL"
+    )
+    con_sinopsis = await db.pool().fetchval(
+        "SELECT count(*) FROM funes_libros WHERE embedding_sinopsis IS NOT NULL"
+    )
+    con_experiencia = await db.pool().fetchval(
+        "SELECT count(*) FROM funes_libros WHERE embedding_experiencia IS NOT NULL"
+    )
+    por_macro = await db.pool().fetch(
+        "SELECT macro, count(*) n FROM funes_libros GROUP BY 1 ORDER BY 2 DESC"
+    )
+    por_version = await db.pool().fetch(
+        "SELECT COALESCE(version_reescritura, '(sin version)') v, count(*) n "
+        "FROM funes_libros WHERE macro = 'literatura' GROUP BY 1 ORDER BY 2 DESC"
+    )
+    return {
+        "total": total,
+        "con_embedding_abstracto": con_abstracto,
+        "con_embedding_sinopsis": con_sinopsis,
+        "con_embedding_experiencia": con_experiencia,
+        "por_macro": {r["macro"]: r["n"] for r in por_macro},
+        "literatura_por_version": {r["v"]: r["n"] for r in por_version},
+    }
 
 
 async def _listar_librerias():
