@@ -500,3 +500,47 @@ SET embedding_abstracto = NULL, embedding_experiencia = NULL,
 WHERE id IN ('los-extranos-de-m', 'la-gilada', 'educacion-fisica-infantil',
              'ciencia-ficcion-espacio')
   AND embedding_abstracto IS NOT NULL;
+
+-- Migracion v5a de literatura (sept. 2026, ver funes/instructivo_reescritura_v5.md):
+-- de los agentes que reescribieron sinopsis/experiencia libro por libro, 22
+-- terminaron en cuarentena porque no se pudo confirmar con una fuente que
+-- edicion es exactamente cada uno -ISBN cruzado con otro producto, homonimo
+-- real sin forma de desambiguar, o ficha generica sin autor/ISBN-. Mismo
+-- criterio que la exclusion anterior de 4 libros: los embeddings van a NULL,
+-- la fila no se borra.
+UPDATE funes_libros
+SET embedding_abstracto = NULL, embedding_experiencia = NULL,
+    confianza_abstracto = 'baja',
+    nota = CASE id
+        WHEN 'aves' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a un numero de la revista Litoral (antologia de varios autores), no a ''Los pajaros'' de Aristofanes que describe la ficha.'
+        WHEN 'cuentos-perversos' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El titulo lo usan al menos dos obras distintas en espanol (Javier Tomeo/Anagrama, y una compilacion de Gonzalo Marquez Cristo), sin ISBN ni autor en la ficha para desambiguar.'
+        WHEN 'desierto' THEN 'Excluido del recomendador (migracion v5a, cuarentena): La ficha describe ''Desert'' de Le Clezio, pero el ISBN corresponde a un ensayo/manifiesto postecologista anonimo sin relacion.'
+        WHEN 'diccionario-multilingue-ilustrado' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Diccionario visual generico sin autor, editorial ni ISBN: no hay edicion identificable.'
+        WHEN 'educacion-sexual-integral-para-la-inclusion' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Titulo generico de material pedagogico sobre ESI e inclusion, sin ISBN ni autor: hay multiples materiales similares, ninguno identificable con certeza.'
+        WHEN 'el-buscon' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a una adaptacion abreviada para lectores juveniles (Susaeta), no al texto original de Quevedo que describe la ficha.'
+        WHEN 'el-dinero' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a ''El dinero'' de Carl Menger (ensayo economico), no a la novela de Zola que describe la ficha.'
+        WHEN 'el-viy-y-otros-relatos' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a una edicion que solo trae el relato ''El Viy'' de Gogol, no la seleccion de varios relatos que describe la ficha.'
+        WHEN 'electra-edipo-en-colono-ayax' THEN 'Excluido del recomendador (migracion v5a, cuarentena): No existe ninguna edicion publicada que combine exactamente esas tres tragedias de Sofocles; probable ficha cruzada con otro volumen del catalogo.'
+        WHEN 'estoy-solo' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a un libro infantil ilustrado sobre las emociones (coleccion Mis Sentimientos), no a la novela mauritana de Beyrouk que describe la ficha.'
+        WHEN 'la-ley-del-talion' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a un libro de no ficcion sobre un caso real en Palencia (Calleja Ibanez), no a la antologia de ciencia ficcion de Gerard Klein que describe la ficha.'
+        WHEN 'la-tregua' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Homonimo real: el ISBN corresponde a ''La tregua'' de Mario Benedetti, pero el texto de la ficha describe la novela de Primo Levi con el mismo titulo.'
+        WHEN 'las-tecnologias-de-la-informacion-y-la-comunicacion' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Titulo generico de manual educativo sobre TIC, sin ISBN ni autor: circula en multiples ediciones, ninguna identificable con certeza.'
+        WHEN 'notas-de-prensa-i-obra-periodistica-1961-1984' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Primer tomo de una edicion real de Garcia Marquez en dos volumenes (Sudamericana), pero sin forma de confirmar que columnas especificas trae este tomo frente al otro con el mismo ISBN.'
+        WHEN 'notas-de-prensa-ii-obra-periodistica-1961-1984' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Segundo tomo de la misma edicion que el anterior, mismo ISBN, misma imposibilidad de diferenciar contenido entre los dos tomos.'
+        WHEN 'pioneros' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a un libro de cronica futbolistica (''Pioneros: una historia de la Copa America'', Jorge Barraza), no a ''O Pioneers!'' de Willa Cather que describe la ficha.'
+        WHEN 'poemas-escogidos' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a ''Poemas escogidos'' de Eliseo Diego, no a la seleccion de Pedro Salinas que describe la ficha.'
+        WHEN 'terror-y-suspenso' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Antologia de Conan Doyle sin ISBN ni titulo verificable contra ninguna edicion real conocida.'
+        WHEN 'tierra-fantasy' THEN 'Excluido del recomendador (migracion v5a, cuarentena): La propia ficha admite no poder confirmar cual de los volumenes numerados de la antologia corresponde a este ejemplar.'
+        WHEN 'un-relampago' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Pulp de ciencia ficcion francesa (Maurice Limat) real pero sin fuente que confirme el argumento de este titulo puntual.'
+        WHEN 'vida' THEN 'Excluido del recomendador (migracion v5a, cuarentena): La propia ficha admite no poder confirmar la identidad de la autora ni el titulo exacto.'
+        WHEN 'zadig-o-el-destino' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a la antologia de Catedra ''Candido; Micromegas; Zadig'' completa, no a una edicion independiente de Zadig como describe la ficha.'
+    END
+WHERE id IN (
+    'aves', 'cuentos-perversos', 'desierto', 'diccionario-multilingue-ilustrado',
+    'educacion-sexual-integral-para-la-inclusion', 'el-buscon', 'el-dinero',
+    'el-viy-y-otros-relatos', 'electra-edipo-en-colono-ayax', 'estoy-solo',
+    'la-ley-del-talion', 'la-tregua', 'las-tecnologias-de-la-informacion-y-la-comunicacion',
+    'notas-de-prensa-i-obra-periodistica-1961-1984', 'notas-de-prensa-ii-obra-periodistica-1961-1984',
+    'pioneros', 'poemas-escogidos', 'terror-y-suspenso', 'tierra-fantasy',
+    'un-relampago', 'vida', 'zadig-o-el-destino'
+) AND embedding_abstracto IS NOT NULL;
