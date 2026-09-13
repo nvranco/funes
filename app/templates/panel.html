@@ -115,6 +115,16 @@
       </div>
       {% endif %}
     </div>
+
+    {% if eventos_combinados %}
+    {# Debajo de las dos bifurcaciones, en la misma columna -ancho 420px-,
+       no al lado de los indicadores. Titulo afuera de la tarjeta, mismo
+       patron que "Lo que mas funciono" en la columna de al lado. #}
+    <div class="mt-6">
+      <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Actividad</h2>
+      {{ log_actividad(eventos_combinados, TONOS, alto=700, mostrar_titulo=false) }}
+    </div>
+    {% endif %}
     </div>
 
     <div class="min-w-0 space-y-6 mt-6 lg:mt-0">
@@ -217,18 +227,6 @@
     </div>
 
   </div>
-
-  {% if eventos_combinados %}
-  {# Ancho completo y no metido en ninguna de las dos columnas: un solo feed
-     con lo que le pasa al inventario (vistas, busquedas, consultas por
-     WhatsApp) Y a Funes (conversaciones) — el mismo macro que usa el
-     dashboard de Funes, mismo orden tipo chat. Titulo afuera de la tarjeta,
-     mismo patron que "Lo que mas funciono" arriba. #}
-  <div class="mt-6">
-    <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Actividad</h2>
-    {{ log_actividad(eventos_combinados, TONOS, alto=600, mostrar_titulo=false) }}
-  </div>
-  {% endif %}
   </main>
 
   <input id="input-fotos" type="file" accept="image/*" multiple class="hidden">
