@@ -42,12 +42,6 @@ async def calcular(libreria_id: int) -> dict:
         "precision": piloto.proporcion(
             precision["con_acierto"], precision["calificadas"], piloto.UMBRALES["HF-2"]),
         "timeline": timeline,
-        "resumen_semana": {
-            "total": sum(f["total"] for f in timeline),
-            "verdes": sum(f["verdes"] for f in timeline),
-            "amarillas": sum(f["amarillas"] for f in timeline),
-            "rojas": sum(f["rojas"] for f in timeline),
-        },
         "eventos": await _eventos(libreria_id),
     }
 

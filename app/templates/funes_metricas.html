@@ -10,12 +10,82 @@
   (ver panel.html), asi que ahi el diseño es el completo — 4 tarjetas +
   grafico apilado con tooltip.
 
-  Mobile no es el desktop encogido, es una lectura deliberadamente mas chica
-  -numeros grandes sin el aparato de margen/umbral, y una sola linea de texto
-  en vez del grafico, que de entrada es una interaccion de mouse (el tooltip)
-  que no tiene un equivalente tactil directo- por si alguien llega igual (un
-  link compartido, o mientras el boton de entrada no exista en mobile).
+  Mobile no es el desktop encogido: las 4 tarjetas van compactas (numeros
+  grandes sin el aparato de margen/umbral) y el grafico/log son los mismos
+  dos macros de abajo con alturas mas chicas -el tooltip no tiene equivalente
+  tactil, pero el numero ya va arriba de cada barra, asi que la info central
+  sigue accesible sin hover tambien ahi.
 #}
+
+{% macro grafico_calidad(dashboard, TONOS, alto_seccion=380, alto_barras=260) %}
+<section class="bg-papel border border-borde rounded-xl2 p-4 relative grafico-calidad-card" style="height: {{ alto_seccion }}px">
+  <h2 class="text-xs font-bold uppercase tracking-wide text-gris">Calidad</h2>
+  <p class="text-xs text-gris mt-0.5 mb-3">Conversaciones calificadas por día, según la mejor valoración que recibieron</p>
+  {# La grilla es un overlay aparte (pointer-events-none, detrás en el DOM) y
+     no lineas metidas entre las barras: asi no compite con el mousemove que
+     arma el tooltip sobre .barra-dia. #}
+  <div class="relative" style="height: {{ alto_barras }}px">
+    <div class="absolute inset-0 pointer-events-none">
+      {% for pct in (0, 25, 50, 75, 100) %}
+      <div class="absolute left-0 right-0 border-t border-borde/70" style="bottom: {{ pct }}%"></div>
+      {% endfor %}
+    </div>
+    <div class="relative flex items-end justify-between gap-2 h-full">
+      {% for d in dashboard.timeline %}
+      <div class="flex-1 h-full flex flex-col justify-end barra-dia" data-dia="{{ d.dia.strftime('%d/%m') }}"
+           data-verdes="{{ d.verdes }}" data-amarillas="{{ d.amarillas }}" data-rojas="{{ d.rojas }}" data-total="{{ d.total }}">
+        <span class="block text-center text-[10px] text-gris tabular-nums mb-0.5">{{ d.total }}</span>
+        <div class="w-full rounded-t overflow-hidden flex flex-col cursor-default"
+             style="height: {{ d.pct_total }}%; min-height: {{ '3px' if d.total else '0' }}">
+          {% if d.rojas %}<div style="height: {{ d.pct_roja }}%; background: {{ TONOS.rojo }}"></div>{% endif %}
+          {% if d.amarillas %}<div style="height: {{ d.pct_amarilla }}%; background: {{ TONOS.gris }}"></div>{% endif %}
+          {% if d.verdes %}<div style="height: {{ d.pct_verde }}%; background: {{ TONOS.verde }}"></div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="flex justify-between gap-2 mt-1">
+    {% for d in dashboard.timeline %}
+    <span class="flex-1 text-center text-[10px] text-gris">{{ d.dia.strftime('%d/%m') }}</span>
+    {% endfor %}
+  </div>
+  {# Clase y no id: el mismo macro se llama dos veces (mobile y desktop), y
+     un id repetido en la pagina es invalido — el JS de mas abajo recorre
+     .grafico-calidad-card en vez de buscar un id fijo. #}
+  <div class="tooltip-calidad-el hidden absolute z-10 pointer-events-none text-xs rounded-lg px-3 py-2 shadow-lg leading-snug"
+       style="background: rgb(var(--tinta)); color: rgb(var(--papel)); max-width: 220px"></div>
+</section>
+{% endmacro %}
+
+{% macro log_actividad(dashboard, TONOS, alto=380) %}
+<section class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col" style="height: {{ alto }}px">
+  <h2 class="text-xs font-bold uppercase tracking-wide text-gris">Actividad</h2>
+  <p class="text-xs text-gris mt-0.5 mb-3">Lo último que pasó en tus conversaciones</p>
+  {# min-h-0 en un hijo flex es necesario para que se achique por debajo de su
+     contenido natural: sin esto, el alto fijo del padre no alcanza a activar
+     el scroll interno, el contenido lo desborda. #}
+  <div class="flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-1 log-actividad-scroll">
+    {% for e in dashboard.eventos %}
+    <div class="text-xs leading-snug pb-2.5 border-b border-borde/60 last:border-0">
+      <p class="text-[10px] text-gris tabular-nums">{{ e.creado_en.strftime('%d/%m %H:%M') }}</p>
+      {% if e.tipo == 'abandono' %}
+      <p>Un lector inició una conversación con Funes pero la abandonó antes de recibir una recomendación.</p>
+      {% else %}
+      <p>
+        Funes le recomendó a un lector <em>{{ e.titulo }}</em>{% if e.autor %} de <em>{{ e.autor }}</em>{% endif -%}
+        {%- if e.veredicto_label %} y éste la valoró como
+        <span style="color: {{ TONOS[e.veredicto_color] }}" class="font-medium">{{ e.veredicto_label }}</span>
+        {%- endif %}.
+      </p>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="text-xs text-gris">Todavía no hay actividad para mostrar.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endmacro %}
 
 {% block contenido %}
 <header class="bg-celeste">
@@ -68,17 +138,8 @@
         <p class="text-xs text-gris mt-1">Catálogo cubierto</p>
       </div>
     </div>
-    <p class="text-sm text-gris text-center leading-snug">
-      {% if dashboard.resumen_semana.total == 0 %}
-        Esta semana todavía no hubo conversaciones calificadas.
-      {% else %}
-        Esta semana: <strong class="text-texto-papel">{{ dashboard.resumen_semana.total }}</strong>
-        {{ 'conversación' if dashboard.resumen_semana.total == 1 else 'conversaciones' }} calificada{{ 's' if dashboard.resumen_semana.total != 1 else '' }}
-        — {{ dashboard.resumen_semana.verdes }} precisa{{ 's' if dashboard.resumen_semana.verdes != 1 else '' }},
-        {{ dashboard.resumen_semana.amarillas }} dudosa{{ 's' if dashboard.resumen_semana.amarillas != 1 else '' }},
-        {{ dashboard.resumen_semana.rojas }} floja{{ 's' if dashboard.resumen_semana.rojas != 1 else '' }}.
-      {% endif %}
-    </p>
+    {{ grafico_calidad(dashboard, TONOS, alto_seccion=280, alto_barras=140) }}
+    {{ log_actividad(dashboard, TONOS, alto=280) }}
   </div>
 
   {# ————— Desktop: completa ————— #}
@@ -118,68 +179,8 @@
        para forzar el scroll interno del log. Con las dos en el mismo alto
        explícito, el que se pasa simplemente scrollea (overflow-y-auto). #}
     <div class="grid grid-cols-2 gap-4">
-      <section class="bg-papel border border-borde rounded-xl2 p-4 relative" id="grafico-calidad" style="height: 380px">
-        <h2 class="text-xs font-bold uppercase tracking-wide text-gris">Calidad</h2>
-        <p class="text-xs text-gris mt-0.5 mb-3">Conversaciones calificadas por día, según la mejor valoración que recibieron</p>
-        {# La grilla es un overlay aparte (pointer-events-none, detrás en el
-           DOM) y no lineas metidas entre las barras: asi no compite con el
-           mousemove que arma el tooltip sobre .barra-dia. #}
-        <div class="relative" style="height: 260px">
-          <div class="absolute inset-0 pointer-events-none">
-            {% for pct in (0, 25, 50, 75, 100) %}
-            <div class="absolute left-0 right-0 border-t border-borde/70" style="bottom: {{ pct }}%"></div>
-            {% endfor %}
-          </div>
-          <div class="relative flex items-end justify-between gap-2 h-full">
-            {% for d in dashboard.timeline %}
-            <div class="flex-1 h-full flex flex-col justify-end barra-dia" data-dia="{{ d.dia.strftime('%d/%m') }}"
-                 data-verdes="{{ d.verdes }}" data-amarillas="{{ d.amarillas }}" data-rojas="{{ d.rojas }}" data-total="{{ d.total }}">
-              <span class="block text-center text-[10px] text-gris tabular-nums mb-0.5">{{ d.total }}</span>
-              <div class="w-full rounded-t overflow-hidden flex flex-col cursor-default"
-                   style="height: {{ d.pct_total }}%; min-height: {{ '3px' if d.total else '0' }}">
-                {% if d.rojas %}<div style="height: {{ d.pct_roja }}%; background: {{ TONOS.rojo }}"></div>{% endif %}
-                {% if d.amarillas %}<div style="height: {{ d.pct_amarilla }}%; background: {{ TONOS.gris }}"></div>{% endif %}
-                {% if d.verdes %}<div style="height: {{ d.pct_verde }}%; background: {{ TONOS.verde }}"></div>{% endif %}
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-        <div class="flex justify-between gap-2 mt-1">
-          {% for d in dashboard.timeline %}
-          <span class="flex-1 text-center text-[10px] text-gris">{{ d.dia.strftime('%d/%m') }}</span>
-          {% endfor %}
-        </div>
-        <div id="tooltip-calidad" class="hidden absolute z-10 pointer-events-none text-xs rounded-lg px-3 py-2 shadow-lg leading-snug"
-             style="background: rgb(var(--tinta)); color: rgb(var(--papel)); max-width: 220px"></div>
-      </section>
-
-      <section class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col" style="height: 380px">
-        <h2 class="text-xs font-bold uppercase tracking-wide text-gris">Actividad</h2>
-        <p class="text-xs text-gris mt-0.5 mb-3">Lo último que pasó en tus conversaciones</p>
-        {# min-h-0 en un hijo flex es necesario para que se achique por debajo
-           de su contenido natural: sin esto, el alto fijo del padre no
-           alcanza a activar el scroll interno, el contenido lo desborda. #}
-        <div class="flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-1" id="log-actividad">
-          {% for e in dashboard.eventos %}
-          <div class="text-xs leading-snug pb-2.5 border-b border-borde/60 last:border-0">
-            <p class="text-[10px] text-gris tabular-nums">{{ e.creado_en.strftime('%d/%m %H:%M') }}</p>
-            {% if e.tipo == 'abandono' %}
-            <p>Un lector inició una conversación con Funes pero la abandonó antes de recibir una recomendación.</p>
-            {% else %}
-            <p>
-              Funes le recomendó a un lector <em>{{ e.titulo }}</em>{% if e.autor %} de <em>{{ e.autor }}</em>{% endif -%}
-              {%- if e.veredicto_label %} y éste la valoró como
-              <span style="color: {{ TONOS[e.veredicto_color] }}" class="font-medium">{{ e.veredicto_label }}</span>
-              {%- endif %}.
-            </p>
-            {% endif %}
-          </div>
-          {% else %}
-          <p class="text-xs text-gris">Todavía no hay actividad para mostrar.</p>
-          {% endfor %}
-        </div>
-      </section>
+      {{ grafico_calidad(dashboard, TONOS, alto_seccion=380, alto_barras=260) }}
+      {{ log_actividad(dashboard, TONOS, alto=380) }}
     </div>
   </div>
 </div>
@@ -187,32 +188,36 @@
 <script>
 (function () {
   const TONOS = { verde: "{{ TONOS.verde }}", amarilla: "{{ TONOS.gris }}", roja: "{{ TONOS.rojo }}" };
-  const cont = document.getElementById('grafico-calidad');
-  const tip = document.getElementById('tooltip-calidad');
-  if (!cont) return;
-  cont.querySelectorAll('.barra-dia').forEach((barra) => {
-    barra.addEventListener('mousemove', (ev) => {
-      const total = Number(barra.dataset.total);
-      const dia = barra.dataset.dia;
-      tip.innerHTML = total === 0
-        ? `<strong>${dia}</strong><br>Sin conversaciones calificadas`
-        : `<strong>${dia}</strong> · ${total} conversación${total === 1 ? '' : 'es'}<br>` +
-          `<span style="color:${TONOS.verde}">●</span> ${barra.dataset.verdes} precisa${barra.dataset.verdes == 1 ? '' : 's'}` +
-          ` · <span style="color:${TONOS.amarilla}">●</span> ${barra.dataset.amarillas} dudosa${barra.dataset.amarillas == 1 ? '' : 's'}` +
-          ` · <span style="color:${TONOS.roja}">●</span> ${barra.dataset.rojas} floja${barra.dataset.rojas == 1 ? '' : 's'}`;
-      const rect = cont.getBoundingClientRect();
-      tip.style.left = Math.min(ev.clientX - rect.left + 12, rect.width - 230) + 'px';
-      tip.style.top = Math.max(ev.clientY - rect.top - 8, 0) + 'px';
-      tip.classList.remove('hidden');
+
+  // El mismo macro de grafico se usa dos veces (mobile y desktop), asi que
+  // se recorre por clase y no por id -cada tarjeta arma su propio tooltip.
+  document.querySelectorAll('.grafico-calidad-card').forEach((cont) => {
+    const tip = cont.querySelector('.tooltip-calidad-el');
+    cont.querySelectorAll('.barra-dia').forEach((barra) => {
+      barra.addEventListener('mousemove', (ev) => {
+        const total = Number(barra.dataset.total);
+        const dia = barra.dataset.dia;
+        tip.innerHTML = total === 0
+          ? `<strong>${dia}</strong><br>Sin conversaciones calificadas`
+          : `<strong>${dia}</strong> · ${total} ${total === 1 ? 'conversación' : 'conversaciones'}<br>` +
+            `<span style="color:${TONOS.verde}">●</span> ${barra.dataset.verdes} precisa${barra.dataset.verdes == 1 ? '' : 's'}` +
+            ` · <span style="color:${TONOS.amarilla}">●</span> ${barra.dataset.amarillas} dudosa${barra.dataset.amarillas == 1 ? '' : 's'}` +
+            ` · <span style="color:${TONOS.roja}">●</span> ${barra.dataset.rojas} floja${barra.dataset.rojas == 1 ? '' : 's'}`;
+        const rect = cont.getBoundingClientRect();
+        tip.style.left = Math.min(ev.clientX - rect.left + 12, rect.width - 230) + 'px';
+        tip.style.top = Math.max(ev.clientY - rect.top - 8, 0) + 'px';
+        tip.classList.remove('hidden');
+      });
+      barra.addEventListener('mouseleave', () => tip.classList.add('hidden'));
     });
-    barra.addEventListener('mouseleave', () => tip.classList.add('hidden'));
   });
 
   // El log ordena lo mas viejo arriba y lo mas nuevo abajo, como un chat:
   // arranca ya scrolleado al final para que lo ultimo se vea sin que haga
-  // falta bajar a mano.
-  const logActividad = document.getElementById('log-actividad');
-  if (logActividad) logActividad.scrollTop = logActividad.scrollHeight;
+  // falta bajar a mano. Mismo motivo de clase-y-no-id que el grafico.
+  document.querySelectorAll('.log-actividad-scroll').forEach((log) => {
+    log.scrollTop = log.scrollHeight;
+  });
 })();
 </script>
 {% endblock %}
