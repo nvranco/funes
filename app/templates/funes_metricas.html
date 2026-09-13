@@ -89,10 +89,10 @@
       </div>
       {{ tarjeta('Finalización', 'Terminan la conversación',
                  'De los que contestaron la primera pregunta, cuántos vieron un libro',
-                 dashboard.finalizacion, mostrar_barra=false, mostrar_margen=false, usar_color=false) }}
+                 dashboard.finalizacion, mostrar_barra=false, mostrar_margen=false, usar_color=false, mostrar_umbral=false) }}
       {{ tarjeta('Precisión', 'Llegan a un libro que sirve',
                  'De las conversaciones calificadas, cuántas llegaron a un acierto',
-                 dashboard.precision, mostrar_barra=false, mostrar_margen=false, usar_color=false) }}
+                 dashboard.precision, mostrar_barra=false, mostrar_margen=false, usar_color=false, mostrar_umbral=false) }}
       <div class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col">
         <p class="text-xs font-bold uppercase tracking-wide text-gris">Cobertura</p>
         <p class="text-base font-semibold mt-1 leading-tight">Funes conoce tu catálogo</p>

@@ -13,12 +13,12 @@
 {% set TONOS = {'verde': 'rgb(122 158 120)', 'rojo': 'rgb(190 110 85)',
                 'gris': 'rgb(180 165 140)', 'sin_datos': 'rgb(200 190 175)'} %}
 
-{% macro tarjeta(id, titulo, pregunta, dato, nota='', viejos=0, mostrar_barra=true, mostrar_margen=true, usar_color=true) -%}
+{% macro tarjeta(id, titulo, pregunta, dato, nota='', viejos=0, mostrar_barra=true, mostrar_margen=true, usar_color=true, mostrar_umbral=true) -%}
   {% set tono = TONOS[dato.estado] if usar_color else 'inherit' %}
   <div class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col">
     <div class="flex items-baseline justify-between gap-2">
       <p class="text-xs font-bold uppercase tracking-wide text-gris">{{ id }}</p>
-      {% if dato.umbral %}
+      {% if dato.umbral and mostrar_umbral %}
         <p class="text-xs text-gris tabular-nums">≥ {{ (dato.umbral * 100)|int }}%</p>
       {% endif %}
     </div>
