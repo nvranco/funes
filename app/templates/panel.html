@@ -211,19 +211,24 @@
       </div>
       {% endif %}
 
-      {% if eventos_combinados %}
-      {# Ampliada: un solo feed con lo que le pasa al inventario (vistas,
-         busquedas, consultas por WhatsApp) Y a Funes (conversaciones) — el
-         mismo macro que usa el dashboard de Funes, mismo orden tipo chat. #}
-      {{ log_actividad(eventos_combinados, TONOS, alto=400, bajada='Lo último que pasó en tu librería') }}
-      {% endif %}
-
       <p class="text-xs text-center lg:text-left">
         <a href="{{ url_metricas }}" class="text-celeste font-medium underline underline-offset-2">Ver historial completo →</a>
       </p>
     </div>
 
   </div>
+
+  {% if eventos_combinados %}
+  {# Ancho completo y no metido en ninguna de las dos columnas: un solo feed
+     con lo que le pasa al inventario (vistas, busquedas, consultas por
+     WhatsApp) Y a Funes (conversaciones) — el mismo macro que usa el
+     dashboard de Funes, mismo orden tipo chat. Titulo afuera de la tarjeta,
+     mismo patron que "Lo que mas funciono" arriba. #}
+  <div class="mt-6">
+    <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Actividad</h2>
+    {{ log_actividad(eventos_combinados, TONOS, alto=600, mostrar_titulo=false) }}
+  </div>
+  {% endif %}
   </main>
 
   <input id="input-fotos" type="file" accept="image/*" multiple class="hidden">

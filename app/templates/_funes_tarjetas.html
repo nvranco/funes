@@ -113,10 +113,12 @@
    cual. El panel del librero le suma eventos de catalogo (vista/busqueda/
    clic_whatsapp) con origen='inventario' y payload crudo de la tabla
    `eventos`, para un solo feed combinado. #}
-{% macro log_actividad(eventos, TONOS, alto=380, bajada='Lo último que pasó en tus conversaciones') %}
+{% macro log_actividad(eventos, TONOS, alto=380, bajada='Lo último que pasó en tus conversaciones', mostrar_titulo=true) %}
 <section class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col" style="height: {{ alto }}px">
+  {% if mostrar_titulo %}
   <h2 class="text-xs font-bold uppercase tracking-wide text-gris">Actividad</h2>
-  <p class="text-xs text-gris mt-0.5 mb-3">{{ bajada }}</p>
+  {% if bajada %}<p class="text-xs text-gris mt-0.5 mb-3">{{ bajada }}</p>{% endif %}
+  {% endif %}
   {# min-h-0 en un hijo flex es necesario para que se achique por debajo de su
      contenido natural: sin esto, el alto fijo del padre no alcanza a activar
      el scroll interno, el contenido lo desborda. #}
