@@ -176,31 +176,39 @@
         </div>
       </div>
 
-      <div class="bg-papel border border-borde rounded-xl2 p-3">
-        <div class="flex items-end justify-between gap-1" style="height: 56px;">
-          {% for d in visitas_semana %}
-          <div class="flex-1 flex flex-col items-center justify-end h-full gap-1">
-            <span class="text-[10px] text-gris">{{ d.cant }}</span>
-            <div class="w-full bg-celeste rounded-t" style="height: {{ d.pct }}%; min-height: 3px;"></div>
+      <div>
+        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Visitas</h2>
+        <div class="bg-papel border border-borde rounded-xl2 p-3">
+          <div class="flex items-end justify-between gap-1" style="height: 56px;">
+            {% for d in visitas_semana %}
+            <div class="flex-1 flex flex-col items-center justify-end h-full gap-1">
+              <span class="text-[10px] text-gris">{{ d.cant }}</span>
+              <div class="w-full bg-celeste rounded-t" style="height: {{ d.pct }}%; min-height: 3px;"></div>
+            </div>
+            {% endfor %}
           </div>
-          {% endfor %}
+          <div class="flex justify-between gap-1 mt-1">
+            {% for d in visitas_semana %}
+            {# Hoy/Ayer para los dos ultimos dias, mismo criterio que el
+               grafico de Calidad -se leen de un vistazo, sin restar fechas. #}
+            <span class="flex-1 text-center text-[10px] text-gris">{{ 'Hoy' if loop.last else ('Ayer' if loop.revindex == 2 else d.dia_corto) }}</span>
+            {% endfor %}
+          </div>
+          <p class="text-sm text-gris mt-3 pt-3 border-t border-borde">
+            Hubo <span class="font-semibold text-texto-papel">{{ total_semana }}</span>
+            visita{{ 's' if total_semana != 1 else '' }} 👀 al catálogo en la última semana.
+          </p>
         </div>
-        <div class="flex justify-between gap-1 mt-1">
-          {% for d in visitas_semana %}
-          <span class="flex-1 text-center text-[10px] text-gris">{{ d.dia_corto }}</span>
-          {% endfor %}
-        </div>
-        <p class="text-sm text-gris mt-3 pt-3 border-t border-borde">
-          Hubo <span class="font-semibold text-texto-papel">{{ total_semana }}</span>
-          visita{{ 's' if total_semana != 1 else '' }} 👀 al catálogo en la última semana.
-        </p>
       </div>
 
       {% if dashboard_funes %}
       {# Ampliada: el mismo grafico de "calidad de la semana" del dashboard
          de Funes, al lado del de visitas de arriba para que se puedan
          comparar las dos señales del ciclo actual. #}
-      {{ grafico_calidad(dashboard_funes, TONOS, alto_barras=160) }}
+      <div>
+        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Calidad</h2>
+        {{ grafico_calidad(dashboard_funes, TONOS, alto_barras=160, mostrar_titulo=false) }}
+      </div>
       {% endif %}
 
       {% if top_catalogos %}

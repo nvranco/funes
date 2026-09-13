@@ -64,11 +64,13 @@
    la tarjeta de Actividad de al lado (grid-cols-2, desktop); en mobile y en
    el panel del librero (una sola columna, nada al lado con que igualar) se
    deja sin pisar y la tarjeta toma su alto natural. #}
-{% macro grafico_calidad(dashboard, TONOS, alto_seccion=none, alto_barras=260) %}
+{% macro grafico_calidad(dashboard, TONOS, alto_seccion=none, alto_barras=260, mostrar_titulo=true) %}
 <section class="bg-papel border border-borde rounded-xl2 p-4 relative grafico-calidad-card"
          {% if alto_seccion %}style="height: {{ alto_seccion }}px"{% endif %}>
+  {% if mostrar_titulo %}
   <h2 class="text-xs font-bold uppercase tracking-wide text-gris">Calidad</h2>
   <p class="text-xs text-gris mt-0.5 mb-3">Conversaciones calificadas por día, según la mejor valoración que recibieron</p>
+  {% endif %}
   {# La grilla es un overlay aparte (pointer-events-none, detrás en el DOM) y
      no lineas metidas entre las barras: asi no compite con el mousemove que
      arma el tooltip sobre .barra-dia. #}
@@ -80,7 +82,10 @@
     </div>
     <div class="relative flex items-end justify-between gap-2 h-full">
       {% for d in dashboard.timeline %}
-      <div class="flex-1 h-full flex flex-col justify-end barra-dia" data-dia="{{ d.dia.strftime('%d/%m') }}"
+      {# Hoy/Ayer en vez de la fecha para los dos ultimos dias: son los que se
+         leen de un vistazo sin tener que restar contra la fecha de hoy. #}
+      {% set etiqueta_dia = 'Hoy' if loop.last else ('Ayer' if loop.revindex == 2 else d.dia.strftime('%d/%m')) %}
+      <div class="flex-1 h-full flex flex-col justify-end barra-dia" data-dia="{{ etiqueta_dia }}"
            data-verdes="{{ d.verdes }}" data-amarillas="{{ d.amarillas }}" data-rojas="{{ d.rojas }}" data-total="{{ d.total }}">
         <span class="block text-center text-[10px] text-gris tabular-nums mb-0.5">{{ d.total }}</span>
         <div class="w-full rounded-t overflow-hidden flex flex-col cursor-default"
@@ -95,9 +100,16 @@
   </div>
   <div class="flex justify-between gap-2 mt-1">
     {% for d in dashboard.timeline %}
-    <span class="flex-1 text-center text-[10px] text-gris">{{ d.dia.strftime('%d/%m') }}</span>
+    <span class="flex-1 text-center text-[10px] text-gris">{{ 'Hoy' if loop.last else ('Ayer' if loop.revindex == 2 else d.dia.strftime('%d/%m')) }}</span>
     {% endfor %}
   </div>
+  {# Mismo patron que el resumen de visitas del panel: el total no reemplaza
+     al detalle diario, lo completa -de un vistazo, sin sumar barra por barra. #}
+  {% set total_semana = dashboard.timeline | sum(attribute='total') %}
+  <p class="text-sm text-gris mt-3 pt-3 border-t border-borde">
+    Hubo <span class="font-semibold text-texto-papel">{{ total_semana }}</span>
+    {{ 'recomendación' if total_semana == 1 else 'recomendaciones' }} calificada{{ 's' if total_semana != 1 else '' }} 🔮 en la última semana.
+  </p>
   {# Clase y no id: este macro se puede llamar mas de una vez en la misma
      pagina (mobile y desktop del dashboard), y un id repetido es invalido —
      el JS de cada pagina recorre .grafico-calidad-card en vez de un id fijo. #}
