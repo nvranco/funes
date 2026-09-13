@@ -178,8 +178,11 @@
 
       <div>
         <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Visitas</h2>
-        <div class="bg-papel border border-borde rounded-xl2 p-3">
-          <div class="flex items-end justify-between gap-1" style="height: 56px;">
+        {# Mismo alto fijo que Calidad de al lado (alto_seccion=260 en su
+           macro): las dos tarjetas terminan de llenar el espacio que le
+           sobraba a esta columna contra la de Actividad. #}
+        <div class="bg-papel border border-borde rounded-xl2 p-3 flex flex-col" style="height: 260px">
+          <div class="flex-1 flex items-end justify-between gap-1">
             {% for d in visitas_semana %}
             <div class="flex-1 flex flex-col items-center justify-end h-full gap-1">
               <span class="text-[10px] text-gris">{{ d.cant }}</span>
@@ -207,7 +210,7 @@
          comparar las dos señales del ciclo actual. #}
       <div>
         <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Calidad</h2>
-        {{ grafico_calidad(dashboard_funes, TONOS, alto_barras=160, mostrar_titulo=false) }}
+        {{ grafico_calidad(dashboard_funes, TONOS, alto_seccion=260, alto_barras=160, mostrar_titulo=false, mostrar_grilla=false) }}
       </div>
       {% endif %}
 

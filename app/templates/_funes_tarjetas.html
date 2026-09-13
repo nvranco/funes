@@ -64,7 +64,7 @@
    la tarjeta de Actividad de al lado (grid-cols-2, desktop); en mobile y en
    el panel del librero (una sola columna, nada al lado con que igualar) se
    deja sin pisar y la tarjeta toma su alto natural. #}
-{% macro grafico_calidad(dashboard, TONOS, alto_seccion=none, alto_barras=260, mostrar_titulo=true) %}
+{% macro grafico_calidad(dashboard, TONOS, alto_seccion=none, alto_barras=260, mostrar_titulo=true, mostrar_grilla=true) %}
 <section class="bg-papel border border-borde rounded-xl2 p-4 relative grafico-calidad-card"
          {% if alto_seccion %}style="height: {{ alto_seccion }}px"{% endif %}>
   {% if mostrar_titulo %}
@@ -75,11 +75,13 @@
      no lineas metidas entre las barras: asi no compite con el mousemove que
      arma el tooltip sobre .barra-dia. #}
   <div class="relative" style="height: {{ alto_barras }}px">
+    {% if mostrar_grilla %}
     <div class="absolute inset-0 pointer-events-none">
       {% for pct in (0, 25, 50, 75, 100) %}
       <div class="absolute left-0 right-0 border-t border-borde/70" style="bottom: {{ pct }}%"></div>
       {% endfor %}
     </div>
+    {% endif %}
     <div class="relative flex items-end justify-between gap-2 h-full">
       {% for d in dashboard.timeline %}
       {# Hoy/Ayer en vez de la fecha para los dos ultimos dias: son los que se
