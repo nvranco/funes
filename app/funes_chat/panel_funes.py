@@ -18,6 +18,17 @@ from app import db
 from app.funes_chat import piloto
 
 DIAS_TIMELINE = 7
+EVENTOS_LIMITE = 60
+
+# Mismas etiquetas que ve el lector en el chat (funes_chat.html), no los
+# valores viejos de columna - ver el comentario de alla sobre el cambio de
+# "Me la llevo" a "Precisa". La clave de color es la del dict TONOS
+# (_funes_tarjetas.html).
+_ETIQUETAS_VEREDICTO = {
+    "me_la_llevo": ("Precisa", "verde"),
+    "puede_ser": ("Dudosa", "gris"),
+    "no_me_interesa": ("Floja", "rojo"),
+}
 
 
 async def calcular(libreria_id: int) -> dict:
@@ -37,6 +48,7 @@ async def calcular(libreria_id: int) -> dict:
             "amarillas": sum(f["amarillas"] for f in timeline),
             "rojas": sum(f["rojas"] for f in timeline),
         },
+        "eventos": await _eventos(libreria_id),
     }
 
 
@@ -117,3 +129,56 @@ async def _timeline(libreria_id: int, hoy: datetime.date) -> list[dict]:
         f["pct_amarilla"] = round(f["amarillas"] / f["total"] * 100, 1) if f["total"] else 0
         f["pct_roja"] = round(f["rojas"] / f["total"] * 100, 1) if f["total"] else 0
     return crudos
+
+
+async def _eventos(libreria_id: int, limite: int = EVENTOS_LIMITE) -> list[dict]:
+    """Una fila por conversacion que empezo (q1 <> ''), mas recientes primero:
+    o abandono antes de ver un libro, o la recomendacion que "gano" esa
+    conversacion. Cuando hay veredicto, gana el mejor -mismo criterio "la
+    valoracion superior pisa a las inferiores" que usa _timeline()-; cuando
+    ninguna se califico, se muestra la ULTIMA que se le mostro al lector (la
+    de mayor `orden`), que es lo mas parecido a "en que quedo la charla"."""
+    filas = await db.pool().fetch(
+        f"""
+        WITH candidatos AS (
+            SELECT r.sesion_id, r.titulo, r.autor, r.veredicto,
+                   row_number() OVER (
+                       PARTITION BY r.sesion_id
+                       ORDER BY
+                           CASE r.veredicto WHEN 'me_la_llevo' THEN 2
+                                            WHEN 'puede_ser' THEN 1
+                                            WHEN 'no_me_interesa' THEN 0
+                                            ELSE -1 END DESC,
+                           r.orden DESC
+                   ) AS rn
+            FROM funes_recomendaciones r
+            JOIN funes_sesiones s ON s.id = r.sesion_id
+            WHERE s.libreria_id = $1
+        )
+        SELECT (s.creado_en AT TIME ZONE '{piloto.ZONA}') AS creado_en,
+               EXISTS (SELECT 1 FROM funes_recomendaciones r2 WHERE r2.sesion_id = s.id)
+                   AS con_recomendacion,
+               c.titulo, c.autor, c.veredicto
+        FROM funes_sesiones s
+        LEFT JOIN candidatos c ON c.sesion_id = s.id AND c.rn = 1
+        WHERE s.libreria_id = $1 AND s.q1 <> ''
+        ORDER BY s.creado_en DESC
+        LIMIT $2
+        """,
+        libreria_id, limite,
+    )
+    eventos = []
+    for f in filas:
+        if not f["con_recomendacion"]:
+            eventos.append({"tipo": "abandono", "creado_en": f["creado_en"]})
+            continue
+        label, color = _ETIQUETAS_VEREDICTO.get(f["veredicto"], (None, None))
+        eventos.append({
+            "tipo": "recomendacion",
+            "creado_en": f["creado_en"],
+            "titulo": f["titulo"],
+            "autor": f["autor"],
+            "veredicto_label": label,
+            "veredicto_color": color,
+        })
+    return eventos
