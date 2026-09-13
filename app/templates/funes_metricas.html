@@ -91,10 +91,10 @@
       </div>
       {{ tarjeta('Finalización', 'Terminan la conversación',
                  'De los que contestaron la primera pregunta, cuántos vieron un libro',
-                 dashboard.finalizacion) }}
+                 dashboard.finalizacion, mostrar_barra=false) }}
       {{ tarjeta('Precisión', 'Llegan a un libro que sirve',
                  'De las conversaciones calificadas, cuántas llegaron a un acierto',
-                 dashboard.precision) }}
+                 dashboard.precision, mostrar_barra=false) }}
       <div class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col">
         <p class="text-xs font-bold uppercase tracking-wide text-gris">Cobertura</p>
         <p class="text-base font-semibold mt-1 leading-tight">Funes conoce tu catálogo</p>
@@ -117,21 +117,32 @@
        para forzar el scroll interno del log. Con las dos en el mismo alto
        explícito, el que se pasa simplemente scrollea (overflow-y-auto). #}
     <div class="grid grid-cols-2 gap-4">
-      <section class="bg-papel border border-borde rounded-xl2 p-4 relative" id="grafico-calidad" style="height: 260px">
+      <section class="bg-papel border border-borde rounded-xl2 p-4 relative" id="grafico-calidad" style="height: 380px">
         <h2 class="text-xs font-bold uppercase tracking-wide text-gris">Calidad de la semana</h2>
         <p class="text-xs text-gris mt-0.5 mb-3">Conversaciones calificadas por día, según la mejor valoración que recibieron</p>
-        <div class="flex items-end justify-between gap-2" style="height: 140px">
-          {% for d in dashboard.timeline %}
-          <div class="flex-1 h-full flex flex-col justify-end barra-dia" data-dia="{{ d.dia.strftime('%d/%m') }}"
-               data-verdes="{{ d.verdes }}" data-amarillas="{{ d.amarillas }}" data-rojas="{{ d.rojas }}" data-total="{{ d.total }}">
-            <div class="w-full rounded-t overflow-hidden flex flex-col cursor-default"
-                 style="height: {{ d.pct_total }}%; min-height: {{ '3px' if d.total else '0' }}">
-              {% if d.rojas %}<div style="height: {{ d.pct_roja }}%; background: {{ TONOS.rojo }}"></div>{% endif %}
-              {% if d.amarillas %}<div style="height: {{ d.pct_amarilla }}%; background: {{ TONOS.gris }}"></div>{% endif %}
-              {% if d.verdes %}<div style="height: {{ d.pct_verde }}%; background: {{ TONOS.verde }}"></div>{% endif %}
-            </div>
+        {# La grilla es un overlay aparte (pointer-events-none, detrás en el
+           DOM) y no lineas metidas entre las barras: asi no compite con el
+           mousemove que arma el tooltip sobre .barra-dia. #}
+        <div class="relative" style="height: 260px">
+          <div class="absolute inset-0 pointer-events-none">
+            {% for pct in (0, 25, 50, 75, 100) %}
+            <div class="absolute left-0 right-0 border-t border-borde/70" style="bottom: {{ pct }}%"></div>
+            {% endfor %}
           </div>
-          {% endfor %}
+          <div class="relative flex items-end justify-between gap-2 h-full">
+            {% for d in dashboard.timeline %}
+            <div class="flex-1 h-full flex flex-col justify-end barra-dia" data-dia="{{ d.dia.strftime('%d/%m') }}"
+                 data-verdes="{{ d.verdes }}" data-amarillas="{{ d.amarillas }}" data-rojas="{{ d.rojas }}" data-total="{{ d.total }}">
+              <span class="block text-center text-[10px] text-gris tabular-nums mb-0.5">{{ d.total }}</span>
+              <div class="w-full rounded-t overflow-hidden flex flex-col cursor-default"
+                   style="height: {{ d.pct_total }}%; min-height: {{ '3px' if d.total else '0' }}">
+                {% if d.rojas %}<div style="height: {{ d.pct_roja }}%; background: {{ TONOS.rojo }}"></div>{% endif %}
+                {% if d.amarillas %}<div style="height: {{ d.pct_amarilla }}%; background: {{ TONOS.gris }}"></div>{% endif %}
+                {% if d.verdes %}<div style="height: {{ d.pct_verde }}%; background: {{ TONOS.verde }}"></div>{% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
         </div>
         <div class="flex justify-between gap-2 mt-1">
           {% for d in dashboard.timeline %}
@@ -142,7 +153,7 @@
              style="background: rgb(var(--tinta)); color: rgb(var(--papel)); max-width: 220px"></div>
       </section>
 
-      <section class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col" style="height: 260px">
+      <section class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col" style="height: 380px">
         <h2 class="text-xs font-bold uppercase tracking-wide text-gris">Actividad</h2>
         <p class="text-xs text-gris mt-0.5 mb-3">Lo último que pasó en tus conversaciones</p>
         {# min-h-0 en un hijo flex es necesario para que se achique por debajo
@@ -150,7 +161,7 @@
            alcanza a activar el scroll interno, el contenido lo desborda. #}
         <div class="flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-1">
           {% for e in dashboard.eventos %}
-          <div class="text-sm leading-snug pb-2.5 border-b border-borde/60 last:border-0">
+          <div class="text-xs leading-snug pb-2.5 border-b border-borde/60 last:border-0">
             <p class="text-[10px] text-gris tabular-nums">{{ e.creado_en.strftime('%d/%m %H:%M') }}</p>
             {% if e.tipo == 'abandono' %}
             <p>Un lector inició una conversación con Funes pero la abandonó antes de recibir una recomendación.</p>
@@ -164,7 +175,7 @@
             {% endif %}
           </div>
           {% else %}
-          <p class="text-sm text-gris">Todavía no hay actividad para mostrar.</p>
+          <p class="text-xs text-gris">Todavía no hay actividad para mostrar.</p>
           {% endfor %}
         </div>
       </section>

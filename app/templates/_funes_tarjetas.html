@@ -13,7 +13,7 @@
 {% set TONOS = {'verde': 'rgb(122 158 120)', 'rojo': 'rgb(190 110 85)',
                 'gris': 'rgb(180 165 140)', 'sin_datos': 'rgb(200 190 175)'} %}
 
-{% macro tarjeta(id, titulo, pregunta, dato, nota='', viejos=0) -%}
+{% macro tarjeta(id, titulo, pregunta, dato, nota='', viejos=0, mostrar_barra=true) -%}
   {% set tono = TONOS[dato.estado] %}
   <div class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col">
     <div class="flex items-baseline justify-between gap-2">
@@ -39,6 +39,7 @@
         {{ dato.exitos }} de {{ dato.n }}{% if viejos %} · {{ viejos }} viejos afuera{% endif %}
       </p>
 
+      {% if mostrar_barra %}
       {# La barra lleva la marca del umbral encima: sin esa linea, el largo de la
          barra no dice nada — el numero hay que compararlo contra algo. #}
       <div class="relative h-2 rounded-full mt-2" style="background: rgba(46,33,22,0.10)">
@@ -53,6 +54,7 @@
         {%- elif dato.estado == 'verde' %}supera el umbral
         {%- elif dato.estado == 'rojo' %}no llega al umbral{% endif %}
       </p>
+      {% endif %}
     {% endif %}
     {% if nota %}<p class="text-xs text-gris mt-3 leading-snug">{{ nota }}</p>{% endif %}
   </div>
