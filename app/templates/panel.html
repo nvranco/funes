@@ -106,23 +106,48 @@
     {% endif %}
 
     <div class="mt-2 space-y-1.5">
-      <a href="{{ url_inventario }}"
-        class="tap btn-secundario w-full flex items-center justify-center rounded-xl2 font-medium">
-        Ver inventario 📖
-      </a>
-
-      <a href="{{ url_catalogos }}"
-        class="tap btn-secundario w-full flex items-center justify-center rounded-xl2 font-medium">
-        Ver catálogos 🗂️
-      </a>
+      <div>
+        <button type="button" data-accion="toggle-menu" data-target="menu-inventario"
+          class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium">
+          <span>Gestionar inventario 📖</span>
+          <span class="text-gris" data-flecha>▾</span>
+        </button>
+        <div id="menu-inventario" class="hidden mt-1.5 space-y-1.5">
+          <a href="{{ url_inventario }}"
+            class="tap btn-secundario w-full flex items-center justify-center rounded-xl2 font-medium">
+            Ver inventario 📖
+          </a>
+          <a href="{{ url_catalogos }}"
+            class="tap btn-secundario w-full flex items-center justify-center rounded-xl2 font-medium">
+            Ver catálogos 🗂️
+          </a>
+        </div>
+      </div>
 
       {% if libreria.funes_habilitado %}
-      {# Solo desktop por ahora: la pagina de destino todavia no tiene una
-         lectura movil pensada como flujo principal, solo una version reducida. #}
-      <a href="{{ url_funes_metricas }}"
-        class="tap btn-secundario w-full hidden lg:flex items-center justify-center rounded-xl2 font-medium">
-        Ver dashboard de Funes 🔮
-      </a>
+      <div>
+        <button type="button" data-accion="toggle-menu" data-target="menu-funes"
+          class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium">
+          <span>Gestionar a Funes 🔮</span>
+          <span class="text-gris" data-flecha>▾</span>
+        </button>
+        <div id="menu-funes" class="hidden mt-1.5 space-y-1.5">
+          <a href="{{ url_funes }}" target="_blank" rel="noopener"
+            class="tap btn-secundario w-full flex items-center justify-center rounded-xl2 font-medium">
+            Ir a Funes 🔮
+          </a>
+          <button type="button" onclick="copiarLink('{{ url_funes }}', this)"
+            class="tap btn-secundario w-full flex items-center justify-center rounded-xl2 font-medium">
+            Copiar link para compartir 🔗
+          </button>
+          {# Solo desktop por ahora: la pagina de destino todavia no tiene una
+             lectura movil pensada como flujo principal, solo una version reducida. #}
+          <a href="{{ url_funes_metricas }}"
+            class="tap btn-secundario w-full hidden lg:flex items-center justify-center rounded-xl2 font-medium">
+            Ver estadísticas 📊
+          </a>
+        </div>
+      </div>
       {% endif %}
     </div>
     </div>
@@ -207,6 +232,26 @@
   // estante con varios lomos), asi que la guia de "2 pasos" no le sirve —
   // el boton abre la camara/galeria directo, sin pasar nunca por ahi.
   const SALTAR_GUIA_SIEMPRE = {{ 'true' if libreria.tipo_catalogo == 'cds' else 'false' }};
+
+  function copiarLink(texto, btn) {
+    navigator.clipboard.writeText(texto).then(function () {
+      var original = btn.textContent;
+      btn.textContent = '¡Copiado!';
+      setTimeout(function () { btn.textContent = original; }, 1500);
+    });
+  }
+
+  // Las dos bifurcaciones (inventario / Funes) arrancan cerradas y se abren
+  // a demanda — fundir 3 botones sueltos en 2 grupos es al pedo si los dos
+  // grupos quedan siempre expandidos, mismo lugar en la pantalla que antes.
+  document.querySelectorAll('[data-accion="toggle-menu"]').forEach((boton) => {
+    boton.addEventListener('click', () => {
+      const menu = document.getElementById(boton.dataset.target);
+      const abierto = menu.classList.toggle('hidden') === false;
+      const flecha = boton.querySelector('[data-flecha]');
+      if (flecha) flecha.textContent = abierto ? '▴' : '▾';
+    });
+  });
 
   function animarContadores() {
     document.querySelectorAll('[data-contador]').forEach((el) => {

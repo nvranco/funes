@@ -148,6 +148,7 @@ async def panel_home(request: Request, slug: str, token: str):
             "top_catalogos": metricas_ciclo["por_catalogo"][:3],
             "top_busquedas_sin_resultado": metricas_ciclo["top_busquedas_sin_resultado"][:5],
             "url_publica": f"{base}/{slug}",
+            "url_funes": f"{base}/funes/{slug}",
             "url_inventario": f"{base}/{slug}/panel/{token}/libros",
             "url_vender": f"{base}/{slug}/panel/{token}/vender",
             "url_catalogos": f"{base}/{slug}/panel/{token}/catalogos",
