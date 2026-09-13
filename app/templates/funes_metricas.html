@@ -37,7 +37,10 @@
   </div>
 </header>
 
-<div class="min-h-screen max-w-6xl mx-auto px-5 lg:px-6 py-6 lg:py-8">
+{# Sin min-h-screen: con el header ya puesto, forzar un piso de 100vh ADEMAS
+   de esa altura es lo que obligaba a scrollear la pagina entera aunque el
+   contenido real entrara de sobra en una pantalla. #}
+<div class="max-w-6xl mx-auto px-5 lg:px-6 py-6 lg:py-8">
 
   {# ————— Mobile: compacta, no el desktop encogido ————— #}
   <div class="lg:hidden space-y-4">
