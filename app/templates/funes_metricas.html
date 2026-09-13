@@ -2,6 +2,18 @@
 {% block titulo %}Funes — {{ libreria.nombre }}{% endblock %}
 {% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
 {% from "_funes_tarjetas.html" import tarjeta, TONOS %}
+{% block head %}
+<style>
+  /* Por default el scroll del log solo se ve al pasar el mouse (o nunca, en
+     mac con "mostrar barras: automaticamente"). Estilar el pseudo-elemento
+     lo saca del modo overlay y lo deja siempre pintado, en las dos versiones
+     (misma clase .log-actividad-scroll para mobile y desktop). */
+  .log-actividad-scroll { scrollbar-width: thin; scrollbar-color: rgb(var(--borde)) transparent; }
+  .log-actividad-scroll::-webkit-scrollbar { width: 6px; }
+  .log-actividad-scroll::-webkit-scrollbar-track { background: transparent; }
+  .log-actividad-scroll::-webkit-scrollbar-thumb { background: rgb(var(--borde)); border-radius: 3px; }
+</style>
+{% endblock %}
 
 {#
   El dashboard de Funes para el dueño de UNA libreria — la version chica del
@@ -17,8 +29,13 @@
   sigue accesible sin hover tambien ahi.
 #}
 
-{% macro grafico_calidad(dashboard, TONOS, alto_seccion=380, alto_barras=260) %}
-<section class="bg-papel border border-borde rounded-xl2 p-4 relative grafico-calidad-card" style="height: {{ alto_seccion }}px">
+{# alto_seccion es opcional: en desktop iguala el alto con la tarjeta de
+   Actividad de al lado (estan en el mismo grid-cols-2); en mobile no hay
+   nada al lado con que igualar, asi que se deja sin pisar y la tarjeta
+   toma su alto natural -sin el espacio de sobra de un numero puesto a ojo. #}
+{% macro grafico_calidad(dashboard, TONOS, alto_seccion=none, alto_barras=260) %}
+<section class="bg-papel border border-borde rounded-xl2 p-4 relative grafico-calidad-card"
+         {% if alto_seccion %}style="height: {{ alto_seccion }}px"{% endif %}>
   <h2 class="text-xs font-bold uppercase tracking-wide text-gris">Calidad</h2>
   <p class="text-xs text-gris mt-0.5 mb-3">Conversaciones calificadas por día, según la mejor valoración que recibieron</p>
   {# La grilla es un overlay aparte (pointer-events-none, detrás en el DOM) y
@@ -138,7 +155,7 @@
         <p class="text-xs text-gris mt-1">Catálogo cubierto</p>
       </div>
     </div>
-    {{ grafico_calidad(dashboard, TONOS, alto_seccion=280, alto_barras=140) }}
+    {{ grafico_calidad(dashboard, TONOS, alto_barras=140) }}
     {{ log_actividad(dashboard, TONOS, alto=560) }}
   </div>
 
