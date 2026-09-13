@@ -140,6 +140,44 @@ async def funes_sync_catalogo_estado(token: str):
     }
 
 
+@router.get("/admin/{token}/funes/exportar-macro/{macro}")
+async def funes_exportar_macro(token: str, macro: str):
+    """Vuelca todas las columnas de catalogo de una macro, para respaldarlas
+    en un archivo local antes de purgarlas de produccion (ver
+    funes/respaldar_y_purgar_macro.py). Es la contracara de sync-catalogo:
+    en vez de escribir un lote, lee uno entero."""
+    _validar_token(token)
+    filas = await db.pool().fetch(
+        f"SELECT {', '.join(COLUMNAS_CATALOGO)} FROM funes_libros WHERE macro = $1 ORDER BY id",
+        macro,
+    )
+    return {"macro": macro, "cantidad": len(filas), "libros": [dict(f) for f in filas]}
+
+
+@router.delete("/admin/{token}/funes/purgar-macro/{macro}")
+async def funes_purgar_macro(token: str, macro: str, payload: dict = Body(...)):
+    """Borra de funes_libros todas las filas de una macro. Requiere
+    `cantidad_esperada` en el body -el conteo que el llamador ya respaldo- y
+    aborta con 409 si no coincide con lo que hay en la base en este momento:
+    guarda contra un macro mal escrito o una fila nueva que llego entre el
+    respaldo y el borrado."""
+    _validar_token(token)
+    cantidad_esperada = payload.get("cantidad_esperada")
+    if not isinstance(cantidad_esperada, int):
+        raise HTTPException(status_code=400, detail="Body debe traer {'cantidad_esperada': N}.")
+    actual = await db.pool().fetchval("SELECT count(*) FROM funes_libros WHERE macro = $1", macro)
+    if actual != cantidad_esperada:
+        raise HTTPException(
+            status_code=409,
+            detail=f"cantidad_esperada={cantidad_esperada} pero hay {actual} filas con macro='{macro}' ahora mismo.",
+        )
+    eliminados = await db.pool().fetchval(
+        "WITH borrados AS (DELETE FROM funes_libros WHERE macro = $1 RETURNING 1) SELECT count(*) FROM borrados",
+        macro,
+    )
+    return {"macro": macro, "eliminados": eliminados}
+
+
 async def _listar_librerias():
     filas = await db.pool().fetch(
         """

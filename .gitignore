@@ -25,3 +25,7 @@ funes/_scraping/
 # Es utilitario local para juntar catalogo crudo, no parte de la app que
 # se despliega: no entra al repo.
 funes/scrapers/
+
+# Respaldos de macros purgadas de produccion (funes/respaldar_y_purgar_macro.py):
+# copias completas del catalogo, no codigo.
+funes/_respaldos/
