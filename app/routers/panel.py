@@ -160,7 +160,6 @@ async def panel_home(request: Request, slug: str, token: str):
             "total_semana": total_semana,
             "lotes_pendientes": lotes_pendientes,
             "top_catalogos": metricas_ciclo["por_catalogo"][:3],
-            "top_busquedas_sin_resultado": metricas_ciclo["top_busquedas_sin_resultado"][:5],
             "dashboard_funes": dashboard_funes,
             "cobertura": cobertura,
             "eventos_combinados": eventos_combinados,

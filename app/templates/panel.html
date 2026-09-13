@@ -205,21 +205,7 @@
       </div>
       {% endif %}
 
-      {% if top_busquedas_sin_resultado %}
-      <div>
-        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">🔎 Te buscaron y no lo tenías</h2>
-        <div class="bg-papel border border-borde rounded-xl2 divide-y divide-borde">
-          {% for q, cant in top_busquedas_sin_resultado %}
-          <div class="flex items-center justify-between px-4 py-2 text-sm">
-            <span class="truncate">"{{ q }}"</span>
-            <span class="text-gris shrink-0 ml-3">{{ cant }}×</span>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-
-      {% if not top_catalogos and not top_busquedas_sin_resultado %}
+      {% if not top_catalogos %}
       <div class="bg-papel border border-borde rounded-xl2 p-4 text-center text-sm text-gris">
         Todavía no hay actividad suficiente en este ciclo para mostrar esto.
       </div>
