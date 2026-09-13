@@ -83,11 +83,13 @@
         <p class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5">Gestionar inventario</p>
         <div class="space-y-1.5">
           <a href="{{ url_inventario }}"
-            class="tap btn-secundario w-full flex items-center justify-center rounded-xl2 font-medium">
+            class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+            style="border: 1px solid rgb(var(--borde))">
             Ver inventario 📖
           </a>
           <a href="{{ url_catalogos }}"
-            class="tap btn-secundario w-full flex items-center justify-center rounded-xl2 font-medium">
+            class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+            style="border: 1px solid rgb(var(--borde))">
             Ver catálogos 🗂️
           </a>
         </div>
@@ -98,17 +100,20 @@
         <p class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5">Gestionar a Funes</p>
         <div class="space-y-1.5">
           <a href="{{ url_funes }}" target="_blank" rel="noopener"
-            class="tap btn-secundario w-full flex items-center justify-center rounded-xl2 font-medium">
+            class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+            style="border: 1px solid rgb(var(--borde))">
             Ir a Funes 🔮
           </a>
           <button type="button" onclick="copiarLink('{{ url_funes }}', this)"
-            class="tap btn-secundario w-full flex items-center justify-center rounded-xl2 font-medium">
-            Copiar link para compartir 🔗
+            class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+            style="border: 1px solid rgb(var(--borde))">
+            Copiar link 🔗
           </button>
           {# Solo desktop por ahora: la pagina de destino todavia no tiene una
              lectura movil pensada como flujo principal, solo una version reducida. #}
           <a href="{{ url_funes_metricas }}"
-            class="tap btn-secundario w-full hidden lg:flex items-center justify-center rounded-xl2 font-medium">
+            class="tap btn-secundario w-full hidden lg:flex items-center justify-start px-4 rounded-xl2 font-medium"
+            style="border: 1px solid rgb(var(--borde))">
             Ver estadísticas 📊
           </a>
         </div>
