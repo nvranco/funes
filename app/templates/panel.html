@@ -136,13 +136,13 @@
       <div>
         <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Resumen</h2>
         <div class="grid grid-cols-2 gap-3">
-          <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+          <div class="bg-papel border border-borde rounded-xl2 p-5 text-center">
             <p class="text-2xl font-bold flex items-center justify-center gap-1">
               <span data-contador="{{ cant_libros }}">0</span><span class="text-sm">📖</span>
             </p>
             <p class="text-xs text-gris mt-1">{{ et.libro if cant_libros == 1 else et.libros }} publicado{{ 's' if cant_libros != 1 else '' }}</p>
           </div>
-          <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+          <div class="bg-papel border border-borde rounded-xl2 p-5 text-center">
             <p class="text-2xl font-bold flex items-center justify-center gap-1">
               <span data-contador="{{ cant_catalogos }}">0</span><span class="text-sm">🗂️</span>
             </p>
@@ -150,13 +150,13 @@
           </div>
         </div>
         <div class="grid {{ 'grid-cols-3' if cobertura else 'grid-cols-2' }} gap-3 mt-3">
-          <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+          <div class="bg-papel border border-borde rounded-xl2 p-5 text-center">
             <p class="text-2xl font-bold flex items-center justify-center gap-1">
               <span data-contador="{{ vistas_ciclo }}">0</span><span class="text-sm">👀</span>
             </p>
             <p class="text-xs text-gris mt-1">Visita{{ 's' if vistas_ciclo != 1 else '' }} registrada{{ 's' if vistas_ciclo != 1 else '' }}</p>
           </div>
-          <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+          <div class="bg-papel border border-borde rounded-xl2 p-5 text-center">
             <p class="text-2xl font-bold flex items-center justify-center gap-1">
               <span data-contador="{{ clics_ciclo }}">0</span><span class="text-sm">💬</span>
             </p>
@@ -166,7 +166,7 @@
           {# Ampliada: solo con Funes prendido. cobertura.matched es "cuantos
              de mis libros puede recomendar Funes" (nucleo.cobertura_libreria),
              no un conteo aparte — mismo numero que ya se ve en el dashboard. #}
-          <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+          <div class="bg-papel border border-borde rounded-xl2 p-5 text-center">
             <p class="text-2xl font-bold flex items-center justify-center gap-1">
               <span data-contador="{{ cobertura.matched }}">0</span><span class="text-sm">🔮</span>
             </p>
@@ -178,10 +178,10 @@
 
       <div>
         <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Visitas</h2>
-        {# Mismo alto fijo que Calidad de al lado (alto_seccion=250 en su
+        {# Mismo alto fijo que Calidad de al lado (alto_seccion=235 en su
            macro): las dos tarjetas terminan de llenar el espacio que le
            sobraba a esta columna contra la de Actividad. #}
-        <div class="bg-papel border border-borde rounded-xl2 p-3 flex flex-col" style="height: 250px">
+        <div class="bg-papel border border-borde rounded-xl2 p-3 flex flex-col" style="height: 235px">
           <div class="flex-1 flex items-end justify-between gap-1">
             {% for d in visitas_semana %}
             <div class="flex-1 flex flex-col items-center justify-end h-full gap-1">
@@ -210,7 +210,7 @@
          comparar las dos señales del ciclo actual. #}
       <div>
         <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Calidad</h2>
-        {{ grafico_calidad(dashboard_funes, TONOS, alto_seccion=250, alto_barras=160, mostrar_titulo=false, mostrar_grilla=false) }}
+        {{ grafico_calidad(dashboard_funes, TONOS, alto_seccion=235, alto_barras=160, mostrar_titulo=false, mostrar_grilla=false) }}
       </div>
       {% endif %}
 
