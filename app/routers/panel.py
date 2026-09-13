@@ -15,6 +15,7 @@ from app.colores import PALETA_CATALOGOS, color_catalogo
 from app.etiquetas import etiquetas
 from app.funes_chat import nucleo as funes_nucleo
 from app.funes_chat import panel_funes
+from app.funes_chat import piloto as funes_piloto
 from app.funes_chat import qr as funes_qr
 from app.metricas import calcular_metricas
 
@@ -131,6 +132,19 @@ async def panel_home(request: Request, slug: str, token: str):
     )
     metricas_ciclo = calcular_metricas(filas_eventos_ciclo, [], [], filas_catalogos)
 
+    # La bateria ampliada (cobertura, calidad de la semana, log combinado)
+    # solo tiene sentido con Funes prendido — el resto de las consultas ni
+    # se disparan si no, para no pagar ese costo en cada libreria sin Funes.
+    con_funes = libreria["funes_habilitado"] and libreria["tipo_catalogo"] == "libros"
+    dashboard_funes = None
+    cobertura = None
+    eventos_combinados = []
+    if con_funes:
+        dashboard_funes = await panel_funes.calcular(libreria["id"])
+        cobertura = await funes_nucleo.cobertura_libreria(slug)
+        eventos_combinados = _combinar_eventos(
+            metricas_ciclo["eventos_recientes"], dashboard_funes["eventos"])
+
     base = str(request.base_url).rstrip("/")
     return templates.TemplateResponse(
         request,
@@ -147,6 +161,9 @@ async def panel_home(request: Request, slug: str, token: str):
             "lotes_pendientes": lotes_pendientes,
             "top_catalogos": metricas_ciclo["por_catalogo"][:3],
             "top_busquedas_sin_resultado": metricas_ciclo["top_busquedas_sin_resultado"][:5],
+            "dashboard_funes": dashboard_funes,
+            "cobertura": cobertura,
+            "eventos_combinados": eventos_combinados,
             "url_publica": f"{base}/{slug}",
             "url_funes": f"{base}/funes/{slug}",
             "url_inventario": f"{base}/{slug}/panel/{token}/libros",
@@ -158,6 +175,37 @@ async def panel_home(request: Request, slug: str, token: str):
             "url_qr": f"/api/{slug}/{token}/qr.png",
         },
     )
+
+
+# Solo estos 3: son las señales de un LECTOR (mira, busca, escribe), el
+# mismo tipo de actividad que mide el log de Funes. Las demas (lote_publicado,
+# catalogo_editado, etc.) son acciones del propio librero -un registro de
+# auditoria, no una lectura de "que esta pasando con mi publico".
+_TIPOS_INVENTARIO_EN_LOG = {"vista", "busqueda", "clic_whatsapp"}
+
+
+def _combinar_eventos(eventos_catalogo: list[dict], eventos_funes: list[dict]) -> list[dict]:
+    """Un solo feed, mas viejo primero, mezclando los eventos de catalogo
+    (origen='inventario') con los de Funes (origen='funes', ya tageados por
+    panel_funes._eventos). Los dos vienen con husos distintos -catalogo en
+    UTC real, Funes ya convertido a hora local- asi que hay que igualarlos
+    antes de poder ordenarlos juntos, o comparar aware con naive tira
+    TypeError."""
+    combinados = []
+    for e in eventos_catalogo:
+        if e["tipo"] not in _TIPOS_INVENTARIO_EN_LOG:
+            continue
+        creado = e["creado_en"]
+        if creado.tzinfo is not None:
+            creado = creado.astimezone(funes_piloto.HUSO)
+        combinados.append({**e, "origen": "inventario", "creado_en": creado})
+    for e in eventos_funes:
+        creado = e["creado_en"]
+        if creado.tzinfo is None:
+            creado = creado.replace(tzinfo=funes_piloto.HUSO)
+        combinados.append({**e, "creado_en": creado})
+    combinados.sort(key=lambda e: e["creado_en"])
+    return combinados[-panel_funes.EVENTOS_LIMITE:]
 
 
 @router.get("/{slug}/panel/{token}/guia", response_class=HTMLResponse)

@@ -1,6 +1,17 @@
 {% extends "base.html" %}
 {% block titulo %}Funes — {{ libreria.nombre }}{% endblock %}
 {% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
+{% from "_funes_tarjetas.html" import TONOS, grafico_calidad, log_actividad %}
+{% block head %}
+<style>
+  /* Mismo motivo que en funes_metricas.html: sin esto el scroll del log solo
+     se ve al pasar el mouse (o nunca, en mac con "mostrar barras: automaticamente"). */
+  .log-actividad-scroll { scrollbar-width: thin; scrollbar-color: rgb(var(--borde)) transparent; }
+  .log-actividad-scroll::-webkit-scrollbar { width: 6px; }
+  .log-actividad-scroll::-webkit-scrollbar-track { background: transparent; }
+  .log-actividad-scroll::-webkit-scrollbar-thumb { background: rgb(var(--borde)); border-radius: 3px; }
+</style>
+{% endblock %}
 {% block contenido %}
 {# <header>, no <div>: escapa a `body > div { max-width: 480px }` de base.html
    para que el banner verde llegue a los dos bordes en desktop, igual que en
@@ -24,62 +35,21 @@
 <div class="min-h-screen max-w-6xl mx-auto flex flex-col">
 
   <main class="flex-1 px-5 -mt-4 lg:mt-0 lg:pt-8 pb-40 lg:pb-10">
-  {# Una columna en el celular; en desktop, lo propio (KPIs del ciclo + acciones)
-     a la izquierda y lo que ya funcionó (catálogos, búsquedas sin resultado) a
-     la derecha — mismo criterio que /admin: son dos lecturas distintas y
-     verlas lado a lado evita apilar todo en un scroll largo. #}
+  {# Una columna en el celular; en desktop, la izquierda es solo para ELEGIR
+     (que hacer con el inventario, que hacer con Funes) y la derecha es solo
+     para MIRAR (todos los indicadores, básicos o + Funes) — nada de
+     mezclar accion y lectura en la misma columna. #}
   <div class="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 lg:gap-8 items-start">
 
     <div class="min-w-0">
-    <div class="grid grid-cols-3 gap-2">
-      <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
-        <p class="text-2xl font-bold flex items-center justify-center gap-1">
-          <span data-contador="{{ cant_catalogos }}">0</span><span class="text-sm">🗂️</span>
-        </p>
-        <p class="text-xs text-gris mt-1">Catálogo{{ 's' if cant_catalogos != 1 else '' }} publicado{{ 's' if cant_catalogos != 1 else '' }}</p>
-      </div>
-      <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
-        <p class="text-2xl font-bold flex items-center justify-center gap-1">
-          <span data-contador="{{ vistas_ciclo }}">0</span><span class="text-sm">👀</span>
-        </p>
-        <p class="text-xs text-gris mt-1">Visita{{ 's' if vistas_ciclo != 1 else '' }} registrada{{ 's' if vistas_ciclo != 1 else '' }}</p>
-      </div>
-      <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
-        <p class="text-2xl font-bold flex items-center justify-center gap-1">
-          <span data-contador="{{ clics_ciclo }}">0</span><span class="text-sm">💬</span>
-        </p>
-        <p class="text-xs text-gris mt-1">Consulta{{ 's' if clics_ciclo != 1 else '' }} por WhatsApp</p>
-      </div>
-    </div>
-
-    <div class="bg-papel border border-borde rounded-xl2 p-3 mt-2">
-      <div class="flex items-end justify-between gap-1" style="height: 56px;">
-        {% for d in visitas_semana %}
-        <div class="flex-1 flex flex-col items-center justify-end h-full gap-1">
-          <span class="text-[10px] text-gris">{{ d.cant }}</span>
-          <div class="w-full bg-celeste rounded-t" style="height: {{ d.pct }}%; min-height: 3px;"></div>
-        </div>
-        {% endfor %}
-      </div>
-      <div class="flex justify-between gap-1 mt-1">
-        {% for d in visitas_semana %}
-        <span class="flex-1 text-center text-[10px] text-gris">{{ d.dia_corto }}</span>
-        {% endfor %}
-      </div>
-      <p class="text-sm text-gris mt-3 pt-3 border-t border-borde">
-        Hubo <span class="font-semibold text-texto-papel">{{ total_semana }}</span>
-        visita{{ 's' if total_semana != 1 else '' }} 👀 al catálogo en la última semana.
-      </p>
-    </div>
-
     {% if cant_libros == 0 %}
-    <div class="mt-6 text-center text-gris px-4">
+    <div class="text-center text-gris px-4">
       <p class="text-4xl mb-3">📷</p>
       <p>Todavía no cargaste ningún estante. Sacá 5 o 6 fotos y probá.</p>
     </div>
     {% endif %}
 
-    <div id="carga-estado" class="mt-6 hidden">
+    <div id="carga-estado" class="hidden">
       <div class="bg-papel border-2 border-celeste rounded-xl2 p-4 shadow-sm">
         <p id="carga-mensaje" class="font-bold text-lg">Subiendo fotos…</p>
         <p id="carga-detalle" class="text-sm text-gris mt-0.5">&nbsp;</p>
@@ -91,7 +61,7 @@
     </div>
 
     {% if lotes_pendientes %}
-    <div class="mt-6">
+    <div class="mb-2">
       <p class="text-sm font-medium text-gris mb-2">Lotes pendientes de revisión</p>
       <div class="space-y-2">
         {% for lote in lotes_pendientes %}
@@ -105,14 +75,13 @@
     </div>
     {% endif %}
 
-    <div class="mt-2 space-y-1.5">
+    {# Las dos bifurcaciones van siempre desglosadas -sin boton de
+       toggle-, no un acordeon: son las unicas dos cosas que hay para elegir
+       en esta columna, esconderlas de entrada no ahorra nada. #}
+    <div class="space-y-4">
       <div>
-        <button type="button" data-accion="toggle-menu" data-target="menu-inventario"
-          class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium">
-          <span>Gestionar inventario 📖</span>
-          <span class="text-gris" data-flecha>▾</span>
-        </button>
-        <div id="menu-inventario" class="hidden mt-1.5 space-y-1.5">
+        <p class="text-sm font-bold text-gris uppercase tracking-wide px-1 mb-1.5">Gestionar inventario 📖</p>
+        <div class="space-y-1.5">
           <a href="{{ url_inventario }}"
             class="tap btn-secundario w-full flex items-center justify-center rounded-xl2 font-medium">
             Ver inventario 📖
@@ -126,12 +95,8 @@
 
       {% if libreria.funes_habilitado %}
       <div>
-        <button type="button" data-accion="toggle-menu" data-target="menu-funes"
-          class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium">
-          <span>Gestionar a Funes 🔮</span>
-          <span class="text-gris" data-flecha>▾</span>
-        </button>
-        <div id="menu-funes" class="hidden mt-1.5 space-y-1.5">
+        <p class="text-sm font-bold text-gris uppercase tracking-wide px-1 mb-1.5">Gestionar a Funes 🔮</p>
+        <div class="space-y-1.5">
           <a href="{{ url_funes }}" target="_blank" rel="noopener"
             class="tap btn-secundario w-full flex items-center justify-center rounded-xl2 font-medium">
             Ir a Funes 🔮
@@ -153,6 +118,74 @@
     </div>
 
     <div class="min-w-0 space-y-6 mt-6 lg:mt-0">
+      {# Bateria basica: la misma para todas las librerias. Libros publicados
+         es nuevo (existia el dato, cant_libros, pero no tenia tarjeta propia
+         -antes solo se usaba para decidir el estado vacio). #}
+      <div class="grid grid-cols-3 gap-3">
+        <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+          <p class="text-2xl font-bold flex items-center justify-center gap-1">
+            <span data-contador="{{ cant_libros }}">0</span><span class="text-sm">📖</span>
+          </p>
+          <p class="text-xs text-gris mt-1">{{ et.libro if cant_libros == 1 else et.libros }} publicado{{ 's' if cant_libros != 1 else '' }}</p>
+        </div>
+        <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+          <p class="text-2xl font-bold flex items-center justify-center gap-1">
+            <span data-contador="{{ cant_catalogos }}">0</span><span class="text-sm">🗂️</span>
+          </p>
+          <p class="text-xs text-gris mt-1">Catálogo{{ 's' if cant_catalogos != 1 else '' }} publicado{{ 's' if cant_catalogos != 1 else '' }}</p>
+        </div>
+        <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+          <p class="text-2xl font-bold flex items-center justify-center gap-1">
+            <span data-contador="{{ vistas_ciclo }}">0</span><span class="text-sm">👀</span>
+          </p>
+          <p class="text-xs text-gris mt-1">Visita{{ 's' if vistas_ciclo != 1 else '' }} registrada{{ 's' if vistas_ciclo != 1 else '' }}</p>
+        </div>
+        <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+          <p class="text-2xl font-bold flex items-center justify-center gap-1">
+            <span data-contador="{{ clics_ciclo }}">0</span><span class="text-sm">💬</span>
+          </p>
+          <p class="text-xs text-gris mt-1">Consulta{{ 's' if clics_ciclo != 1 else '' }} por WhatsApp</p>
+        </div>
+        {% if cobertura %}
+        {# Ampliada: solo con Funes prendido. cobertura.matched es "cuantos
+           de mis libros puede recomendar Funes" (nucleo.cobertura_libreria),
+           no un conteo aparte — mismo numero que ya se ve en el dashboard. #}
+        <div class="bg-papel border border-borde rounded-xl2 p-3 text-center">
+          <p class="text-2xl font-bold flex items-center justify-center gap-1">
+            <span data-contador="{{ cobertura.matched }}">0</span><span class="text-sm">🔮</span>
+          </p>
+          <p class="text-xs text-gris mt-1">{{ et.libro if cobertura.matched == 1 else et.libros }} recomendado{{ 's' if cobertura.matched != 1 else '' }}</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="bg-papel border border-borde rounded-xl2 p-3">
+        <div class="flex items-end justify-between gap-1" style="height: 56px;">
+          {% for d in visitas_semana %}
+          <div class="flex-1 flex flex-col items-center justify-end h-full gap-1">
+            <span class="text-[10px] text-gris">{{ d.cant }}</span>
+            <div class="w-full bg-celeste rounded-t" style="height: {{ d.pct }}%; min-height: 3px;"></div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="flex justify-between gap-1 mt-1">
+          {% for d in visitas_semana %}
+          <span class="flex-1 text-center text-[10px] text-gris">{{ d.dia_corto }}</span>
+          {% endfor %}
+        </div>
+        <p class="text-sm text-gris mt-3 pt-3 border-t border-borde">
+          Hubo <span class="font-semibold text-texto-papel">{{ total_semana }}</span>
+          visita{{ 's' if total_semana != 1 else '' }} 👀 al catálogo en la última semana.
+        </p>
+      </div>
+
+      {% if dashboard_funes %}
+      {# Ampliada: el mismo grafico de "calidad de la semana" del dashboard
+         de Funes, al lado del de visitas de arriba para que se puedan
+         comparar las dos señales del ciclo actual. #}
+      {{ grafico_calidad(dashboard_funes, TONOS, alto_barras=160) }}
+      {% endif %}
+
       {% if top_catalogos %}
       <div>
         <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">🏆 Lo que más funcionó</h2>
@@ -190,6 +223,13 @@
       <div class="bg-papel border border-borde rounded-xl2 p-4 text-center text-sm text-gris">
         Todavía no hay actividad suficiente en este ciclo para mostrar esto.
       </div>
+      {% endif %}
+
+      {% if eventos_combinados %}
+      {# Ampliada: un solo feed con lo que le pasa al inventario (vistas,
+         busquedas, consultas por WhatsApp) Y a Funes (conversaciones) — el
+         mismo macro que usa el dashboard de Funes, mismo orden tipo chat. #}
+      {{ log_actividad(eventos_combinados, TONOS, alto=400, bajada='Lo último que pasó en tu librería') }}
       {% endif %}
 
       <p class="text-xs text-center lg:text-left">
@@ -241,17 +281,35 @@
     });
   }
 
-  // Las dos bifurcaciones (inventario / Funes) arrancan cerradas y se abren
-  // a demanda — fundir 3 botones sueltos en 2 grupos es al pedo si los dos
-  // grupos quedan siempre expandidos, mismo lugar en la pantalla que antes.
-  document.querySelectorAll('[data-accion="toggle-menu"]').forEach((boton) => {
-    boton.addEventListener('click', () => {
-      const menu = document.getElementById(boton.dataset.target);
-      const abierto = menu.classList.toggle('hidden') === false;
-      const flecha = boton.querySelector('[data-flecha]');
-      if (flecha) flecha.textContent = abierto ? '▴' : '▾';
+  // Mismo tooltip del grafico de calidad y mismo auto-scroll del log que
+  // funes_metricas.html -- misma logica, misma clase, dos plantillas
+  // distintas usando el macro compartido (_funes_tarjetas.html).
+  (function () {
+    const TONOS = { verde: "{{ TONOS.verde }}", amarilla: "{{ TONOS.gris }}", roja: "{{ TONOS.rojo }}" };
+    document.querySelectorAll('.grafico-calidad-card').forEach((cont) => {
+      const tip = cont.querySelector('.tooltip-calidad-el');
+      cont.querySelectorAll('.barra-dia').forEach((barra) => {
+        barra.addEventListener('mousemove', (ev) => {
+          const total = Number(barra.dataset.total);
+          const dia = barra.dataset.dia;
+          tip.innerHTML = total === 0
+            ? `<strong>${dia}</strong><br>Sin conversaciones calificadas`
+            : `<strong>${dia}</strong> · ${total} ${total === 1 ? 'conversación' : 'conversaciones'}<br>` +
+              `<span style="color:${TONOS.verde}">●</span> ${barra.dataset.verdes} precisa${barra.dataset.verdes == 1 ? '' : 's'}` +
+              ` · <span style="color:${TONOS.amarilla}">●</span> ${barra.dataset.amarillas} dudosa${barra.dataset.amarillas == 1 ? '' : 's'}` +
+              ` · <span style="color:${TONOS.roja}">●</span> ${barra.dataset.rojas} floja${barra.dataset.rojas == 1 ? '' : 's'}`;
+          const rect = cont.getBoundingClientRect();
+          tip.style.left = Math.min(ev.clientX - rect.left + 12, rect.width - 230) + 'px';
+          tip.style.top = Math.max(ev.clientY - rect.top - 8, 0) + 'px';
+          tip.classList.remove('hidden');
+        });
+        barra.addEventListener('mouseleave', () => tip.classList.add('hidden'));
+      });
     });
-  });
+    document.querySelectorAll('.log-actividad-scroll').forEach((log) => {
+      log.scrollTop = log.scrollHeight;
+    });
+  })();
 
   function animarContadores() {
     document.querySelectorAll('[data-contador]').forEach((el) => {

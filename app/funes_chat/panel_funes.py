@@ -165,13 +165,18 @@ async def _eventos(libreria_id: int, limite: int = EVENTOS_LIMITE) -> list[dict]
         """,
         libreria_id, limite,
     )
+    # origen='funes' en cada fila: el panel del librero combina esta lista
+    # con eventos de catalogo (origen='inventario') en un solo feed, y el
+    # macro compartido log_actividad() (_funes_tarjetas.html) decide como
+    # renderizar cada linea segun ese campo.
     eventos = []
     for f in filas:
         if not f["con_recomendacion"]:
-            eventos.append({"tipo": "abandono", "creado_en": f["creado_en"]})
+            eventos.append({"origen": "funes", "tipo": "abandono", "creado_en": f["creado_en"]})
             continue
         label, color = _ETIQUETAS_VEREDICTO.get(f["veredicto"], (None, None))
         eventos.append({
+            "origen": "funes",
             "tipo": "recomendacion",
             "creado_en": f["creado_en"],
             "titulo": f["titulo"],
