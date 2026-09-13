@@ -48,7 +48,7 @@
   <div class="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-8 items-start">
 
     <div class="min-w-0">
-      <h2 class="text-lg font-bold uppercase tracking-wide mb-3">Alta de librerías</h2>
+      <h2 class="text-base font-bold uppercase tracking-wide mb-3">Alta de librerías</h2>
       <form method="post" class="bg-papel border border-borde rounded-xl2 p-5 space-y-4">
         <div>
           <label class="block text-sm font-medium mb-1">Nombre de la librería</label>
@@ -83,7 +83,7 @@
     </div>
 
     <div class="min-w-0">
-      <h2 class="text-lg font-bold uppercase tracking-wide mb-3">Librerías activas ({{ librerias|length }})</h2>
+      <h2 class="text-base font-bold uppercase tracking-wide mb-3">Librerías activas ({{ librerias|length }})</h2>
       <div class="space-y-2">
         {% for lib in librerias %}
         <div class="bg-papel border border-borde rounded-xl2 p-4" data-id="{{ lib.id }}" data-nombre="{{ lib.nombre }}">
