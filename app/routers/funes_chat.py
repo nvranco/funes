@@ -407,11 +407,24 @@ async def sesion(request: Request, cuerpo: PedidoSesion):
     limite.controlar(request, caro=False)
     profundas = [p.model_dump() for p in cuerpo.profundas]
     sesion_id = cuerpo.sesion_id
+
+    # Se resuelve aca y no en bitacora: nucleo ya importa bitacora, resolverlo
+    # alla seria un import circular. Nunca tira: una resolucion que falla deja
+    # libreria_id en None, el mismo default que ya tiene todo lo demas.
+    libreria_id = None
+    if cuerpo.libreria:
+        try:
+            libreria_id = await nucleo.id_libreria_activa(cuerpo.libreria)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("funes_sesion_libreria_id_fallo slug=%s error=%s",
+                           cuerpo.libreria, exc)
+
     if not sesion_id:
-        sesion_id = await bitacora.crear_sesion(cuerpo.origen)
+        sesion_id = await bitacora.crear_sesion(cuerpo.origen, libreria_id)
     if sesion_id:
         await bitacora.guardar_estado(
-            sesion_id, _respuestas(cuerpo), profundas, ciclo=cuerpo.ciclo)
+            sesion_id, _respuestas(cuerpo), profundas, ciclo=cuerpo.ciclo,
+            libreria_id=libreria_id)
     return {"sesion_id": sesion_id or ""}
 
 

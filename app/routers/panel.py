@@ -13,6 +13,8 @@ from app import db
 from app.catalogos import ordenar_jerarquico
 from app.colores import PALETA_CATALOGOS, color_catalogo
 from app.etiquetas import etiquetas
+from app.funes_chat import nucleo as funes_nucleo
+from app.funes_chat import panel_funes
 from app.funes_chat import qr as funes_qr
 from app.metricas import calcular_metricas
 
@@ -150,6 +152,7 @@ async def panel_home(request: Request, slug: str, token: str):
             "url_vender": f"{base}/{slug}/panel/{token}/vender",
             "url_catalogos": f"{base}/{slug}/panel/{token}/catalogos",
             "url_metricas": f"{base}/{slug}/panel/{token}/metricas",
+            "url_funes_metricas": f"{base}/{slug}/panel/{token}/funes-metricas",
             "url_guia": f"{base}/{slug}/panel/{token}/guia",
             "url_qr": f"/api/{slug}/{token}/qr.png",
         },
@@ -508,5 +511,27 @@ async def panel_funes_qr(request: Request, slug: str, token: str):
         headers={
             "Content-Disposition": f'inline; filename="funes-qr-{slug}.png"',
             "Cache-Control": "public, max-age=3600",
+        },
+    )
+
+
+@router.get("/{slug}/panel/{token}/funes-metricas", response_class=HTMLResponse)
+async def panel_funes_metricas(request: Request, slug: str, token: str):
+    """El dashboard de Funes para el dueño de la libreria. Mismo gate 404
+    (no 401) que panel_funes_qr: no confirmamos que la ruta existe."""
+    libreria = await _libreria_por_slug_y_token(slug, token)
+    if not libreria["funes_habilitado"] or libreria["tipo_catalogo"] != "libros":
+        raise HTTPException(status_code=404)
+
+    dashboard = await panel_funes.calcular(libreria["id"])
+    cobertura = await funes_nucleo.cobertura_libreria(slug) or {"total": 0, "matched": 0}
+
+    return templates.TemplateResponse(
+        request, "funes_metricas.html",
+        {
+            "libreria": libreria,
+            "dashboard": dashboard,
+            "cobertura": cobertura,
+            "url_atras": f"/{slug}/panel/{token}",
         },
     )

@@ -61,7 +61,7 @@ def normalizar_origen(src: str | None) -> str:
     return src if src in ORIGENES_VALIDOS else "link"
 
 
-async def crear_sesion(origen: str) -> str | None:
+async def crear_sesion(origen: str, libreria_id: int | None = None) -> str | None:
     """Crea la fila de la conversacion y devuelve su id (uuid4 del servidor).
 
     El id lo genera el servidor y nunca el cliente: oficia de capacidad, igual
@@ -70,8 +70,8 @@ async def crear_sesion(origen: str) -> str | None:
     sesion_id = str(uuid.uuid4())
     try:
         await db.pool().execute(
-            "INSERT INTO funes_sesiones (id, origen) VALUES ($1, $2)",
-            sesion_id, normalizar_origen(origen),
+            "INSERT INTO funes_sesiones (id, origen, libreria_id) VALUES ($1, $2, $3)",
+            sesion_id, normalizar_origen(origen), libreria_id,
         )
         return sesion_id
     except Exception as exc:  # noqa: BLE001
@@ -86,6 +86,7 @@ async def guardar_estado(
     pool: int | None = None,
     filtro_aflojado: str | None = None,
     ciclo: int = 1,
+    libreria_id: int | None = None,
 ) -> None:
     """Actualiza las respuestas de una sesion ya creada.
 
@@ -119,6 +120,11 @@ async def guardar_estado(
                 ciclos = GREATEST(ciclos, $10),
                 pool_inicial = COALESCE($8, pool_inicial),
                 filtro_aflojado = COALESCE($9, filtro_aflojado),
+                -- COALESCE y no asignacion directa: si esta llamada puntual
+                -- no trajo el id (resolucion fallo, o el cliente todavia no
+                -- mando `libreria`), no se pisa lo que ya quedo grabado en
+                -- la creacion de la sesion.
+                libreria_id = COALESCE($14, libreria_id),
                 ultima_act = now()
             WHERE id = $1
             """,
@@ -139,6 +145,7 @@ async def guardar_estado(
             # sesion no tiene referencia, y q4b dice si llego al final.
             str(respuestas.get("q4a") or ""),
             str(respuestas.get("q4b") or ""),
+            libreria_id,
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("funes_bitacora_guardar_estado_fallo sesion=%s error=%s", sesion_id, exc)

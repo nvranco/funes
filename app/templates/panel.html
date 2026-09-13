@@ -115,6 +115,15 @@
         class="tap btn-secundario w-full flex items-center justify-center rounded-xl2 font-medium">
         Ver catálogos 🗂️
       </a>
+
+      {% if libreria.funes_habilitado %}
+      {# Solo desktop por ahora: la pagina de destino todavia no tiene una
+         lectura movil pensada como flujo principal, solo una version reducida. #}
+      <a href="{{ url_funes_metricas }}"
+        class="tap btn-secundario w-full hidden lg:flex items-center justify-center rounded-xl2 font-medium">
+        Ver dashboard de Funes 🔮
+      </a>
+      {% endif %}
     </div>
     </div>
 

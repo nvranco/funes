@@ -27,53 +27,9 @@
     decidir, y un verde ahi seria una conclusion inventada.
 #}
 
-{% set TONOS = {'verde': 'rgb(122 158 120)', 'rojo': 'rgb(190 110 85)',
-                'gris': 'rgb(180 165 140)', 'sin_datos': 'rgb(200 190 175)'} %}
-
-{% macro tarjeta(id, titulo, pregunta, dato, nota='', viejos=0) -%}
-  {% set tono = TONOS[dato.estado] %}
-  <div class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col">
-    <div class="flex items-baseline justify-between gap-2">
-      <p class="text-xs font-bold uppercase tracking-wide text-gris">{{ id }}</p>
-      {% if dato.umbral %}
-        <p class="text-xs text-gris tabular-nums">≥ {{ (dato.umbral * 100)|int }}%</p>
-      {% endif %}
-    </div>
-    <p class="text-base font-semibold mt-1 leading-tight">{{ titulo }}</p>
-    {# min-h de dos lineas: sin esto, la bajada que entra en una sola sube su
-       numero y la fila de cuatro queda despareja. #}
-    <p class="text-xs text-gris leading-snug mt-0.5 min-h-[2.1rem]">{{ pregunta }}</p>
-
-    {% if dato.pct is none %}
-      <p class="text-4xl font-bold mt-4" style="color: {{ TONOS.sin_datos }}">—</p>
-      <p class="text-xs text-gris">todavía no hay datos</p>
-    {% else %}
-      <p class="text-5xl font-bold mt-4 tabular-nums leading-none" style="color: {{ tono }}">
-        {{ '%.0f'|format(dato.pct) }}<span class="text-2xl">%</span>
-        <span class="text-lg font-normal text-gris">± {{ '%.0f'|format(dato.margen) }}</span>
-      </p>
-      <p class="text-xs text-gris tabular-nums mt-1.5">
-        {{ dato.exitos }} de {{ dato.n }}{% if viejos %} · {{ viejos }} viejos afuera{% endif %}
-      </p>
-
-      {# La barra lleva la marca del umbral encima: sin esa linea, el largo de la
-         barra no dice nada — el numero hay que compararlo contra algo. #}
-      <div class="relative h-2 rounded-full mt-2" style="background: rgba(46,33,22,0.10)">
-        <div class="h-2 rounded-full" style="width: {{ '%.0f'|format([dato.pct, 100]|min) }}%; background: {{ tono }}"></div>
-        {% if dato.umbral %}
-          <div class="absolute top-[-3px] bottom-[-3px] w-0.5"
-               style="left: {{ (dato.umbral * 100)|int }}%; background: rgba(46,33,22,0.45)"></div>
-        {% endif %}
-      </div>
-      <p class="text-xs mt-1.5" style="color: {{ tono }}">
-        {% if dato.estado == 'gris' %}con esta n no alcanza para decidir
-        {%- elif dato.estado == 'verde' %}supera el umbral
-        {%- elif dato.estado == 'rojo' %}no llega al umbral{% endif %}
-      </p>
-    {% endif %}
-    {% if nota %}<p class="text-xs text-gris mt-3 leading-snug">{{ nota }}</p>{% endif %}
-  </div>
-{%- endmacro %}
+{# TONOS/tarjeta() son compartidos con el dashboard por libreria — ver
+   _funes_tarjetas.html, que es el que los define ahora. #}
+{% from "_funes_tarjetas.html" import tarjeta, TONOS %}
 
 {# El sufijo con la cohorte elegida: cada atajo de fecha tiene que conservarla,
    si no cambiar de rango te devuelve a "todas" sin avisar. #}

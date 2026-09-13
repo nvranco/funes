@@ -1004,6 +1004,31 @@ def invalidar_mascara_libreria(slug: str) -> None:
     _mascara_cache.pop(slug, None)
 
 
+async def id_libreria_activa(slug: str) -> int | None:
+    """El id de librerias para un slug con Funes habilitado, o None si no
+    existe/no esta activa/no tiene Funes prendido - mismo criterio que
+    ids_por_libreria. Sin cache: es un SELECT por indice unique sobre una
+    tabla chica, y cachearlo abriria una ventana en la que una sesion nueva
+    queda atada a una libreria que recien desactivo Funes."""
+    if not slug:
+        return None
+    return await db.pool().fetchval(
+        "SELECT id FROM librerias WHERE slug = $1 AND activa "
+        "AND funes_habilitado AND tipo_catalogo = 'libros'",
+        slug,
+    )
+
+
+async def _indice_clave_a_id() -> dict[tuple[str, str], str]:
+    """Babilonia entera, indexada por clave normalizada. Factorizado para que
+    ids_por_libreria (arma el set de ids a ofrecer) y cobertura_libreria
+    (solo cuenta cuantos matchean) no mantengan dos copias del mismo loop."""
+    indice: dict[tuple[str, str], str] = {}
+    for libro in await _libros():
+        indice.setdefault(tokens.clave_libro(libro["titulo"], libro["autor"]), libro["id"])
+    return indice
+
+
 async def ids_por_libreria(slug: str) -> set[str] | None:
     """ids de funes_libros que matchean el catalogo publicado de una libreria,
     o None si la libreria no existe, no esta activa o no tiene Funes
@@ -1027,22 +1052,16 @@ async def ids_por_libreria(slug: str) -> set[str] | None:
         if cacheado is not None and ahora - cacheado[0] < _TTL_CACHE_SEGUNDOS:
             return cacheado[1]
 
-        libreria = await db.pool().fetchrow(
-            "SELECT id FROM librerias WHERE slug = $1 AND activa "
-            "AND funes_habilitado AND tipo_catalogo = 'libros'",
-            slug,
-        )
-        if libreria is None:
+        libreria_id = await id_libreria_activa(slug)
+        if libreria_id is None:
             return None
 
         propios = await db.pool().fetch(
             "SELECT titulo, autor FROM libros WHERE libreria_id = $1 "
             "AND estado = 'publicado' AND archivado_en IS NULL",
-            libreria["id"],
+            libreria_id,
         )
-        indice: dict[tuple[str, str], str] = {}
-        for libro in await _libros():
-            indice.setdefault(tokens.clave_libro(libro["titulo"], libro["autor"]), libro["id"])
+        indice = await _indice_clave_a_id()
 
         ids: set[str] = set()
         sin_matchear = []
@@ -1060,6 +1079,30 @@ async def ids_por_libreria(slug: str) -> set[str] | None:
 
         _mascara_cache[slug] = (time.monotonic(), ids)
         return ids
+
+
+async def cobertura_libreria(slug: str) -> dict | None:
+    """{"total": N, "matched": M} sobre los libros PROPIOS de la libreria (no
+    sobre el set deduplicado de Babilonia que devuelve ids_por_libreria): si
+    dos libros propios distintos colisionan en la misma clave normalizada,
+    cuentan dos veces aca (dos libros del estante matchean) y una sola alla
+    (un solo libro de Babilonia se ofrece) - las dos cuentas son correctas
+    para lo que cada una mide. Sin cache: no es hot path de recomendacion,
+    se calcula solo cuando alguien abre el dashboard."""
+    libreria_id = await id_libreria_activa(slug)
+    if libreria_id is None:
+        return None
+    propios = await db.pool().fetch(
+        "SELECT titulo, autor FROM libros WHERE libreria_id = $1 "
+        "AND estado = 'publicado' AND archivado_en IS NULL",
+        libreria_id,
+    )
+    indice = await _indice_clave_a_id()
+    matched = sum(
+        1 for fila in propios
+        if tokens.clave_libro(fila["titulo"], fila["autor"]) in indice
+    )
+    return {"total": len(propios), "matched": matched}
 
 
 _cant_cache: int | None = None

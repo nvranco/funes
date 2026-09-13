@@ -1,12 +1,27 @@
 {% extends "base.html" %}
-{% block titulo %}Admin — Librero{% endblock %}
+{% block titulo %}Funes — Admin{% endblock %}
+{% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
 {% block contenido %}
-<div class="min-h-screen px-5 py-8 max-w-2xl mx-auto">
+{# <header>, no <div>: escapa a `body > div { max-width: 480px }` de base.html
+   (selector por tag, no por clase) para que el banner verde llegue a los dos
+   bordes de la pantalla, igual que en el tablero de piloto. #}
+<header class="bg-celeste">
+  <div class="max-w-6xl mx-auto px-6 py-5 flex items-center gap-2">
+    <h1 class="text-3xl font-bold text-tinta leading-tight" style="font-family: var(--font-display);">Funes</h1>
+    {# Mismo laberinto que la cabecera del chat y del tablero de piloto: es la
+       marca de Funes, no un adorno nuevo por pantalla. #}
+    <svg viewBox="0 0 32 32" class="w-7 h-7 text-tinta shrink-0" fill="none"
+         stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+      <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
+      <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
+      <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
+      <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
+    </svg>
+    <span class="text-tinta/70 text-sm font-medium ml-1">Admin</span>
+  </div>
+</header>
 
-  <header class="mb-8">
-    <p class="text-celeste font-bold text-sm">LIBRERO</p>
-    <h1 class="text-2xl font-bold">Alta de librerías</h1>
-  </header>
+<div class="min-h-screen max-w-6xl mx-auto px-6 py-8">
 
   {% if error %}
   <div class="mb-6 rounded-xl2 border-2 border-ambar bg-ambar/10 px-4 py-3 text-sm">
@@ -27,88 +42,100 @@
   </div>
   {% endif %}
 
-  <form method="post" class="bg-papel border border-borde rounded-xl2 p-5 space-y-4 mb-10">
-    <div>
-      <label class="block text-sm font-medium mb-1">Nombre de la librería</label>
-      <input name="nombre" required class="tap w-full rounded-lg border border-borde px-3 py-2"
-        placeholder="Ej: El Anticuario">
-    </div>
-    <div>
-      <label class="block text-sm font-medium mb-1">Slug (URL pública)</label>
-      <input name="slug" class="tap w-full rounded-lg border border-borde px-3 py-2"
-        placeholder="se-genera-solo-si-lo-dejas-vacio">
-    </div>
-    <div>
-      <label class="block text-sm font-medium mb-1">WhatsApp (formato 54911...)</label>
-      <input name="whatsapp" required pattern="[0-9]{10,15}" class="tap w-full rounded-lg border border-borde px-3 py-2"
-        placeholder="5491122334455">
-    </div>
-    <div>
-      <label class="block text-sm font-medium mb-1">Mensaje de WhatsApp precargado</label>
-      <textarea name="mensaje_wa_template" rows="2" class="w-full rounded-lg border border-borde px-3 py-2 text-sm"
-        >{{ mensaje_wa_default }}</textarea>
-      <p class="text-xs text-gris mt-1">Usá {{ '{titulo}' }} y {{ '{autor}' }} — se completan solos.</p>
-    </div>
-    <label class="flex items-center gap-2 text-sm">
-      <input type="checkbox" name="funes_habilitado" class="tap w-4 h-4">
-      Habilitar Funes (recomendador con IA, solo literatura)
-    </label>
-    <button type="submit"
-      class="tap btn-primario w-full rounded-xl2 font-bold text-lg">
-      Crear librería
-    </button>
-  </form>
+  {# Una columna en el celular; en desktop, alta a la izquierda y librerías
+     activas a la derecha — son dos tareas distintas (crear vs. gestionar) y
+     verlas lado a lado evita el scroll largo que tenía todo apilado. #}
+  <div class="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-8 items-start">
 
-  <h2 class="text-lg font-bold mb-3">Librerías activas ({{ librerias|length }})</h2>
-  <div class="space-y-2">
-    {% for lib in librerias %}
-    <div class="bg-papel border border-borde rounded-xl2 p-4" data-id="{{ lib.id }}" data-nombre="{{ lib.nombre }}">
-      <div class="flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <p class="font-medium truncate">{{ lib.nombre }}</p>
-          <p class="text-xs text-gris">/{{ lib.slug }} · {{ lib.cant_libros }} libros</p>
+    <div class="min-w-0">
+      <h2 class="text-lg font-bold mb-3">Alta de librerías</h2>
+      <form method="post" class="bg-papel border border-borde rounded-xl2 p-5 space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Nombre de la librería</label>
+          <input name="nombre" required class="tap w-full rounded-lg border border-borde px-3 py-2"
+            placeholder="Ej: El Anticuario">
         </div>
-        <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-          <a href="/{{ lib.slug }}/panel/{{ lib.token_panel }}" target="_blank" rel="noopener"
-            class="tap btn-secundario rounded-lg px-3 flex items-center text-sm font-medium">
-            Panel ↗
-          </a>
-          <a href="/admin/{{ token }}/librerias/{{ lib.id }}/metricas" target="_blank" rel="noopener"
-            class="tap btn-secundario rounded-lg px-3 flex items-center text-sm font-medium">
-            Métricas 📊
-          </a>
-          {% if lib.tipo_catalogo == 'libros' %}
-          <button type="button" data-accion="toggle-funes"
-            class="tap rounded-lg px-3 flex items-center text-sm font-medium border-2 {{ 'border-celeste text-celeste' if lib.funes_habilitado else 'border-borde text-gris' }}">
-            Funes: {{ 'ON' if lib.funes_habilitado else 'OFF' }}
-          </button>
-          {% endif %}
-          <button type="button" data-accion="borrar"
-            class="tap rounded-lg px-3 flex items-center text-sm font-medium text-terracota border-2 border-terracota">
-            Borrar
-          </button>
+        <div>
+          <label class="block text-sm font-medium mb-1">Slug (URL pública)</label>
+          <input name="slug" class="tap w-full rounded-lg border border-borde px-3 py-2"
+            placeholder="se-genera-solo-si-lo-dejas-vacio">
         </div>
-      </div>
-      <div data-rol="confirmar" class="hidden mt-3 pt-3 border-t border-borde">
-        <p class="text-sm"><strong>¿Borrar "{{ lib.nombre }}" para siempre?</strong></p>
-        <p class="text-xs text-gris mt-1">
-          Se elimina la librería con sus {{ lib.cant_libros }} libros, lotes y fotos. No se puede deshacer.
-        </p>
-        <div class="mt-2 flex gap-2">
-          <button type="button" data-accion="confirmar-borrar"
-            class="tap flex-1 rounded-lg bg-terracota text-crema text-sm font-bold">
-            Sí, borrar para siempre
-          </button>
-          <button type="button" data-accion="cancelar-borrar"
-            class="tap flex-1 btn-secundario rounded-lg text-sm font-medium">
-            Cancelar
-          </button>
+        <div>
+          <label class="block text-sm font-medium mb-1">WhatsApp (formato 54911...)</label>
+          <input name="whatsapp" required pattern="[0-9]{10,15}" class="tap w-full rounded-lg border border-borde px-3 py-2"
+            placeholder="5491122334455">
         </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Mensaje de WhatsApp precargado</label>
+          <textarea name="mensaje_wa_template" rows="2" class="w-full rounded-lg border border-borde px-3 py-2 text-sm"
+            >{{ mensaje_wa_default }}</textarea>
+          <p class="text-xs text-gris mt-1">Usá {{ '{titulo}' }} y {{ '{autor}' }} — se completan solos.</p>
+        </div>
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="funes_habilitado" class="w-4 h-4">
+          Habilitar Funes
+        </label>
+        <button type="submit"
+          class="tap btn-primario w-full rounded-xl2 font-bold text-lg">
+          Crear librería
+        </button>
+      </form>
+    </div>
+
+    <div class="min-w-0">
+      <h2 class="text-lg font-bold mb-3">Librerías activas ({{ librerias|length }})</h2>
+      <div class="space-y-2">
+        {% for lib in librerias %}
+        <div class="bg-papel border border-borde rounded-xl2 p-4" data-id="{{ lib.id }}" data-nombre="{{ lib.nombre }}">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="font-medium truncate">{{ lib.nombre }}</p>
+              <p class="text-xs text-gris">/{{ lib.slug }} · {{ lib.cant_libros }} libros</p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap justify-end">
+              <a href="/{{ lib.slug }}/panel/{{ lib.token_panel }}" target="_blank" rel="noopener"
+                class="tap btn-secundario rounded-lg px-3 flex items-center text-sm font-medium">
+                Panel ↗
+              </a>
+              <a href="/admin/{{ token }}/librerias/{{ lib.id }}/metricas" target="_blank" rel="noopener"
+                class="tap btn-secundario rounded-lg px-3 flex items-center text-sm font-medium">
+                Métricas 📊
+              </a>
+              {% if lib.tipo_catalogo == 'libros' %}
+              <button type="button" data-accion="toggle-funes"
+                class="tap rounded-lg px-3 flex items-center text-sm font-medium border-2 {{ 'border-celeste text-celeste' if lib.funes_habilitado else 'border-borde text-gris' }}">
+                Funes: {{ 'ON' if lib.funes_habilitado else 'OFF' }}
+              </button>
+              {% endif %}
+              <button type="button" data-accion="borrar"
+                class="tap rounded-lg px-3 flex items-center text-sm font-medium text-terracota border-2 border-terracota">
+                Borrar
+              </button>
+            </div>
+          </div>
+          <div data-rol="confirmar" class="hidden mt-3 pt-3 border-t border-borde">
+            <p class="text-sm"><strong>¿Borrar "{{ lib.nombre }}" para siempre?</strong></p>
+            <p class="text-xs text-gris mt-1">
+              Se elimina la librería con sus {{ lib.cant_libros }} libros, lotes y fotos. No se puede deshacer.
+            </p>
+            <div class="mt-2 flex gap-2">
+              <button type="button" data-accion="confirmar-borrar"
+                class="tap flex-1 rounded-lg bg-terracota text-crema text-sm font-bold">
+                Sí, borrar para siempre
+              </button>
+              <button type="button" data-accion="cancelar-borrar"
+                class="tap flex-1 btn-secundario rounded-lg text-sm font-medium">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <p class="text-gris text-sm">Todavía no diste de alta ninguna librería.</p>
+        {% endfor %}
       </div>
     </div>
-    {% else %}
-    <p class="text-gris text-sm">Todavía no diste de alta ninguna librería.</p>
-    {% endfor %}
+
   </div>
 </div>
 

@@ -180,7 +180,7 @@ def margen(exitos: int, n: int) -> float | None:
     return 1.96 * math.sqrt(p * (1 - p) / n) * 100
 
 
-def _proporcion(exitos: int, n: int, umbral: float | None) -> dict:
+def proporcion(exitos: int, n: int, umbral: float | None) -> dict:
     """Un porcentaje con todo lo que hace falta para no malinterpretarlo.
 
     `estado` es 'verde'/'rojo' solo cuando el intervalo entero cae de un lado
@@ -318,7 +318,7 @@ async def _hipotesis(filas, desde, hasta, origenes) -> dict:
     primera pregunta: la gente que efectivamente empezo."""
     # HF-1: de los que empezaron a contestar, cuantos llegaron a ver un libro.
     c = COHORTES_VALIDAS["HF-1"]
-    hf1 = _proporcion(_sumar(filas, "con_recomendacion", c),
+    hf1 = proporcion(_sumar(filas, "con_recomendacion", c),
                       _sumar(filas, "empezaron", c), UMBRALES["HF-1"])
 
     # HF-2 y HF-3 salen de la MISMA consulta y de la misma poblacion, porque son
@@ -344,8 +344,8 @@ async def _hipotesis(filas, desde, hasta, origenes) -> dict:
           AND {ORIGEN} = ANY($5::text[])
           AND {_RANGO}
         """, desde, hasta, origenes, CORTE_VEREDICTO_PUNTERIA, list(c))
-    hf2 = _proporcion(emb["con_acierto"], emb["calificadas"], UMBRALES["HF-2"])
-    hf3 = _proporcion(emb["con_clic"], emb["con_acierto"], UMBRALES["HF-3"])
+    hf2 = proporcion(emb["con_acierto"], emb["calificadas"], UMBRALES["HF-2"])
+    hf3 = proporcion(emb["con_clic"], emb["con_acierto"], UMBRALES["HF-3"])
 
     return {
         "HF-1": hf1, "HF-2": hf2, "HF-3": hf3,
