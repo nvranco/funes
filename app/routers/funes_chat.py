@@ -733,10 +733,7 @@ async def admin_conversaciones(token: str, limite: int = 5, sesion: str = "",
 
     Es de solo lectura y va detras del mismo token que el resto del panel."""
     _validar_admin(token)
-    # Temp: subir el tope de 25 a 2000 para exportar el piloto entero y buscar
-    # bugs leyendo las conversaciones reales (mismo motivo que a833f01). Se
-    # revierte apenas termina el volcado.
-    limite = max(1, min(int(limite), 2000))
+    limite = max(1, min(int(limite), 25))
 
     if sesion:
         sesiones = await db.pool().fetch(
