@@ -134,24 +134,28 @@
         </div>
         {% endif %}
 
+        {# Mismo fondo tonal que tenian como btn-primario.border-celeste, pero
+           sin el borde grueso de color -solo el fondo/color de texto los
+           distingue ahora, el borde es el mismo 1px neutro que el resto. #}
         <button id="btn-cargar" type="button"
-          class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium relative"
-          style="border: 1px solid rgb(var(--borde))">
+          class="tap w-full flex items-center justify-start px-4 rounded-xl2 font-medium relative"
+          style="border: 1px solid rgb(var(--borde)); background: var(--btn-primario-a-bg); color: rgb(var(--texto-papel))">
           {{ et.accion_cargar }} 📷
           {% if libreria.tipo_catalogo != 'cds' %}
           {# La guia ("Como sacar una buena foto") ya no es un link aparte
-             abajo -se saco toda la barra fija-, ahora es este (i) adentro
-             del boton: stopPropagation para que tocarlo lleve a la guia
-             sin disparar tambien el click del boton (que abre la camara). #}
+             abajo -se saco toda la barra fija-, ahora es este boton (?)
+             adentro del boton grande: stopPropagation para que tocarlo
+             lleve a la guia sin disparar tambien el click del boton
+             grande (que abre la camara). #}
           <span id="btn-info-guia" role="button" tabindex="0" aria-label="Cómo sacar una buena foto"
             class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border border-tinta/30 flex items-center justify-center text-sm font-normal text-tinta/70">
-            i
+            ?
           </span>
           {% endif %}
         </button>
         <a href="{{ url_vender }}"
-          class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
-          style="border: 1px solid rgb(var(--borde))">
+          class="tap w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+          style="border: 1px solid rgb(var(--borde)); background: var(--btn-primario-b-bg); color: rgb(var(--texto-papel))">
           Marcar vendidos 💰
         </a>
       </div>
