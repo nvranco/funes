@@ -3,6 +3,10 @@
 {% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
 {% from "_funes_tarjetas.html" import TONOS, grafico_calidad, log_actividad %}
 {% block head %}
+{# Unico uso de una libreria de iconos en toda la app -el resto es
+   emoji-, para el icono compuesto (camara+"?") del boton de info de la
+   guia: no hay un emoji que combine las dos cosas. #}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.46.0/tabler-icons.min.css">
 <style>
   /* Mismo motivo que en funes_metricas.html: sin esto el scroll del log solo
      se ve al pasar el mouse (o nunca, en mac con "mostrar barras: automaticamente"). */
@@ -91,23 +95,31 @@
           <button type="button" data-acordeon="gestion-inventario"
             class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium"
             style="border: 1px solid rgb(var(--borde))">
-            Gestionar inventario
-            <span class="acordeon-flecha text-gris" aria-hidden="true">▾</span>
+            Gestionar el inventario 📚
+            <span class="acordeon-flecha text-gris transition-transform duration-300" aria-hidden="true">▾</span>
           </button>
-          {# ml-4: un poco mas adelantados que el boton que los despliega, y
-             por eso mismo mas cortos horizontalmente -mismo ancho del
-             contenedor, borde derecho igual, borde izquierdo corrido. #}
-          <div id="gestion-inventario" class="hidden ml-4 mt-1.5 space-y-1.5">
-            <a href="{{ url_inventario }}"
-              class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium text-sm"
-              style="border: 1px solid rgb(var(--borde))">
-              Ver inventario 📖
-            </a>
-            <a href="{{ url_catalogos }}"
-              class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium text-sm"
-              style="border: 1px solid rgb(var(--borde))">
-              Ver catálogos 🗂️
-            </a>
+          {# grid-template-rows 0fr->1fr (con overflow-hidden adentro) en vez
+             de hidden: es el truco estandar para animar a un alto "auto" sin
+             medirlo a mano con JS -hidden tapaba/mostraba de un salto, sin
+             transicion posible porque display:none no anima. #}
+          <div id="gestion-inventario" class="grid transition-[grid-template-rows] duration-300 ease-in-out" style="grid-template-rows: 0fr">
+            <div class="overflow-hidden">
+              {# ml-4: un poco mas adelantados que el boton que los despliega,
+                 y por eso mismo mas cortos horizontalmente -mismo ancho del
+                 contenedor, borde derecho igual, borde izquierdo corrido. #}
+              <div class="ml-4 mt-1.5 space-y-1.5">
+                <a href="{{ url_inventario }}"
+                  class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+                  style="border: 1px solid rgb(var(--borde))">
+                  Ver inventario 📖
+                </a>
+                <a href="{{ url_catalogos }}"
+                  class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+                  style="border: 1px solid rgb(var(--borde))">
+                  Ver catálogos 🗂️
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -117,19 +129,23 @@
             class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium"
             style="border: 1px solid rgb(var(--borde))">
             Gestionar a Funes
-            <span class="acordeon-flecha text-gris" aria-hidden="true">▾</span>
+            <span class="acordeon-flecha text-gris transition-transform duration-300" aria-hidden="true">▾</span>
           </button>
-          <div id="gestion-funes" class="hidden ml-4 mt-1.5 space-y-1.5">
-            <a href="{{ url_funes }}" target="_blank" rel="noopener"
-              class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium text-sm"
-              style="border: 1px solid rgb(var(--borde))">
-              Ir a Funes 🌀
-            </a>
-            <button type="button" onclick="copiarLink('{{ url_funes }}', this)"
-              class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium text-sm"
-              style="border: 1px solid rgb(var(--borde))">
-              Copiar link 🔗
-            </button>
+          <div id="gestion-funes" class="grid transition-[grid-template-rows] duration-300 ease-in-out" style="grid-template-rows: 0fr">
+            <div class="overflow-hidden">
+              <div class="ml-4 mt-1.5 space-y-1.5">
+                <a href="{{ url_funes }}" target="_blank" rel="noopener"
+                  class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+                  style="border: 1px solid rgb(var(--borde))">
+                  Ir a Funes 🌀
+                </a>
+                <button type="button" onclick="copiarLink('{{ url_funes }}', this)"
+                  class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+                  style="border: 1px solid rgb(var(--borde))">
+                  Copiar link 🔗
+                </button>
+              </div>
+            </div>
           </div>
         </div>
         {% endif %}
@@ -140,13 +156,14 @@
           {{ et.accion_cargar }} 📷
           {% if libreria.tipo_catalogo != 'cds' %}
           {# La guia ("Como sacar una buena foto") ya no es un link aparte
-             abajo -se saco toda la barra fija-, ahora es este boton (?)
-             adentro del boton grande: stopPropagation para que tocarlo
-             lleve a la guia sin disparar tambien el click del boton
-             grande (que abre la camara). #}
+             abajo -se saco toda la barra fija-, ahora es este boton adentro
+             del boton grande: stopPropagation para que tocarlo lleve a la
+             guia sin disparar tambien el click del boton grande (que abre
+             la camara). Icono ti-camera-question -unico icono no-emoji de
+             la app, ver el link de Tabler en {% block head %}. #}
           <span id="btn-info-guia" role="button" tabindex="0" aria-label="Cómo sacar una buena foto"
-            class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border border-tinta/30 flex items-center justify-center text-sm font-normal text-tinta/70">
-            ?
+            class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border border-tinta/30 flex items-center justify-center text-tinta/70">
+            <i class="ti ti-camera-question" style="font-size: 15px" aria-hidden="true"></i>
           </span>
           {% endif %}
         </button>
@@ -366,9 +383,9 @@
     const contenido = document.getElementById(boton.dataset.acordeon);
     const flecha = boton.querySelector('.acordeon-flecha');
     boton.addEventListener('click', () => {
-      const vaAAbrir = contenido.classList.contains('hidden');
-      contenido.classList.toggle('hidden', !vaAAbrir);
-      if (flecha) flecha.textContent = vaAAbrir ? '▴' : '▾';
+      const vaAAbrir = contenido.style.gridTemplateRows !== '1fr';
+      contenido.style.gridTemplateRows = vaAAbrir ? '1fr' : '0fr';
+      if (flecha) flecha.style.transform = vaAAbrir ? 'rotate(180deg)' : '';
     });
   });
 
