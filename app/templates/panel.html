@@ -169,14 +169,18 @@
             <p class="text-xs text-gris mt-1">Catálogo{{ 's' if cant_catalogos != 1 else '' }} publicado{{ 's' if cant_catalogos != 1 else '' }}</p>
           </div>
         </div>
-        <div class="grid {{ 'grid-cols-3' if cobertura else 'grid-cols-2' }} gap-3 mt-3">
+        {# En mobile van siempre 2 tarjetas, nunca 3 -3 en una fila queda
+           apretado en esta columna angosta-: sin Funes, Visitas+Consultas; con
+           Funes, Visitas+Recomendados -Consultas se saca en mobile y vuelve
+           en desktop, donde las 3 entran comodas. #}
+        <div class="grid grid-cols-2 {{ 'lg:grid-cols-3' if cobertura else '' }} gap-3 mt-3">
           <div class="bg-papel border border-borde rounded-xl2 p-5 text-center">
             <p class="text-2xl font-bold flex items-center justify-center gap-1">
               <span data-contador="{{ vistas_ciclo }}">0</span><span class="text-sm">👀</span>
             </p>
             <p class="text-xs text-gris mt-1">Visita{{ 's' if vistas_ciclo != 1 else '' }} registrada{{ 's' if vistas_ciclo != 1 else '' }}</p>
           </div>
-          <div class="bg-papel border border-borde rounded-xl2 p-5 text-center">
+          <div class="bg-papel border border-borde rounded-xl2 p-5 text-center {{ 'hidden lg:block' if cobertura else '' }}">
             <p class="text-2xl font-bold flex items-center justify-center gap-1">
               <span data-contador="{{ clics_ciclo }}">0</span><span class="text-sm">💬</span>
             </p>
