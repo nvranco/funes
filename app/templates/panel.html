@@ -83,7 +83,7 @@
       {% if cobertura %}
       <div class="bg-papel border border-borde rounded-xl2 p-5 text-center">
         <p class="text-2xl font-bold flex items-center justify-center gap-1">
-          <span data-contador="{{ cobertura.matched }}">0</span><span class="text-sm">🌀</span>
+          <span data-contador="{{ cobertura.matched }}">0</span><span class="text-sm">🧙</span>
         </p>
         <p class="text-xs text-gris mt-1">{{ (et.libro if cobertura.matched == 1 else et.libros)|capitalize }} recomendado{{ 's' if cobertura.matched != 1 else '' }}</p>
       </div>
@@ -176,7 +176,7 @@
           <button type="button" data-acordeon="gestion-funes"
             class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium"
             style="border: 1px solid rgb(var(--borde))">
-            Gestionar a Funes 🌀
+            Gestionar a Funes 🧙
             <span class="acordeon-flecha text-gris transition-transform duration-300" aria-hidden="true">▾</span>
           </button>
           <div id="gestion-funes" class="grid transition-[grid-template-rows] duration-300 ease-in-out" style="grid-template-rows: 0fr">
@@ -185,7 +185,7 @@
                 <a href="{{ url_funes }}" target="_blank" rel="noopener"
                   class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
                   style="border: 1px solid rgb(var(--borde))">
-                  Ir a Funes 🌀
+                  Ir a Funes 🧙
                 </a>
                 <button type="button" onclick="copiarLink('{{ url_funes }}', this)"
                   class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
@@ -247,7 +247,7 @@
           <a href="{{ url_funes }}" target="_blank" rel="noopener"
             class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
             style="border: 1px solid rgb(var(--borde))">
-            Ir a Funes 🌀
+            Ir a Funes 🧙
           </a>
           <button type="button" onclick="copiarLink('{{ url_funes }}', this)"
             class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
@@ -334,7 +334,7 @@
              no un conteo aparte — mismo numero que ya se ve en el dashboard. #}
           <div class="bg-papel border border-borde rounded-xl2 p-5 text-center">
             <p class="text-2xl font-bold flex items-center justify-center gap-1">
-              <span data-contador="{{ cobertura.matched }}">0</span><span class="text-sm">🌀</span>
+              <span data-contador="{{ cobertura.matched }}">0</span><span class="text-sm">🧙</span>
             </p>
             <p class="text-xs text-gris mt-1">{{ (et.libro if cobertura.matched == 1 else et.libros)|capitalize }} recomendado{{ 's' if cobertura.matched != 1 else '' }}</p>
           </div>
