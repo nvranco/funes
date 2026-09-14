@@ -104,31 +104,33 @@
     </div>
     {% endif %}
 
-    <div id="carga-estado" class="hidden">
-      <div class="bg-papel border-2 border-celeste rounded-xl2 p-4 shadow-sm">
-        <p id="carga-mensaje" class="font-bold text-lg">Subiendo fotos…</p>
-        <p id="carga-detalle" class="text-sm text-gris mt-0.5">&nbsp;</p>
-        <div class="mt-3 h-2 w-full bg-borde rounded-full overflow-hidden">
-          <div id="carga-barra" class="h-full bg-celeste rounded-full transition-all duration-700 ease-out" style="width: 4%"></div>
+    {# Mismo formato que el resto de las secciones -titulo uppercase, tarjetas
+       con borde fino sin color-: se ve tanto mientras se procesa un lote
+       recien subido (carga-estado, arrancado por JS) como mientras hay
+       lotes ya procesados sin revisar (lotes_pendientes, server-side). La
+       seccion arranca oculta salvo que haya lotes pendientes al cargar la
+       pagina; subirLote() la muestra a mano si hace falta (ver mas abajo). #}
+    <div id="seccion-pendientes" class="{{ '' if lotes_pendientes else 'hidden' }} mb-6">
+      <p class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5">Pendientes</p>
+      <div class="space-y-1.5">
+        <div id="carga-estado" class="hidden bg-papel rounded-xl2 p-4" style="border: 1px solid rgb(var(--borde))">
+          <p id="carga-mensaje" class="font-medium">Subiendo fotos…</p>
+          <p id="carga-detalle" class="text-sm text-gris mt-0.5">&nbsp;</p>
+          <div class="mt-3 h-2 w-full bg-borde rounded-full overflow-hidden">
+            <div id="carga-barra" class="h-full bg-celeste rounded-full transition-all duration-700 ease-out" style="width: 4%"></div>
+          </div>
+          <p id="carga-contador" class="text-sm font-medium mt-2 hidden"></p>
         </div>
-        <p id="carga-contador" class="text-sm font-medium mt-2 hidden"></p>
-      </div>
-    </div>
-
-    {% if lotes_pendientes %}
-    <div class="mb-2">
-      <p class="text-sm font-medium text-gris mb-2">Lotes pendientes de revisión</p>
-      <div class="space-y-2">
         {% for lote in lotes_pendientes %}
         <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}/lote/{{ lote.id }}"
-          class="tap flex items-center justify-between bg-papel border border-ambar rounded-xl2 p-3">
-          <span class="font-medium">Lote de {{ lote.cant_fotos }} foto{{ 's' if lote.cant_fotos != 1 else '' }}</span>
-          <span class="text-sm text-ambar font-medium">{{ lote.cant_libros }} {{ et.libros }} por revisar →</span>
+          class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium"
+          style="border: 1px solid rgb(var(--borde))">
+          <span>Lote de {{ lote.cant_fotos }} foto{{ 's' if lote.cant_fotos != 1 else '' }}</span>
+          <span class="text-sm text-gris">{{ lote.cant_libros }} {{ et.libros }} por revisar →</span>
         </a>
         {% endfor %}
       </div>
     </div>
-    {% endif %}
 
     {# Mobile: una sola lista "Gestión" -inventario/Funes colapsados en un
        acordeon, no da para repetir 2 titulos desglosados en tan poco ancho-
@@ -391,7 +393,7 @@
 
       {% if top_catalogos %}
       <div>
-        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5 lg:mb-2">🏆 Lo que más funcionó</h2>
+        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5 lg:mb-2">Catálogos</h2>
         <div class="space-y-2">
           {% for c in top_catalogos %}
           <div class="{{ c.color.bg }} border {{ c.color.borde }} rounded-xl2 p-3 flex items-center gap-3">
@@ -517,6 +519,7 @@
 
   const btnCargar = document.getElementById('btn-cargar');
   const inputFotos = document.getElementById('input-fotos');
+  const seccionPendientes = document.getElementById('seccion-pendientes');
   const cargaEstado = document.getElementById('carga-estado');
   const cargaMensaje = document.getElementById('carga-mensaje');
   const cargaDetalle = document.getElementById('carga-detalle');
@@ -619,6 +622,7 @@
   async function subirLote(archivos) {
     btnCargar.disabled = true;
     btnCargar.classList.add('opacity-60');
+    seccionPendientes.classList.remove('hidden');
     cargaEstado.classList.remove('hidden');
     cargaContador.classList.add('hidden');
     progresoActual = 4;
