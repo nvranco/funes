@@ -142,7 +142,7 @@
           <button type="button" data-acordeon="gestion-inventario"
             class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium"
             style="border: 1px solid rgb(var(--borde))">
-            Gestionar el inventario 📚
+            Gestionar inventario 📚
             <span class="acordeon-flecha text-gris transition-transform duration-300" aria-hidden="true">▾</span>
           </button>
           {# grid-template-rows 0fr->1fr (con overflow-hidden adentro) en vez
@@ -175,7 +175,7 @@
           <button type="button" data-acordeon="gestion-funes"
             class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium"
             style="border: 1px solid rgb(var(--borde))">
-            Gestionar a Funes 🧙
+            Gestionar recomendaciones 🧙
             <span class="acordeon-flecha text-gris transition-transform duration-300" aria-hidden="true">▾</span>
           </button>
           <div id="gestion-funes" class="grid transition-[grid-template-rows] duration-300 ease-in-out" style="grid-template-rows: 0fr">
@@ -241,7 +241,7 @@
 
       {% if libreria.funes_habilitado %}
       <div>
-        <p class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5">Gestionar a Funes</p>
+        <p class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5">Gestionar recomendaciones</p>
         <div class="space-y-1.5">
           <a href="{{ url_funes }}" target="_blank" rel="noopener"
             class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
