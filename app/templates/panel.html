@@ -129,14 +129,16 @@
        no al lado de los indicadores. Titulo afuera de la tarjeta, mismo
        patron que "Lo que mas funciono" en la columna de al lado.
        Dos llamadas al macro (mismo patron que funes_metricas.html): en
-       mobile, alto=420 deja la tarjeta tapada por la barra fija de abajo
-       (Cargar estante / Marcar vendidos) porque ahi no hay nada al lado
-       con que igualar altura -a diferencia de desktop, donde 420px
-       empareja el resto de la columna derecha. #}
+       desktop, 420px empareja el resto de la columna derecha. En mobile no
+       hay con que igualar, y el espacio libre antes de la barra fija de
+       abajo (Cargar estante / Marcar vendidos) depende del alto del celular
+       -en un iPhone SE (667px) sobra mucho menos que en uno grande- asi que
+       ahi el alto se calcula con alto_css en vez de un px fijo que se
+       calibra para una sola pantalla y se rompe en las demas. #}
     <div class="mt-6">
       <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Actividad</h2>
       <div class="lg:hidden">
-        {{ log_actividad(eventos_combinados, TONOS, alto=230, mostrar_titulo=false) }}
+        {{ log_actividad(eventos_combinados, TONOS, alto_css='max(90px, calc(100vh - 560px))', mostrar_titulo=false) }}
       </div>
       <div class="hidden lg:block">
         {{ log_actividad(eventos_combinados, TONOS, alto=420, mostrar_titulo=false) }}

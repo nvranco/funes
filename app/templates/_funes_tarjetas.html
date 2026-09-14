@@ -134,8 +134,14 @@
    cual. El panel del librero le suma eventos de catalogo (vista/busqueda/
    clic_whatsapp) con origen='inventario' y payload crudo de la tabla
    `eventos`, para un solo feed combinado. #}
-{% macro log_actividad(eventos, TONOS, alto=380, bajada='Lo último que pasó en tus conversaciones', mostrar_titulo=true) %}
-<section class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col" style="height: {{ alto }}px">
+{# alto_css es una salida de escape para cuando un alto fijo en px no alcanza
+   (ver panel.html, tarjeta mobile): ahi el espacio libre depende del alto del
+   viewport, no de un numero que se pueda fijar de antemano sin romperse en
+   pantallas mas chicas que la que se uso para calibrarlo -mismo problema que
+   ya paso con alto_seccion en grafico_calidad(). Con alto_css presente, alto
+   se ignora. #}
+{% macro log_actividad(eventos, TONOS, alto=380, alto_css=none, bajada='Lo último que pasó en tus conversaciones', mostrar_titulo=true) %}
+<section class="bg-papel border border-borde rounded-xl2 p-4 flex flex-col" style="height: {{ alto_css if alto_css else (alto ~ 'px') }}">
   {% if mostrar_titulo %}
   <h2 class="text-xs font-bold uppercase tracking-wide text-gris">Actividad</h2>
   {% if bajada %}<p class="text-xs text-gris mt-0.5 mb-3">{{ bajada }}</p>{% endif %}
