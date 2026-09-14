@@ -49,6 +49,13 @@ ZONA = "America/Argentina/Buenos_Aires"
 # huso igual, porque ahi lo resuelve Postgres, que si la tiene.
 HUSO = datetime.timezone(datetime.timedelta(hours=-3))
 
+# Nombres de dia fijos en vez de strftime('%a')/('%A'): esos dependen del
+# locale del proceso (distinto entre la notebook y Railway, y ninguno de los
+# dos garantiza tener el locale es_AR instalado), asi que un offset fijo por
+# weekday() es lo unico que se comporta igual en todos lados.
+DIAS_CORTOS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
+DIAS_LARGOS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+
 
 def ahora() -> datetime.datetime:
     """El reloj del proyecto. Todo lo que se muestra va en hora de Argentina:

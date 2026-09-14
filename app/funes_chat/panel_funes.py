@@ -114,7 +114,10 @@ async def _timeline(libreria_id: int, hoy: datetime.date) -> list[dict]:
     for d in dias:
         f = por_dia.get(d)
         v, a, r = (f["verdes"], f["amarillas"], f["rojas"]) if f else (0, 0, 0)
-        crudos.append({"dia": d, "verdes": v, "amarillas": a, "rojas": r, "total": v + a + r})
+        crudos.append({
+            "dia": d, "dia_corto": piloto.DIAS_CORTOS[d.weekday()], "dia_largo": piloto.DIAS_LARGOS[d.weekday()],
+            "verdes": v, "amarillas": a, "rojas": r, "total": v + a + r,
+        })
 
     tope = max((f["total"] for f in crudos), default=0) or 1
     for f in crudos:

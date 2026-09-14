@@ -360,7 +360,15 @@
             {% for d in visitas_semana %}
             {# Hoy/Ayer para los dos ultimos dias, mismo criterio que el
                grafico de Calidad -se leen de un vistazo, sin restar fechas. #}
-            <span class="flex-1 text-center text-[10px] text-gris">{{ 'Hoy' if loop.last else ('Ayer' if loop.revindex == 2 else d.dia_corto) }}</span>
+            <span class="flex-1 text-center text-[10px] text-gris">
+              {%- if loop.last -%}
+                Hoy
+              {%- elif loop.revindex == 2 -%}
+                Ayer
+              {%- else -%}
+                <span class="hidden lg:inline">{{ d.dia_largo|capitalize }}</span><span class="lg:hidden">{{ d.dia_corto }}</span>
+              {%- endif -%}
+            </span>
             {% endfor %}
           </div>
           <p class="text-sm text-gris mt-3 pt-3 border-t border-borde">

@@ -91,9 +91,9 @@
     {% endif %}
     <div class="relative flex items-end justify-between gap-2 h-full">
       {% for d in dashboard.timeline %}
-      {# Hoy/Ayer en vez de la fecha para los dos ultimos dias: son los que se
+      {# Hoy/Ayer en vez del nombre del dia para los dos ultimos: son los que se
          leen de un vistazo sin tener que restar contra la fecha de hoy. #}
-      {% set etiqueta_dia = 'Hoy' if loop.last else ('Ayer' if loop.revindex == 2 else d.dia.strftime('%d/%m')) %}
+      {% set etiqueta_dia = 'Hoy' if loop.last else ('Ayer' if loop.revindex == 2 else d.dia_largo|capitalize) %}
       <div class="flex-1 h-full flex flex-col justify-end barra-dia" data-dia="{{ etiqueta_dia }}"
            data-verdes="{{ d.verdes }}" data-amarillas="{{ d.amarillas }}" data-rojas="{{ d.rojas }}" data-total="{{ d.total }}">
         <span class="block text-center text-[10px] text-gris tabular-nums mb-0.5">{{ d.total }}</span>
@@ -109,7 +109,15 @@
   </div>
   <div class="flex justify-between gap-2 mt-1">
     {% for d in dashboard.timeline %}
-    <span class="flex-1 text-center text-[10px] text-gris">{{ 'Hoy' if loop.last else ('Ayer' if loop.revindex == 2 else d.dia.strftime('%d/%m')) }}</span>
+    <span class="flex-1 text-center text-[10px] text-gris">
+      {%- if loop.last -%}
+        Hoy
+      {%- elif loop.revindex == 2 -%}
+        Ayer
+      {%- else -%}
+        <span class="hidden lg:inline">{{ d.dia_largo|capitalize }}</span><span class="lg:hidden">{{ d.dia_corto }}</span>
+      {%- endif -%}
+    </span>
     {% endfor %}
   </div>
   {# Mismo patron que el resumen de visitas del panel: el total no reemplaza

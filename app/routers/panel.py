@@ -22,8 +22,6 @@ from app.metricas import calcular_metricas
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-DIAS_CORTOS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
-
 
 async def _libreria_por_slug_y_token(slug: str, token: str):
     fila = await db.pool().fetchrow(
@@ -96,7 +94,8 @@ async def panel_home(request: Request, slug: str, token: str):
     total_semana = sum(conteo_por_dia.get(d, 0) for d in dias)
     visitas_semana = [
         {
-            "dia_corto": DIAS_CORTOS[d.weekday()],
+            "dia_corto": funes_piloto.DIAS_CORTOS[d.weekday()],
+            "dia_largo": funes_piloto.DIAS_LARGOS[d.weekday()],
             "cant": conteo_por_dia.get(d, 0),
             "pct": round(conteo_por_dia.get(d, 0) / cant_maxima * 100, 1) if cant_maxima else 0,
         }
