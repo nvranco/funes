@@ -125,7 +125,7 @@
   {% set total_semana = dashboard.timeline | sum(attribute='total') %}
   <p class="text-sm text-gris mt-3 pt-3 border-t border-borde">
     Hubo <span class="font-semibold text-texto-papel">{{ total_semana }}</span>
-    {{ 'recomendación' if total_semana == 1 else 'recomendaciones' }} calificada{{ 's' if total_semana != 1 else '' }} 🌀 en la última semana.
+    {{ 'recomendación' if total_semana == 1 else 'recomendaciones' }} calificada{{ 's' if total_semana != 1 else '' }} 🧙 en la última semana.
   </p>
   {# Clase y no id: este macro se puede llamar mas de una vez en la misma
      pagina (mobile y desktop del dashboard), y un id repetido es invalido —
