@@ -37,7 +37,7 @@
 
 <div class="min-h-screen max-w-6xl mx-auto flex flex-col">
 
-  <main class="flex-1 px-5 pt-6 lg:pt-8 pb-40 lg:pb-10">
+  <main class="flex-1 px-5 pt-6 pb-10 lg:pt-8">
   {# Una columna en el celular; en desktop, la izquierda es solo para ELEGIR
      (que hacer con el inventario, que hacer con Funes) y la derecha es solo
      para MIRAR (todos los indicadores, básicos o + Funes) — nada de
@@ -78,10 +78,84 @@
     </div>
     {% endif %}
 
-    {# Las dos bifurcaciones van siempre desglosadas -sin boton de
-       toggle-, no un acordeon: son las unicas dos cosas que hay para elegir
-       en esta columna, esconderlas de entrada no ahorra nada. #}
-    <div class="space-y-4">
+    {# Mobile: una sola lista "Gestión" -inventario/Funes colapsados en un
+       acordeon, no da para repetir 2 titulos desglosados en tan poco ancho-
+       con los 2 CTAs que antes vivian en la barra fija de abajo (Cargar
+       estante/Marcar vendidos) como items mas de la misma lista. Desktop
+       sigue como estaba: las 2 bifurcaciones siempre desglosadas, sin
+       acordeon y sin los CTAs (esos son y fueron siempre mobile-only). #}
+    <div class="lg:hidden">
+      <p class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5">Gestión</p>
+      <div class="space-y-1.5">
+        <div>
+          <button type="button" data-acordeon="gestion-inventario"
+            class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium"
+            style="border: 1px solid rgb(var(--borde))">
+            Gestionar inventario
+            <span class="acordeon-flecha text-gris" aria-hidden="true">▾</span>
+          </button>
+          {# ml-4: un poco mas adelantados que el boton que los despliega, y
+             por eso mismo mas cortos horizontalmente -mismo ancho del
+             contenedor, borde derecho igual, borde izquierdo corrido. #}
+          <div id="gestion-inventario" class="hidden ml-4 mt-1.5 space-y-1.5">
+            <a href="{{ url_inventario }}"
+              class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium text-sm"
+              style="border: 1px solid rgb(var(--borde))">
+              Ver inventario 📖
+            </a>
+            <a href="{{ url_catalogos }}"
+              class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium text-sm"
+              style="border: 1px solid rgb(var(--borde))">
+              Ver catálogos 🗂️
+            </a>
+          </div>
+        </div>
+
+        {% if libreria.funes_habilitado %}
+        <div>
+          <button type="button" data-acordeon="gestion-funes"
+            class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium"
+            style="border: 1px solid rgb(var(--borde))">
+            Gestionar a Funes
+            <span class="acordeon-flecha text-gris" aria-hidden="true">▾</span>
+          </button>
+          <div id="gestion-funes" class="hidden ml-4 mt-1.5 space-y-1.5">
+            <a href="{{ url_funes }}" target="_blank" rel="noopener"
+              class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium text-sm"
+              style="border: 1px solid rgb(var(--borde))">
+              Ir a Funes 🌀
+            </a>
+            <button type="button" onclick="copiarLink('{{ url_funes }}', this)"
+              class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium text-sm"
+              style="border: 1px solid rgb(var(--borde))">
+              Copiar link 🔗
+            </button>
+          </div>
+        </div>
+        {% endif %}
+
+        <button id="btn-cargar" type="button"
+          class="tap btn-primario w-full rounded-xl2 font-bold text-lg flex items-center justify-center gap-1 border-2 border-celeste relative">
+          {{ et.accion_cargar }} 📷
+          {% if libreria.tipo_catalogo != 'cds' %}
+          {# La guia ("Como sacar una buena foto") ya no es un link aparte
+             abajo -se saco toda la barra fija-, ahora es este (i) adentro
+             del boton: stopPropagation para que tocarlo lleve a la guia
+             sin disparar tambien el click del boton (que abre la camara). #}
+          <span id="btn-info-guia" role="button" tabindex="0" aria-label="Cómo sacar una buena foto"
+            class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border border-tinta/30 flex items-center justify-center text-sm font-normal text-tinta/70">
+            i
+          </span>
+          {% endif %}
+        </button>
+        <a href="{{ url_vender }}"
+          class="tap btn-primario w-full rounded-xl2 font-bold text-lg flex items-center justify-center gap-1 border-2 border-ambar">
+          Marcar vendidos 💰
+        </a>
+      </div>
+    </div>
+
+    <div class="hidden lg:block space-y-4">
       <div>
         <p class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5">Gestionar inventario</p>
         <div class="space-y-1.5">
@@ -112,10 +186,8 @@
             style="border: 1px solid rgb(var(--borde))">
             Copiar link 🔗
           </button>
-          {# Solo desktop por ahora: la pagina de destino todavia no tiene una
-             lectura movil pensada como flujo principal, solo una version reducida. #}
           <a href="{{ url_funes_metricas }}"
-            class="tap btn-secundario w-full hidden lg:flex items-center justify-start px-4 rounded-xl2 font-medium"
+            class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
             style="border: 1px solid rgb(var(--borde))">
             Ver estadísticas 📊
           </a>
@@ -262,24 +334,6 @@
   </main>
 
   <input id="input-fotos" type="file" accept="image/*" multiple class="hidden">
-
-  <div class="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto bg-crema/95 backdrop-blur-0 border-t border-borde px-5 py-3 safe-b lg:hidden">
-    <div class="space-y-2">
-      <button id="btn-cargar" type="button"
-        class="tap btn-primario w-full rounded-xl2 font-bold text-lg flex items-center justify-center gap-1 border-2 border-celeste">
-        {{ et.accion_cargar }} 📷
-      </button>
-      <a href="{{ url_vender }}"
-        class="tap btn-primario w-full rounded-xl2 font-bold text-lg flex items-center justify-center gap-1 border-2 border-ambar">
-        Marcar vendidos 💰
-      </a>
-    </div>
-    {% if libreria.tipo_catalogo != 'cds' %}
-    <p class="text-center text-xs text-gris mt-2">
-      <a href="{{ url_guia }}" class="text-celeste font-medium underline underline-offset-2">Cómo sacar una buena foto</a>
-    </p>
-    {% endif %}
-  </div>
 </div>
 
 <script>
@@ -293,6 +347,27 @@
   // estante con varios lomos), asi que la guia de "2 pasos" no le sirve —
   // el boton abre la camara/galeria directo, sin pasar nunca por ahi.
   const SALTAR_GUIA_SIEMPRE = {{ 'true' if libreria.tipo_catalogo == 'cds' else 'false' }};
+
+  const btnInfoGuia = document.getElementById('btn-info-guia');
+  if (btnInfoGuia) {
+    btnInfoGuia.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      window.location.href = URL_GUIA;
+    });
+  }
+
+  // Acordeon de "Gestión" (mobile): cada boton con data-acordeon muestra/
+  // esconde el div con su mismo id, sin exclusividad entre ellos -no hace
+  // falta cerrar uno para abrir el otro, son 2 nada mas.
+  document.querySelectorAll('[data-acordeon]').forEach((boton) => {
+    const contenido = document.getElementById(boton.dataset.acordeon);
+    const flecha = boton.querySelector('.acordeon-flecha');
+    boton.addEventListener('click', () => {
+      const vaAAbrir = contenido.classList.contains('hidden');
+      contenido.classList.toggle('hidden', !vaAAbrir);
+      if (flecha) flecha.textContent = vaAAbrir ? '▴' : '▾';
+    });
+  });
 
   function copiarLink(texto, btn) {
     navigator.clipboard.writeText(texto).then(function () {
