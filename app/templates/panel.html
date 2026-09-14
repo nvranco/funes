@@ -21,10 +21,11 @@
    para que el banner verde llegue a los dos bordes en desktop, igual que en
    /admin y en el tablero de piloto. #}
 <header class="bg-celeste">
-  {# py-4 uniforme (sin bump en mobile) y "Admin" siempre visible: mismo
-     tamaño y contenido que el header de admin.html en todas las pantallas,
-     no solo en desktop. #}
-  <div class="max-w-6xl mx-auto px-5 lg:px-6 py-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
+  {# px-6/py-4 uniformes (sin bump en mobile) y "Admin" siempre visible:
+     mismo tamaño, mismo padding y mismo contenido que el header de
+     admin.html en todas las pantallas -asi el logo de Funes cae exactamente
+     en el mismo lugar en las dos pantallas, no solo se parecen. #}
+  <div class="max-w-6xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
     <div class="flex items-center gap-2">
       <h1 class="text-2xl font-bold text-tinta leading-tight" style="font-family: var(--font-display);">Funes</h1>
       <svg viewBox="0 0 32 32" class="w-6 h-6 text-tinta shrink-0" fill="none"
