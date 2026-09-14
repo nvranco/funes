@@ -148,7 +148,7 @@
             <p class="text-2xl font-bold flex items-center justify-center gap-1">
               <span data-contador="{{ cant_libros }}">0</span><span class="text-sm">📖</span>
             </p>
-            <p class="text-xs text-gris mt-1">{{ et.libro if cant_libros == 1 else et.libros }} publicado{{ 's' if cant_libros != 1 else '' }}</p>
+            <p class="text-xs text-gris mt-1">{{ (et.libro if cant_libros == 1 else et.libros)|capitalize }} publicado{{ 's' if cant_libros != 1 else '' }}</p>
           </div>
           <div class="bg-papel border border-borde rounded-xl2 p-5 text-center">
             <p class="text-2xl font-bold flex items-center justify-center gap-1">
@@ -178,7 +178,7 @@
             <p class="text-2xl font-bold flex items-center justify-center gap-1">
               <span data-contador="{{ cobertura.matched }}">0</span><span class="text-sm">🌀</span>
             </p>
-            <p class="text-xs text-gris mt-1">{{ et.libro if cobertura.matched == 1 else et.libros }} recomendado{{ 's' if cobertura.matched != 1 else '' }}</p>
+            <p class="text-xs text-gris mt-1">{{ (et.libro if cobertura.matched == 1 else et.libros)|capitalize }} recomendado{{ 's' if cobertura.matched != 1 else '' }}</p>
           </div>
           {% endif %}
         </div>
