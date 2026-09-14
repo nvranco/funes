@@ -48,13 +48,32 @@
       </div>
     </div>
 
+    {# grid de CLUSTERS, no de tarjetas: un grid en filas por tarjeta
+       intercala catalogos de nivel 0 con subcatalogos de otros padres que no
+       tienen nada que ver -quedan lejos de su padre apenas no entran los dos
+       en la misma fila/columna (y "columns" con balanceo automatico tiene el
+       mismo problema: el navegador reordena para parejar alturas, un
+       subcatalogo puede terminar en otra columna que su padre). Se arma un
+       wrapper por catalogo de nivel 0 que se queda con sus subcatalogos
+       adentro (hermanos DEL WRAPPER, no de la tarjeta del padre -ver el
+       comentario de abajo sobre por que la tarjeta del padre no puede
+       envolver a la del hijo), y ES ESE WRAPPER el que entra al grid: adentro
+       el padre y sus hijos siempre se apilan juntos, en el orden en que
+       vienen. #}
     <div class="mt-2 space-y-2 lg:space-y-0 lg:mt-3 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">
     {% for c in catalogos %}
+    {% if c.nivel == 0 %}
+      {% if not loop.first %}</div>{% endif %}
+      <div class="space-y-2">
+    {% endif %}
     {# Los subcatalogos (nivel 1) se pintan como hermanos indentados, NUNCA
        anidados en el DOM dentro de la tarjeta del padre: el JS de abajo hace
        querySelectorAll('[id^="catalogo-"]') + tarjeta.querySelector(...) por
        tarjeta, y anidar en el DOM haria que esos querySelector del padre
-       pudieran matchear elementos del hijo. #}
+       pudieran matchear elementos del hijo. (Si estan envueltos en el
+       wrapper de arriba en cambio no hay problema: ese wrapper no matchea
+       '[id^="catalogo-"]', asi que padre e hijo siguen siendo tarjetas
+       hermanas entre si a los ojos del JS.) #}
     <div id="catalogo-{{ c.id }}" data-nivel="{{ c.nivel }}" data-padre-nombre="{{ c.padre_nombre or '' }}"
       class="{{ c.color.bg }} border {{ c.color.borde }} rounded-lg p-2.5 {{ 'ml-4 border-l-4' if c.nivel == 1 else '' }}">
       <div data-rol="vista">
@@ -132,8 +151,9 @@
       </div>
       {% endif %}
     </div>
+    {% if loop.last %}</div>{% endif %}
     {% else %}
-    <p class="lg:col-span-2 xl:col-span-3 text-center text-gris text-sm mt-6">
+    <p class="text-center text-gris text-sm mt-6">
       Todavía no creaste ningún catálogo. Creá uno con el botón de arriba,
       o esperá a publicar un lote nuevo — ahí también vas a poder elegir uno.
     </p>
