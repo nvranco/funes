@@ -132,18 +132,20 @@ async def panel_home(request: Request, slug: str, token: str):
     )
     metricas_ciclo = calcular_metricas(filas_eventos_ciclo, [], [], filas_catalogos)
 
-    # La bateria ampliada (cobertura, calidad de la semana, log combinado)
-    # solo tiene sentido con Funes prendido — el resto de las consultas ni
-    # se disparan si no, para no pagar ese costo en cada libreria sin Funes.
+    # La bateria ampliada (cobertura, calidad de la semana) solo tiene sentido
+    # con Funes prendido — esas consultas ni se disparan si no, para no pagar
+    # ese costo en cada libreria sin Funes. El log de actividad si se arma
+    # siempre: sin Funes, es sencillamente el feed de catalogo solo (mismo
+    # macro, _combinar_eventos con una lista de Funes vacia).
     con_funes = libreria["funes_habilitado"] and libreria["tipo_catalogo"] == "libros"
     dashboard_funes = None
     cobertura = None
-    eventos_combinados = []
+    eventos_funes = []
     if con_funes:
         dashboard_funes = await panel_funes.calcular(libreria["id"])
         cobertura = await funes_nucleo.cobertura_libreria(slug)
-        eventos_combinados = _combinar_eventos(
-            metricas_ciclo["eventos_recientes"], dashboard_funes["eventos"])
+        eventos_funes = dashboard_funes["eventos"]
+    eventos_combinados = _combinar_eventos(metricas_ciclo["eventos_recientes"], eventos_funes)
 
     base = str(request.base_url).rstrip("/")
     return templates.TemplateResponse(
