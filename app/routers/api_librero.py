@@ -350,6 +350,7 @@ async def actualizar_libro(slug: str, token: str, libro_id: int, cambios: Actual
         SET titulo = $1, autor = $2, estado = $3,
             publicado_en = CASE WHEN $3 = 'publicado' THEN now() ELSE publicado_en END,
             vendido_en = CASE WHEN $3 = 'vendido' THEN now() ELSE vendido_en END,
+            archivado_en = CASE WHEN $3 = 'vendido' THEN now() ELSE archivado_en END,
             mostrar_foto = COALESCE($6, mostrar_foto)
         WHERE id = $4 AND libreria_id = $5
         """,
@@ -579,7 +580,7 @@ async def confirmar_vendidos(slug: str, token: str, datos: ConfirmarVentas):
 
     resultado = await db.pool().execute(
         """
-        UPDATE libros SET estado = 'vendido', vendido_en = now()
+        UPDATE libros SET estado = 'vendido', vendido_en = now(), archivado_en = now()
         WHERE id = ANY($1::int[]) AND libreria_id = $2 AND estado = 'publicado'
         """,
         datos.libro_ids, libreria["id"],

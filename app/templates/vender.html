@@ -1,18 +1,18 @@
 {% extends "base.html" %}
-{% block titulo %}Marcar vendidos — {{ libreria.nombre }}{% endblock %}
+{% block titulo %}Remover {{ et.libros }} — {{ libreria.nombre }}{% endblock %}
 {% block contenido %}
 <div class="min-h-screen flex flex-col">
 
   <header class="bg-celeste px-5 pt-8 pb-6">
     <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
-    <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Marcar vendidos</h1>
+    <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Remover {{ et.libros }}</h1>
   </header>
 
   <main class="flex-1 px-5 pt-5 pb-10">
 
     <div id="paso-intro">
       <div id="tarjeta-fotos" class="bg-papel border border-borde rounded-xl2 p-3">
-        <p class="font-medium">¿Vendiste varios {{ et.libros }}?</p>
+        <p class="font-medium">¿Removiste varios {{ et.libros }}?</p>
         <p class="text-sm text-gris mt-1">
           Cargá una foto con los lomos hacia la cámara y los detectamos para que confirmes.
         </p>
@@ -44,7 +44,7 @@
     </div>
 
     <div id="paso-confirmar" class="hidden">
-      <p class="text-sm text-gris mb-3">Confirmá cuáles vendiste. Los que destildes quedan como estaban.</p>
+      <p class="text-sm text-gris mb-3">Confirmá cuáles removiste. Los que destildes quedan como estaban.</p>
       <div id="lista-encontrados" class="space-y-2"></div>
 
       <div id="bloque-no-encontrados" class="hidden mt-5">
@@ -54,7 +54,7 @@
 
       <div class="mt-6 space-y-2">
         <button id="btn-confirmar-ventas" type="button" class="tap btn-primario w-full rounded-xl2 font-bold text-lg">
-          Confirmar venta
+          Confirmar remoción
         </button>
         <button id="btn-cancelar-ventas" type="button" class="tap btn-secundario w-full rounded-xl2 text-sm font-medium">
           Cancelar
@@ -138,7 +138,7 @@
           <p class="text-sm text-gris truncate">${escaparHtml(libro.autor || `${ET_AUTOR_CAP} no disponible`)}</p>
         </div>
         <button type="button" data-accion="vendido" class="tap btn-secundario shrink-0 rounded-lg px-3 text-sm font-medium">
-          Marcar vendido
+          Marcar removido
         </button>
       </div>
     `).join('');
@@ -157,16 +157,16 @@
             body: JSON.stringify({ titulo: libro.titulo, autor: libro.autor, estado: 'vendido' }),
           });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          boton.textContent = 'Vendido ✓';
+          boton.textContent = 'Removido ✓';
           boton.classList.add('opacity-60');
           setTimeout(() => {
             libros = libros.filter((l) => l.id !== id);
             renderBusqueda();
           }, 700);
         } catch (err) {
-          alert('No se pudo marcar como vendido. Probá de nuevo.');
+          alert('No se pudo marcar como removido. Probá de nuevo.');
           boton.disabled = false;
-          boton.textContent = 'Marcar vendido';
+          boton.textContent = 'Marcar removido';
         }
       });
     });
@@ -302,7 +302,7 @@
 
   function actualizarBotonConfirmar() {
     const cant = encontrados.filter((i) => i.incluido).length;
-    btnConfirmarVentas.textContent = cant > 0 ? `Confirmar venta de ${cant} ${cant === 1 ? ET_LIBRO : ET_LIBROS}` : 'Confirmar venta';
+    btnConfirmarVentas.textContent = cant > 0 ? `Confirmar remoción de ${cant} ${cant === 1 ? ET_LIBRO : ET_LIBROS}` : 'Confirmar remoción';
     btnConfirmarVentas.disabled = cant === 0;
     btnConfirmarVentas.classList.toggle('opacity-60', cant === 0);
   }
@@ -359,11 +359,11 @@
       libros = libros.filter((l) => !idsConfirmados.includes(l.id));
       pasoConfirmar.classList.add('hidden');
       pasoVacio.classList.remove('hidden');
-      mensajeVacioVenta.textContent = `¡Listo! Marcamos ${resultado.vendidos} ${resultado.vendidos === 1 ? ET_LIBRO : ET_LIBROS} como vendido${resultado.vendidos === 1 ? '' : 's'}.`;
+      mensajeVacioVenta.textContent = `¡Listo! Removimos ${resultado.vendidos} ${resultado.vendidos === 1 ? ET_LIBRO : ET_LIBROS}.`;
       listaNoEncontradosVacio.innerHTML = '';
       btnReintentar.textContent = 'Volver al panel';
     } catch (err) {
-      alert('No se pudo confirmar la venta. Probá de nuevo.');
+      alert('No se pudo confirmar la remoción. Probá de nuevo.');
       btnConfirmarVentas.disabled = false;
       btnCancelarVentas.disabled = false;
       actualizarBotonConfirmar();

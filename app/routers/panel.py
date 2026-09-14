@@ -436,7 +436,7 @@ async def panel_inventario(request: Request, slug: str, token: str):
         """
         SELECT id, titulo, autor, estado, catalogo_id, foto_portada_id
         FROM libros
-        WHERE libreria_id = $1 AND estado IN ('publicado', 'vendido') AND archivado_en IS NULL
+        WHERE libreria_id = $1 AND estado = 'publicado' AND archivado_en IS NULL
         ORDER BY titulo
         """,
         libreria["id"],
