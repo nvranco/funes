@@ -168,7 +168,7 @@
         {% if e.tipo == 'vista' %}
         <p>Alguien miró tu catálogo{% if e.payload.catalogo_nombre %} <em>{{ e.payload.catalogo_nombre }}</em>{% endif %}. 👀</p>
         {% elif e.tipo == 'busqueda' %}
-        <p>Alguien buscó "{{ e.payload.q }}" en tu catálogo{% if not e.payload.resultados %} y no encontró nada{% endif %}. 🔍</p>
+        <p>Alguien buscó "{{ e.payload.q }}" en tu catálogo{% if e.payload.catalogo_nombre %} <em>{{ e.payload.catalogo_nombre }}</em>{% endif %}{% if not e.payload.resultados %} y no encontró nada{% endif %}. 🔍</p>
         {% elif e.tipo == 'clic_whatsapp' %}
         <p>Un lector te escribió por WhatsApp{% if e.payload.titulo %} sobre <em>{{ e.payload.titulo }}</em>{% endif %}. 💬</p>
         {% endif %}

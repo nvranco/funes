@@ -53,7 +53,7 @@ HUSO = datetime.timezone(datetime.timedelta(hours=-3))
 # locale del proceso (distinto entre la notebook y Railway, y ninguno de los
 # dos garantiza tener el locale es_AR instalado), asi que un offset fijo por
 # weekday() es lo unico que se comporta igual en todos lados.
-DIAS_CORTOS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
+DIAS_CORTOS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 DIAS_LARGOS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 
 
