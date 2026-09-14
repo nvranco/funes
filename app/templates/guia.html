@@ -5,13 +5,13 @@
 
   <header class="bg-celeste px-5 pt-8 pb-6">
     <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
-    <h1 class="text-2xl font-bold text-tinta leading-tight mt-1">Cómo cargar tus {{ et.libros }}</h1>
+    <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Cómo cargar tus {{ et.libros }}</h1>
     <p class="text-sm text-tinta/80 mt-1">
       Librero digitaliza tu catálogo de 2 formas — podés usar las dos, incluso mezcladas en una misma carga.
     </p>
   </header>
 
-  <main class="flex-1 px-5 py-5 pb-40">
+  <main class="flex-1 px-5 py-5 pb-10">
 
     <div id="paso-1">
       <p class="text-xs font-bold text-gris uppercase tracking-wide mb-1">Paso 1 de 2 · Digitalización masiva</p>
@@ -43,7 +43,7 @@
         <strong>No te preocupes por los duplicados:</strong> se detectan solos, no se repiten en tu catálogo.
       </p>
 
-      <button id="btn-paso-siguiente" type="button" class="tap btn-primario w-full rounded-xl2 font-bold mt-5">
+      <button id="btn-paso-siguiente" type="button" class="tap btn-secundario w-full rounded-xl2 font-medium mt-5">
         Siguiente: cargar un {{ et.libro }} particular →
       </button>
     </div>
@@ -84,17 +84,17 @@
 
       <div class="flex gap-2 mt-5">
         <button id="btn-paso-atras" type="button" class="tap btn-secundario flex-1 rounded-xl2 font-medium">
-          ← Atrás
+          Atrás
         </button>
-        <button id="btn-confirmar-guia" type="button" class="tap btn-primario flex-1 rounded-xl2 font-bold">
+        <button id="btn-confirmar-guia" type="button" class="tap btn-secundario flex-1 rounded-xl2 font-medium">
           Entendido, sacar fotos
         </button>
       </div>
     </div>
 
     <div id="carga-estado" class="mt-6 hidden">
-      <div class="bg-papel border-2 border-celeste rounded-xl2 p-4 shadow-sm">
-        <p id="carga-mensaje" class="font-bold text-lg">Subiendo fotos…</p>
+      <div class="bg-papel rounded-xl2 p-4" style="border: 1px solid rgb(var(--borde))">
+        <p id="carga-mensaje" class="font-medium">Subiendo fotos…</p>
         <p id="carga-detalle" class="text-sm text-gris mt-0.5">&nbsp;</p>
         <div class="mt-3 h-2 w-full bg-borde rounded-full overflow-hidden">
           <div id="carga-barra" class="h-full bg-celeste rounded-full transition-all duration-700 ease-out" style="width: 4%"></div>
