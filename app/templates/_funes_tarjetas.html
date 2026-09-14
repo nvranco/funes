@@ -161,23 +161,31 @@
     {% for e in eventos %}
     <div class="text-xs leading-snug pb-2.5 border-b border-borde/60 last:border-0">
       <p class="text-[10px] text-gris tabular-nums">{{ e.creado_en.strftime('%d/%m %H:%M') }}</p>
+      {# Emoji al final de cada linea segun que paso -mismo criterio que un
+         chat: da un vistazo del tono del feed antes de leer el texto. Para
+         recomendacion, depende del veredicto (o su ausencia), no del tipo. #}
       {% if e.origen == 'inventario' %}
         {% if e.tipo == 'vista' %}
-        <p>Alguien miró tu catálogo{% if e.payload.catalogo_nombre %} <em>{{ e.payload.catalogo_nombre }}</em>{% endif %}.</p>
+        <p>Alguien miró tu catálogo{% if e.payload.catalogo_nombre %} <em>{{ e.payload.catalogo_nombre }}</em>{% endif %}. 👀</p>
         {% elif e.tipo == 'busqueda' %}
-        <p>Alguien buscó "{{ e.payload.q }}" en tu catálogo{% if not e.payload.resultados %} y no encontró nada{% endif %}.</p>
+        <p>Alguien buscó "{{ e.payload.q }}" en tu catálogo{% if not e.payload.resultados %} y no encontró nada{% endif %}. 🔍</p>
         {% elif e.tipo == 'clic_whatsapp' %}
-        <p>Un lector te escribió por WhatsApp{% if e.payload.titulo %} sobre <em>{{ e.payload.titulo }}</em>{% endif %}.</p>
+        <p>Un lector te escribió por WhatsApp{% if e.payload.titulo %} sobre <em>{{ e.payload.titulo }}</em>{% endif %}. 💬</p>
         {% endif %}
       {% else %}
         {% if e.tipo == 'abandono' %}
-        <p>Un lector inició una conversación con Funes pero la abandonó antes de recibir una recomendación.</p>
+        <p>Un lector inició una conversación con Funes pero la abandonó antes de recibir una recomendación. 👋</p>
         {% else %}
         <p>
           Funes le recomendó a un lector <em>{{ e.titulo }}</em>{% if e.autor %} de <em>{{ e.autor }}</em>{% endif -%}
           {%- if e.veredicto_label %} y éste la valoró como
           <span style="color: {{ TONOS[e.veredicto_color] }}" class="font-medium">{{ e.veredicto_label }}</span>
           {%- endif %}.
+          {%- if e.veredicto_color == 'verde' %} 🎯
+          {%- elif e.veredicto_color == 'gris' %} 🤷
+          {%- elif e.veredicto_color == 'rojo' %} 👎
+          {%- else %} ⏳
+          {%- endif %}
         </p>
         {% endif %}
       {% endif %}
