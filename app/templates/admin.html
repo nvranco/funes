@@ -6,11 +6,13 @@
    (selector por tag, no por clase) para que el banner verde llegue a los dos
    bordes de la pantalla, igual que en el tablero de piloto. #}
 <header class="bg-celeste">
-  <div class="max-w-6xl mx-auto px-6 py-5 flex items-center gap-2">
-    <h1 class="text-3xl font-bold text-tinta leading-tight" style="font-family: var(--font-display);">Funes</h1>
+  <div class="max-w-6xl mx-auto px-6 py-4 flex items-center gap-2">
+    <h1 class="text-2xl font-bold text-tinta leading-tight" style="font-family: var(--font-display);">Funes</h1>
     {# Mismo laberinto que la cabecera del chat y del tablero de piloto: es la
-       marca de Funes, no un adorno nuevo por pantalla. #}
-    <svg viewBox="0 0 32 32" class="w-7 h-7 text-tinta shrink-0" fill="none"
+       marca de Funes, no un adorno nuevo por pantalla. Mismo alto que el
+       header de funes_chat.html (py-4/text-2xl/w-6 h-6) para que el banner
+       verde mida igual en todas las pantallas de Funes. #}
+    <svg viewBox="0 0 32 32" class="w-6 h-6 text-tinta shrink-0" fill="none"
          stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
       <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
       <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
