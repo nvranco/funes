@@ -127,10 +127,20 @@
     {% if eventos_combinados %}
     {# Debajo de las dos bifurcaciones, en la misma columna -ancho 420px-,
        no al lado de los indicadores. Titulo afuera de la tarjeta, mismo
-       patron que "Lo que mas funciono" en la columna de al lado. #}
+       patron que "Lo que mas funciono" en la columna de al lado.
+       Dos llamadas al macro (mismo patron que funes_metricas.html): en
+       mobile, alto=420 deja la tarjeta tapada por la barra fija de abajo
+       (Cargar estante / Marcar vendidos) porque ahi no hay nada al lado
+       con que igualar altura -a diferencia de desktop, donde 420px
+       empareja el resto de la columna derecha. #}
     <div class="mt-6">
       <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Actividad</h2>
-      {{ log_actividad(eventos_combinados, TONOS, alto=420, mostrar_titulo=false) }}
+      <div class="lg:hidden">
+        {{ log_actividad(eventos_combinados, TONOS, alto=230, mostrar_titulo=false) }}
+      </div>
+      <div class="hidden lg:block">
+        {{ log_actividad(eventos_combinados, TONOS, alto=420, mostrar_titulo=false) }}
+      </div>
     </div>
     {% endif %}
     </div>
