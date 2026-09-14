@@ -628,6 +628,24 @@ async def admin_piloto(request: Request, token: str, desde: str = "", hasta: str
     )
 
 
+@router.get("/funes/admin/{token}/piloto.json")
+async def admin_piloto_json(token: str, desde: str = "", hasta: str = "", origen: str = ""):
+    """Lo mismo que /piloto, sin la plantilla: el tablero entero -las cuatro
+    hipotesis, la escalera de abandono, la concentracion, la salud- como JSON,
+    para comparar rangos de fecha o cohortes desde afuera (un analisis, un
+    script) sin tener que scrapear el HTML pensado para mirarse de un vistazo.
+
+    Misma logica exacta que /piloto (llama a piloto.calcular()): no hay una
+    segunda cuenta de las hipotesis dando vueltas que se pueda desincronizar de
+    la que ya esta probada."""
+    _validar_admin(token)
+    d, h = _fecha(desde), _fecha(hasta)
+    if d and h and d > h:
+        d, h = h, d
+    cohortes = [x for x in (o.strip() for o in origen.split(",")) if x] or None
+    return await piloto.calcular(d, h, cohortes)
+
+
 @router.get("/funes/admin/{token}/bitacora")
 async def admin_bitacora(token: str):
     """La consulta de cohortes de la prueba piloto, en un solo lugar.
@@ -715,7 +733,10 @@ async def admin_conversaciones(token: str, limite: int = 5, sesion: str = "",
 
     Es de solo lectura y va detras del mismo token que el resto del panel."""
     _validar_admin(token)
-    limite = max(1, min(int(limite), 25))
+    # Temp: subir el tope de 25 a 2000 para exportar el piloto entero y buscar
+    # bugs leyendo las conversaciones reales (mismo motivo que a833f01). Se
+    # revierte apenas termina el volcado.
+    limite = max(1, min(int(limite), 2000))
 
     if sesion:
         sesiones = await db.pool().fetch(
