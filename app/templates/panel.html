@@ -279,15 +279,20 @@
     {% endif %}
     </div>
 
-    <div class="min-w-0 space-y-6">
+    <div class="min-w-0">
       {# Bateria basica: la misma para todas las librerias. Libros publicados
          es nuevo (existia el dato, cant_libros, pero no tenia tarjeta propia
          -antes solo se usaba para decidir el estado vacio). Catalogo/libros
          van estirados en su propia fila -son los dos numeros "de fondo" del
          inventario- y el resto (comportamiento del ciclo) abajo.
          hidden lg:block: en mobile ya se ve arriba de todo, ver el bloque
-         nuevo al principio de <main>. #}
-      <div class="hidden lg:block">
+         nuevo al principio de <main>. lg:mb-6 (no space-y con lo de abajo):
+         en mobile este bloque esta oculto pero sigue siendo hijo del div
+         padre, asi que un space-y-6 ahi le habria dado igual un margen
+         fantasma al siguiente hijo (Visitas) aunque este invisible -sumado
+         al gap-6 del grid, quedaba el doble de separacion que en el resto
+         de los saltos de seccion. #}
+      <div class="hidden lg:block lg:mb-6">
         <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Resumen</h2>
         <div class="grid grid-cols-2 gap-3">
           <div class="bg-papel border border-borde rounded-xl2 p-5 text-center">
@@ -334,6 +339,10 @@
         </div>
       </div>
 
+      {# Grupo aparte del Resumen de arriba: asi el primer hijo real de este
+         space-y-6 en mobile es Visitas (Resumen esta oculto ahi), sin el
+         margen fantasma que describe el comentario de arriba. #}
+      <div class="space-y-6">
       <div>
         <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Visitas</h2>
         {# Mismo alto fijo que Recomendaciones de al lado (alto_seccion=233 en
@@ -409,6 +418,7 @@
         {{ log_actividad(eventos_combinados, TONOS, alto=420, mostrar_titulo=false) }}
       </div>
       {% endif %}
+      </div>
     </div>
 
   </div>
