@@ -52,7 +52,6 @@
      mas de una fila en desktop para no romper el alto calibrado a mano
      entre Actividad y el resto. #}
   <div class="lg:hidden mb-6">
-    <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Resumen</h2>
     <div class="grid grid-cols-2 gap-1.5">
       <div class="bg-papel border border-borde rounded-xl2 p-5 text-center">
         <p class="text-2xl font-bold flex items-center justify-center gap-1">
@@ -344,7 +343,7 @@
          margen fantasma que describe el comentario de arriba. #}
       <div class="space-y-6">
       <div>
-        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Visitas</h2>
+        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5 lg:mb-2">Visitas</h2>
         {# Mismo alto fijo que Recomendaciones de al lado (alto_seccion=233 en
            su macro): las dos tarjetas se reparten lo que le sobraba a esta
            columna contra la de Actividad, sin pasarse. #}
@@ -384,14 +383,14 @@
          de Funes, al lado del de visitas de arriba para que se puedan
          comparar las dos señales del ciclo actual. #}
       <div>
-        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Recomendaciones</h2>
+        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5 lg:mb-2">Recomendaciones</h2>
         {{ grafico_calidad(dashboard_funes, TONOS, alto_seccion=233, alto_barras=140, mostrar_titulo=false, mostrar_grilla=false) }}
       </div>
       {% endif %}
 
       {% if top_catalogos %}
       <div>
-        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">🏆 Lo que más funcionó</h2>
+        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5 lg:mb-2">🏆 Lo que más funcionó</h2>
         <div class="space-y-2">
           {% for c in top_catalogos %}
           <div class="{{ c.color.bg }} border {{ c.color.borde }} rounded-xl2 p-3 flex items-center gap-3">
@@ -414,7 +413,7 @@
          del pliegue (no hay barra fija abajo desde que Gestión dejó de
          tenerla), la pagina simplemente sigue y se scrollea. #}
       <div class="lg:hidden">
-        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Actividad</h2>
+        <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5">Actividad</h2>
         {{ log_actividad(eventos_combinados, TONOS, alto=420, mostrar_titulo=false) }}
       </div>
       {% endif %}
