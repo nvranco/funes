@@ -1,45 +1,52 @@
 {% extends "base.html" %}
 {% block titulo %}Inventario — {{ libreria.nombre }}{% endblock %}
 {% block contenido %}
-<div class="min-h-screen flex flex-col">
-
-  <header class="bg-celeste px-5 pt-8 pb-6">
+<header class="bg-celeste px-5 pt-8 pb-6">
+  <div class="max-w-6xl mx-auto">
     <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
     <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Inventario ({{ cant_libros }})</h1>
-  </header>
+  </div>
+</header>
 
+<div class="min-h-screen max-w-6xl mx-auto flex flex-col">
   <main class="flex-1 px-5 pt-5 pb-10">
-    <div class="bg-papel border border-borde rounded-xl2 p-3">
-      <p class="font-medium">Catálogo general</p>
-      <p class="text-xs text-gris mt-1">Todos tus {{ et.libros }} publicados</p>
-      <div class="flex gap-2 mt-2">
-        <button type="button" id="btn-copiar-general" data-link="{{ url_publica }}"
-          class="tap btn-secundario flex-1 rounded-lg px-3 py-2 text-sm font-medium">Copiar link 📋</button>
-        <a href="{{ url_publica }}" target="_blank" rel="noopener"
-          class="tap btn-secundario shrink-0 flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium">Ir 🔗</a>
-        <a href="{{ url_qr }}" download="qr-{{ libreria.slug }}.png"
-          class="tap btn-secundario shrink-0 flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium">QR 🏷️</a>
+    <div class="lg:flex lg:gap-8 lg:items-start">
+      <div class="lg:w-80 lg:shrink-0">
+        <div class="bg-papel border border-borde rounded-xl2 p-3">
+          <p class="font-medium">Catálogo general</p>
+          <p class="text-xs text-gris mt-1">Todos tus {{ et.libros }} publicados</p>
+          <div class="flex gap-2 mt-2">
+            <button type="button" id="btn-copiar-general" data-link="{{ url_publica }}"
+              class="tap btn-secundario flex-1 rounded-lg px-3 py-2 text-sm font-medium">Copiar link 📋</button>
+            <a href="{{ url_publica }}" target="_blank" rel="noopener"
+              class="tap btn-secundario shrink-0 flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium">Ir 🔗</a>
+            <a href="{{ url_qr }}" download="qr-{{ libreria.slug }}.png"
+              class="tap btn-secundario shrink-0 flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium">QR 🏷️</a>
+          </div>
+        </div>
+
+        <input
+          id="buscador"
+          type="search"
+          inputmode="search"
+          placeholder="Buscar un {{ et.libro }} puntual…"
+          class="tap w-full rounded-xl2 border-2 border-tinta bg-papel px-4 py-2 text-lg outline-none placeholder:text-gris mt-4"
+        >
+
+        <div id="filtro-catalogo" class="hidden mt-3 flex items-center justify-between gap-2 bg-celeste-claro/50 border border-celeste rounded-lg px-3 py-2 text-sm">
+          <span>Mostrando: <strong id="filtro-catalogo-nombre"></strong></span>
+          <button type="button" id="btn-quitar-filtro" class="tap text-tinta font-medium underline underline-offset-2 shrink-0">Ver todos</button>
+        </div>
       </div>
-    </div>
 
-    <input
-      id="buscador"
-      type="search"
-      inputmode="search"
-      placeholder="Buscar un {{ et.libro }} puntual…"
-      class="tap w-full rounded-xl2 border-2 border-tinta bg-papel px-4 py-2 text-lg outline-none placeholder:text-gris mt-4"
-    >
+      <div class="lg:flex-1 lg:min-w-0">
+        <div id="lista" class="mt-4 space-y-2 lg:mt-0 lg:grid lg:grid-cols-3 lg:gap-3 lg:space-y-0"></div>
 
-    <div id="filtro-catalogo" class="hidden mt-3 flex items-center justify-between gap-2 bg-celeste-claro/50 border border-celeste rounded-lg px-3 py-2 text-sm">
-      <span>Mostrando: <strong id="filtro-catalogo-nombre"></strong></span>
-      <button type="button" id="btn-quitar-filtro" class="tap text-tinta font-medium underline underline-offset-2 shrink-0">Ver todos</button>
-    </div>
-
-    <div id="lista" class="mt-4 space-y-2"></div>
-
-    <div id="estado-vacio" class="hidden mt-14 text-center text-gris px-4">
-      <p class="text-4xl mb-3">📚</p>
-      <p>Todavía no tenés {{ et.libros }} publicados. Cargá y publicá un estante primero.</p>
+        <div id="estado-vacio" class="hidden mt-14 text-center text-gris px-4">
+          <p class="text-4xl mb-3">📚</p>
+          <p>Todavía no tenés {{ et.libros }} publicados. Cargá y publicá un estante primero.</p>
+        </div>
+      </div>
     </div>
 
     {% if cant_libros %}
@@ -185,8 +192,8 @@
 
     if (filtrados.length === 0) {
       lista.innerHTML = catalogoFiltro
-        ? `<p class="text-center text-gris py-8">Este catálogo todavía no tiene ${ET_LIBROS}.</p>`
-        : '<p class="text-center text-gris py-8">Nada coincide con esa búsqueda.</p>';
+        ? `<p class="lg:col-span-3 text-center text-gris py-8">Este catálogo todavía no tiene ${ET_LIBROS}.</p>`
+        : '<p class="lg:col-span-3 text-center text-gris py-8">Nada coincide con esa búsqueda.</p>';
       return;
     }
 
