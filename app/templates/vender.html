@@ -1,13 +1,14 @@
 {% extends "base.html" %}
 {% block titulo %}Remover {{ et.libros }} — {{ libreria.nombre }}{% endblock %}
 {% block contenido %}
-<div class="min-h-screen flex flex-col">
-
-  <header class="bg-celeste px-5 pt-8 pb-6">
+<header class="bg-celeste px-5 pt-8 pb-6">
+  <div class="max-w-2xl mx-auto">
     <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
     <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Remover {{ et.libros }}</h1>
-  </header>
+  </div>
+</header>
 
+<div class="min-h-screen max-w-2xl mx-auto flex flex-col">
   <main class="flex-1 px-5 pt-5 pb-10">
 
     <div id="paso-intro">

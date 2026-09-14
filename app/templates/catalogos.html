@@ -1,50 +1,54 @@
 {% extends "base.html" %}
 {% block titulo %}Mis catálogos — {{ libreria.nombre }}{% endblock %}
 {% block contenido %}
-<div class="min-h-screen flex flex-col">
-
-  <header class="bg-celeste px-5 pt-8 pb-6">
+<header class="bg-celeste px-5 pt-8 pb-6">
+  <div class="max-w-6xl mx-auto">
     <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
     <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Mis catálogos</h1>
-  </header>
+  </div>
+</header>
 
-  <main class="flex-1 px-5 py-5 space-y-2 pb-10">
-    <div class="bg-papel border border-borde rounded-xl2 p-3">
-      <p class="font-medium">Catálogo general</p>
-      <p class="text-xs text-gris mt-1">Todos tus {{ et.libros }} publicados</p>
-      <div class="flex gap-2 mt-2">
-        <button type="button" data-rol="copiar" data-link="{{ url_publica }}"
-          class="tap btn-secundario flex-1 rounded-lg px-3 py-2 text-sm font-medium">Copiar link 📋</button>
-        <a href="{{ url_publica }}" target="_blank" rel="noopener"
-          class="tap btn-secundario shrink-0 flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium">Ir 🔗</a>
-        <a href="{{ url_qr }}" download="qr-{{ libreria.slug }}.png"
-          class="tap btn-secundario shrink-0 flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium">QR 🏷️</a>
+<div class="min-h-screen max-w-6xl mx-auto flex flex-col">
+  <main class="flex-1 px-5 py-5 pb-10">
+    <div class="space-y-2 lg:max-w-xl">
+      <div class="bg-papel border border-borde rounded-xl2 p-3">
+        <p class="font-medium">Catálogo general</p>
+        <p class="text-xs text-gris mt-1">Todos tus {{ et.libros }} publicados</p>
+        <div class="flex gap-2 mt-2">
+          <button type="button" data-rol="copiar" data-link="{{ url_publica }}"
+            class="tap btn-secundario flex-1 rounded-lg px-3 py-2 text-sm font-medium">Copiar link 📋</button>
+          <a href="{{ url_publica }}" target="_blank" rel="noopener"
+            class="tap btn-secundario shrink-0 flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium">Ir 🔗</a>
+          <a href="{{ url_qr }}" download="qr-{{ libreria.slug }}.png"
+            class="tap btn-secundario shrink-0 flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium">QR 🏷️</a>
+        </div>
+      </div>
+
+      <button type="button" id="btn-nuevo-catalogo"
+        class="tap w-full text-left rounded-xl2 border-2 border-dashed border-borde p-3 text-gris font-medium">
+        + Crear catálogo
+      </button>
+
+      <div id="form-nuevo-catalogo" class="hidden bg-papel border border-borde rounded-xl2 p-3 space-y-2">
+        <input data-campo="nombre" placeholder="Nombre del catálogo (ej: Psicología)"
+          class="tap w-full rounded-lg border border-borde px-3 py-2 text-sm">
+        <textarea data-campo="descripcion" rows="2" placeholder="Descripción breve (opcional)"
+          class="w-full rounded-lg border border-borde px-3 py-2 text-sm resize-none"></textarea>
+        <div data-rol="paleta" class="flex flex-wrap gap-2 py-1">
+          {% for op in paleta %}
+          <button type="button" data-clave="{{ op.clave }}" aria-label="{{ op.nombre }}"
+            class="tap w-9 h-9 rounded-full shrink-0 {{ 'ring-2 ring-offset-2 ring-tinta' if loop.first else '' }}"
+            style="background:{{ op.bg }}; border:2px solid {{ op.borde }};"></button>
+          {% endfor %}
+        </div>
+        <div class="flex gap-2">
+          <button type="button" data-rol="crear" class="tap btn-primario flex-1 rounded-lg px-3 py-2 text-sm font-medium">Crear</button>
+          <button type="button" data-rol="cancelar" class="tap btn-secundario flex-1 rounded-lg px-3 py-2 text-sm font-medium">Cancelar</button>
+        </div>
       </div>
     </div>
 
-    <button type="button" id="btn-nuevo-catalogo"
-      class="tap w-full text-left rounded-xl2 border-2 border-dashed border-borde p-3 text-gris font-medium">
-      + Crear catálogo
-    </button>
-
-    <div id="form-nuevo-catalogo" class="hidden bg-papel border border-borde rounded-xl2 p-3 space-y-2">
-      <input data-campo="nombre" placeholder="Nombre del catálogo (ej: Psicología)"
-        class="tap w-full rounded-lg border border-borde px-3 py-2 text-sm">
-      <textarea data-campo="descripcion" rows="2" placeholder="Descripción breve (opcional)"
-        class="w-full rounded-lg border border-borde px-3 py-2 text-sm resize-none"></textarea>
-      <div data-rol="paleta" class="flex flex-wrap gap-2 py-1">
-        {% for op in paleta %}
-        <button type="button" data-clave="{{ op.clave }}" aria-label="{{ op.nombre }}"
-          class="tap w-9 h-9 rounded-full shrink-0 {{ 'ring-2 ring-offset-2 ring-tinta' if loop.first else '' }}"
-          style="background:{{ op.bg }}; border:2px solid {{ op.borde }};"></button>
-        {% endfor %}
-      </div>
-      <div class="flex gap-2">
-        <button type="button" data-rol="crear" class="tap btn-primario flex-1 rounded-lg px-3 py-2 text-sm font-medium">Crear</button>
-        <button type="button" data-rol="cancelar" class="tap btn-secundario flex-1 rounded-lg px-3 py-2 text-sm font-medium">Cancelar</button>
-      </div>
-    </div>
-
+    <div class="mt-2 space-y-2 lg:space-y-0 lg:mt-3 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">
     {% for c in catalogos %}
     {# Los subcatalogos (nivel 1) se pintan como hermanos indentados, NUNCA
        anidados en el DOM dentro de la tarjeta del padre: el JS de abajo hace
@@ -129,11 +133,12 @@
       {% endif %}
     </div>
     {% else %}
-    <p class="text-center text-gris text-sm mt-6">
+    <p class="lg:col-span-2 xl:col-span-3 text-center text-gris text-sm mt-6">
       Todavía no creaste ningún catálogo. Creá uno con el botón de arriba,
       o esperá a publicar un lote nuevo — ahí también vas a poder elegir uno.
     </p>
     {% endfor %}
+    </div>
   </main>
 </div>
 
