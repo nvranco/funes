@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     await db.cerrar()
 
 
-app = FastAPI(title="Librero", lifespan=lifespan)
+app = FastAPI(title="Funes", lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
