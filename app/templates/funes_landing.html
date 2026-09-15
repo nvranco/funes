@@ -4,7 +4,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Funes">
 <meta property="og:title" content="Funes">
-<meta property="og:description" content="Funes charla con vos hasta encontrar tu próximo libro, en el catálogo real de una librería.">
+<meta property="og:description" content="Funes lee el catálogo digital de tu librería y charla con tus lectores hasta encontrar su próximo libro.">
 <meta property="og:url" content="{{ base_url }}/">
 <meta property="og:image" content="{{ base_url }}/static/funes-og.png?v={{ og_version }}">
 <meta property="og:image:width" content="1200">
@@ -12,7 +12,7 @@
 <meta property="og:image:alt" content="Funes, un recomendador de libros">
 <meta property="og:locale" content="es_AR">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="description" content="Funes charla con vos hasta encontrar tu próximo libro, en el catálogo real de una librería.">
+<meta name="description" content="Funes lee el catálogo digital de tu librería y charla con tus lectores hasta encontrar su próximo libro.">
 {% if posthog_key %}
 <script src="{{ posthog_host }}/static/array.js"></script>
 <script>
@@ -46,10 +46,9 @@
       </svg>
       <h1 class="font-sans text-4xl font-bold text-tinta leading-tight mt-3">Funes</h1>
       <p class="mision text-base text-gris leading-relaxed mt-4 max-w-md mx-auto">
-        Te ayudo a encontrar tu próximo libro charlando — no por género ni
-        por autor, sino por cómo estás hoy. Y todo lo que te recomiendo
-        existe de verdad: sale del catálogo real de una librería, cargado
-        libro por libro.
+        Tu librería ya digitalizó su catálogo, libro por libro. Yo lo leo
+        entero y charlo con tus lectores hasta ayudarlos a encontrar, ahí
+        adentro, el que todavía no sabían que buscaban.
       </p>
       <a href="/funes"
          class="tap btn-primario border-celeste inline-flex items-center justify-center rounded-xl2 font-bold px-8 mt-6">
@@ -57,41 +56,41 @@
       </a>
     </section>
 
-    {# Orden: primero el corazon del producto -la charla misma, que es lo que
-       mas le importa comunicar al usuario y lo que distingue a Funes de un
-       buscador-, despues por que el catalogo del que habla no es generico, y
-       al final el motivo mas importante -que la charla empuja de vuelta al
-       mostrador, no lo reemplaza. Todo escrito en primera persona (es Funes
-       quien habla, no "nosotros" el equipo) para que suene a lo mismo que ya
-       dice en el chat. #}
+    {# Le habla al librero (audiencia de esta pagina), no al lector final: es
+       quien digitaliza el catalogo y decide sumar a Funes, y esta pagina lo
+       tiene que convencer a el. Por eso "tu"/"vos" es el librero, y "tus
+       lectores"/"ellos" son las personas que despues chatean. Sigue en
+       primera persona -es Funes quien habla de si mismo, no "nosotros" el
+       equipo. Orden: primero el corazon del producto -la charla misma-,
+       despues por que el catalogo del que habla no es generico sino EL
+       estante puntual del librero, y al final el motivo mas importante -que
+       la charla empuja de vuelta al mostrador, no lo reemplaza. #}
     <section class="space-y-10 mt-4">
 
       <div>
-        <h2 class="font-bold text-lg leading-tight">No te pregunto qué género buscás</h2>
+        <h2 class="font-bold text-lg leading-tight">No les pregunto qué género buscan</h2>
         <p class="text-sm text-gris mt-1 leading-relaxed">
-          Te pregunto cómo estás, qué te viene dando vueltas, qué leíste
-          últimamente y qué te gustó. Vamos y venimos hasta que aparece un
-          libro — no el más rápido, el que tiene sentido para vos hoy.
+          Les pregunto cómo están, qué les viene dando vueltas, qué leyeron
+          últimamente y qué les gustó. Vamos y venimos hasta que aparece un
+          libro — no el más rápido, el que tiene sentido para ellos ese día.
         </p>
       </div>
 
       <div>
-        <h2 class="font-bold text-lg leading-tight">Lo que hay, no lo que más se vende</h2>
+        <h2 class="font-bold text-lg leading-tight">Lo que tenés, no lo que más se vende</h2>
         <p class="text-sm text-gris mt-1 leading-relaxed">
-          No busco entre millones de libros. Busco en el estante real de una
-          librería — lo que decidieron tener, a mano, uno por uno. A veces
-          eso es encontrar algo que en ningún otro lado te iban a
-          recomendar.
+          No busco entre millones de libros. Busco en tu estante — lo que
+          vos decidiste tener, a mano, uno por uno. A veces así aparece algo
+          que en ningún otro lado le iban a recomendar a tu lector.
         </p>
       </div>
 
       <div>
         <h2 class="font-bold text-lg leading-tight">Termino la charla, no el vínculo</h2>
         <p class="text-sm text-gris mt-1 leading-relaxed">
-          Cuando encontramos un libro, te invito a seguir la charla con las
-          personas de la librería — ahí mismo si estás, o por WhatsApp si
-          no. Yo hago el primer cruce; lo demás sigue siendo entre vos y
-          ellos.
+          Cuando encontramos un libro, invito a tu lector a seguir la charla
+          con vos — presencial si está en el local, o por WhatsApp si no. Yo
+          hago el primer cruce; el vínculo sigue siendo tuyo.
         </p>
       </div>
 
@@ -103,7 +102,7 @@
         Hablar con Funes
       </a>
       <p class="text-xs text-gris mt-3">
-        También podés encontrarme escaneando el código en la librería que te lo recomendó.
+        También me podés sumar a tu mostrador con un código QR propio.
       </p>
     </section>
 
