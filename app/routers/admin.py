@@ -7,11 +7,12 @@ la ruta existe (decisión D2, aplicada también acá).
 import secrets
 
 from fastapi import APIRouter, Body, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from app import db
 from app.config import ADMIN_TOKEN, MENSAJE_WA_DEFAULT
+from app.funes_chat import qr as funes_qr
 from app.metricas import calcular_metricas
 from app.tokens import nuevo_token_panel, slugify
 
@@ -195,17 +196,40 @@ async def _listar_librerias():
     return filas
 
 
+async def _listar_qr_codigos():
+    """Todos los codigos de carpita (qr_codigos.token) con la libreria a la
+    que apuntan hoy, si tienen una — ver schema.sql:qr_codigos. Vinculado_en
+    es la fecha del ULTIMO vinculo (la fila mas reciente de
+    qr_codigos_historial), no la de creacion del codigo: es lo que importa
+    para saber desde cuando esta con la libreria actual."""
+    filas = await db.pool().fetch(
+        """
+        SELECT q.id, q.token, q.libreria_id, q.creado_en,
+               l.nombre AS libreria_nombre,
+               (SELECT h.vinculado_en FROM qr_codigos_historial h
+                WHERE h.qr_codigo_id = q.id ORDER BY h.vinculado_en DESC LIMIT 1) AS vinculado_en
+        FROM qr_codigos q
+        LEFT JOIN librerias l ON l.id = q.libreria_id
+        ORDER BY q.creado_en DESC
+        """
+    )
+    return filas
+
+
 @router.get("/admin/{token}", response_class=HTMLResponse)
 async def admin_home(request: Request, token: str):
     _validar_token(token)
     librerias = await _listar_librerias()
+    qr_codigos = await _listar_qr_codigos()
     return templates.TemplateResponse(
         request,
         "admin.html",
         {
             "librerias": librerias,
+            "qr_codigos": qr_codigos,
             "mensaje_wa_default": MENSAJE_WA_DEFAULT,
             "nueva": None,
+            "nuevo_codigo": None,
             "error": None,
             "token": token,
         },
@@ -256,13 +280,16 @@ async def admin_crear(
             error = f"No se pudo crear (¿el slug ya existe?): {exc}"
 
     librerias = await _listar_librerias()
+    qr_codigos = await _listar_qr_codigos()
     return templates.TemplateResponse(
         request,
         "admin.html",
         {
             "librerias": librerias,
+            "qr_codigos": qr_codigos,
             "mensaje_wa_default": MENSAJE_WA_DEFAULT,
             "nueva": nueva,
+            "nuevo_codigo": None,
             "error": error,
             "token": token,
         },
@@ -360,3 +387,115 @@ async def admin_borrar_libreria(token: str, libreria_id: int):
     if resultado == "DELETE 0":
         raise HTTPException(status_code=404, detail="No existe esa librería.")
     return {"ok": True}
+
+
+@router.post("/admin/{token}/qr-codigos", response_class=HTMLResponse)
+async def admin_crear_qr_codigo(request: Request, token: str):
+    """Genera un codigo de carpita nuevo (sin vincular), para imprimir su QR
+    (/{token}/qr.png de abajo) en una carpita fisica todavia sin asignar."""
+    _validar_token(token)
+
+    nuevo_token = secrets.token_urlsafe(24)
+    async with db.pool().acquire() as con:
+        async with con.transaction():
+            fila = await con.fetchrow(
+                "INSERT INTO qr_codigos (token) VALUES ($1) RETURNING id", nuevo_token
+            )
+            await con.execute(
+                "INSERT INTO qr_codigos_historial (qr_codigo_id, libreria_id, vinculado_por) "
+                "VALUES ($1, NULL, 'sistema')",
+                fila["id"],
+            )
+
+    base = str(request.base_url).rstrip("/")
+    nuevo_codigo = {
+        "id": fila["id"],
+        "url_qr_publica": f"{base}/qr/{nuevo_token}",
+        "url_png": f"/admin/{token}/qr-codigos/{fila['id']}/qr.png",
+    }
+
+    librerias = await _listar_librerias()
+    qr_codigos = await _listar_qr_codigos()
+    return templates.TemplateResponse(
+        request,
+        "admin.html",
+        {
+            "librerias": librerias,
+            "qr_codigos": qr_codigos,
+            "mensaje_wa_default": MENSAJE_WA_DEFAULT,
+            "nueva": None,
+            "nuevo_codigo": nuevo_codigo,
+            "error": None,
+            "token": token,
+        },
+    )
+
+
+@router.get("/admin/{token}/qr-codigos/{codigo_id}/qr.png")
+async def admin_qr_codigo_png(request: Request, token: str, codigo_id: int):
+    """PNG del QR de una carpita puntual, para bajar e insertar en el arte de
+    impresion — apunta a /qr/<token>, no a ninguna libreria (eso se resuelve
+    despues, ver routers/qr.py)."""
+    _validar_token(token)
+    fila = await db.pool().fetchrow("SELECT token FROM qr_codigos WHERE id = $1", codigo_id)
+    if fila is None:
+        raise HTTPException(status_code=404)
+
+    base = str(request.base_url).rstrip("/")
+    if not base.startswith(("http://localhost", "http://127.")):
+        base = base.replace("http://", "https://", 1)
+    imagen = funes_qr.generar(f"{base}/qr/{fila['token']}")
+    return Response(
+        content=imagen,
+        media_type="image/png",
+        headers={"Content-Disposition": f'inline; filename="qr-carpita-{codigo_id}.png"'},
+    )
+
+
+@router.post("/admin/{token}/qr-codigos/{codigo_id}/reasignar")
+async def admin_reasignar_qr_codigo(token: str, codigo_id: int, payload: dict = Body(...)):
+    """A diferencia de POST /api/.../vincular-qr (el librero, que solo puede
+    tomar un codigo libre), esto puede pisar CUALQUIER vinculo o dejarlo
+    libre (libreria_id=null) — es el unico lugar que puede reciclar una
+    carpita que ya esta en uso de otra libreria."""
+    _validar_token(token)
+    libreria_id = payload.get("libreria_id")
+    if libreria_id is not None and not isinstance(libreria_id, int):
+        raise HTTPException(status_code=400, detail="libreria_id debe ser un entero o null.")
+
+    codigo = await db.pool().fetchrow("SELECT id FROM qr_codigos WHERE id = $1", codigo_id)
+    if codigo is None:
+        raise HTTPException(status_code=404, detail="No existe ese código.")
+
+    if libreria_id is not None:
+        existe = await db.pool().fetchval("SELECT 1 FROM librerias WHERE id = $1", libreria_id)
+        if not existe:
+            raise HTTPException(status_code=404, detail="No existe esa librería.")
+
+    async with db.pool().acquire() as con:
+        async with con.transaction():
+            await con.execute(
+                "UPDATE qr_codigos SET libreria_id = $1 WHERE id = $2", libreria_id, codigo_id
+            )
+            await con.execute(
+                "INSERT INTO qr_codigos_historial (qr_codigo_id, libreria_id, vinculado_por) "
+                "VALUES ($1, $2, 'superadmin')",
+                codigo_id, libreria_id,
+            )
+    return {"ok": True}
+
+
+@router.get("/admin/{token}/qr-codigos/{codigo_id}/historial")
+async def admin_qr_codigo_historial(token: str, codigo_id: int):
+    _validar_token(token)
+    filas = await db.pool().fetch(
+        """
+        SELECT h.libreria_id, h.vinculado_por, h.vinculado_en, l.nombre AS libreria_nombre
+        FROM qr_codigos_historial h
+        LEFT JOIN librerias l ON l.id = h.libreria_id
+        WHERE h.qr_codigo_id = $1
+        ORDER BY h.vinculado_en DESC
+        """,
+        codigo_id,
+    )
+    return {"historial": [dict(f) for f in filas]}

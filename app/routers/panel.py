@@ -173,6 +173,7 @@ async def panel_home(request: Request, slug: str, token: str):
             "url_funes_metricas": f"{base}/{slug}/panel/{token}/funes-metricas",
             "url_guia": f"{base}/{slug}/panel/{token}/guia",
             "url_qr": f"/api/{slug}/{token}/qr.png",
+            "url_vincular_qr": f"{base}/{slug}/panel/{token}/vincular-qr",
         },
     )
 
@@ -206,6 +207,24 @@ def _combinar_eventos(eventos_catalogo: list[dict], eventos_funes: list[dict]) -
         combinados.append({**e, "creado_en": creado})
     combinados.sort(key=lambda e: e["creado_en"])
     return combinados[-panel_funes.EVENTOS_LIMITE:]
+
+
+@router.get("/{slug}/panel/{token}/vincular-qr", response_class=HTMLResponse)
+async def panel_vincular_qr(request: Request, slug: str, token: str):
+    """Pantalla para vincular una carpita (codigo qr_codigos) a esta libreria
+    -mobile arranca con la camara, desktop con el campo manual (ver
+    templates/vincular_qr.html). El POST que hace el vinculo real vive en
+    api_librero.py:vincular_qr."""
+    libreria = await _libreria_por_slug_y_token(slug, token)
+    return templates.TemplateResponse(
+        request,
+        "vincular_qr.html",
+        {
+            "libreria": libreria,
+            "url_atras": f"/{slug}/panel/{token}",
+            "url_vincular_api": f"/api/{slug}/{token}/vincular-qr",
+        },
+    )
 
 
 @router.get("/{slug}/panel/{token}/guia", response_class=HTMLResponse)

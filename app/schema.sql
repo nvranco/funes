@@ -546,3 +546,28 @@ WHERE id IN (
     'pioneros', 'poemas-escogidos', 'terror-y-suspenso', 'tierra-fantasy',
     'un-relampago', 'vida', 'zadig-o-el-destino'
 ) AND embedding_abstracto IS NOT NULL;
+
+-- Codigos QR de las carpitas de mesa: cada carpita impresa lleva un token
+-- opaco propio (/qr/<token>), no la URL final de una libreria, para poder
+-- reciclar la misma carpita fisica entre librerias sin reimprimir. El
+-- vinculo (libreria_id) se hace despues de imprimir, desde el panel del
+-- libreria (token libre) o desde /admin (reasigna cualquiera).
+CREATE TABLE IF NOT EXISTS qr_codigos (
+    id SERIAL PRIMARY KEY,
+    token TEXT UNIQUE NOT NULL,
+    libreria_id INTEGER REFERENCES librerias(id),
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Historial completo de a que libreria apunto cada codigo, para poder
+-- reciclar la misma carpita fisica entre librerias con trazabilidad (quien
+-- la vinculo/reasigno y cuando). libreria_id NULL = quedo (o quedo) sin
+-- vincular en ese momento del historial.
+CREATE TABLE IF NOT EXISTS qr_codigos_historial (
+    id SERIAL PRIMARY KEY,
+    qr_codigo_id INTEGER NOT NULL REFERENCES qr_codigos(id),
+    libreria_id INTEGER REFERENCES librerias(id),
+    vinculado_por TEXT NOT NULL,  -- 'sistema' | 'librero' | 'superadmin'
+    vinculado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_qr_codigos_historial_codigo ON qr_codigos_historial(qr_codigo_id, vinculado_en);

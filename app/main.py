@@ -14,7 +14,7 @@ from fastapi.templating import Jinja2Templates
 
 from app import db
 from app.config import DOMINIO_FUNES
-from app.routers import admin, api_librero, api_publico, funes_chat, panel, publico
+from app.routers import admin, api_librero, api_publico, funes_chat, panel, publico, qr
 
 # Los logs de app.vision (latencia/tokens/respuesta cruda del modelo) son el
 # baseline de calidad y de unit economics del pipeline (requisitos §7 y §9).
@@ -131,6 +131,7 @@ app.include_router(api_librero.router)
 app.include_router(api_publico.router)
 app.include_router(funes_chat.router)
 app.include_router(panel.router)
+app.include_router(qr.router)
 app.include_router(publico.router)
 
 

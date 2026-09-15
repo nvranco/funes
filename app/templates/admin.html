@@ -84,7 +84,8 @@
       </form>
     </div>
 
-    <div class="min-w-0">
+    <div class="min-w-0 space-y-8">
+    <div>
       <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-3">Librerías activas ({{ librerias|length }})</h2>
       <div class="space-y-2">
         {% for lib in librerias %}
@@ -134,6 +135,86 @@
         </div>
         {% else %}
         <p class="text-gris text-sm">Todavía no diste de alta ninguna librería.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <h2 class="text-sm font-bold text-gris uppercase tracking-wide">Códigos QR ({{ qr_codigos|length }})</h2>
+        <form method="post" action="/admin/{{ token }}/qr-codigos">
+          <button type="submit" class="tap btn-primario border-celeste rounded-lg px-3 text-sm font-medium">
+            Generar código nuevo
+          </button>
+        </form>
+      </div>
+
+      {% if nuevo_codigo %}
+      <div class="mb-4 rounded-xl2 border-2 border-celeste bg-celeste-claro/30 px-4 py-4">
+        <p class="font-bold mb-2">Código nuevo generado.</p>
+        <p class="text-sm text-gris mb-2">Link del QR (para imprimir en la carpita):</p>
+        <div class="flex items-center gap-2 mb-3">
+          <input readonly value="{{ nuevo_codigo.url_qr_publica }}"
+            class="tap flex-1 min-w-0 truncate rounded-lg border border-borde px-3 py-2 text-sm bg-papel">
+          <button type="button" onclick="copiar('{{ nuevo_codigo.url_qr_publica }}', this)"
+            class="tap btn-primario shrink-0 rounded-lg px-4 text-sm font-medium">Copiar 📋</button>
+        </div>
+        <a href="{{ nuevo_codigo.url_png }}" target="_blank" rel="noopener"
+          class="tap btn-secundario inline-flex items-center rounded-lg px-4 text-sm font-medium">
+          Ver PNG del QR ↗
+        </a>
+      </div>
+      {% endif %}
+
+      <div class="space-y-2">
+        {% for c in qr_codigos %}
+        <div class="bg-papel border border-borde rounded-xl2 p-4" data-qr-id="{{ c.id }}">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="font-mono text-xs text-gris truncate">{{ c.token[:14] }}…</p>
+              <p class="font-medium truncate">{{ c.libreria_nombre or "Sin vincular" }}</p>
+              <p class="text-xs text-gris">
+                {{ "vinculado" if c.libreria_id else "creado" }} el
+                {{ (c.vinculado_en or c.creado_en).strftime('%d/%m/%Y') }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap justify-end">
+              <a href="/admin/{{ token }}/qr-codigos/{{ c.id }}/qr.png" target="_blank" rel="noopener"
+                class="tap btn-secundario rounded-lg px-3 flex items-center text-sm font-medium">
+                PNG ↗
+              </a>
+              <button type="button" data-accion="historial"
+                class="tap btn-secundario rounded-lg px-3 flex items-center text-sm font-medium">
+                Historial
+              </button>
+              <button type="button" data-accion="reasignar"
+                class="tap rounded-lg px-3 flex items-center text-sm font-medium border-2 {{ 'border-celeste text-celeste' if c.libreria_id else 'border-borde text-gris' }}">
+                {{ 'Reasignar' if c.libreria_id else 'Vincular' }}
+              </button>
+            </div>
+          </div>
+          <div data-rol="panel-reasignar" class="hidden mt-3 pt-3 border-t border-borde">
+            <select data-rol="select-libreria" class="tap w-full rounded-lg border border-borde px-3 py-2 text-sm mb-2">
+              <option value="">— Sin vincular —</option>
+              {% for lib in librerias %}
+              <option value="{{ lib.id }}" {{ 'selected' if lib.id == c.libreria_id else '' }}>{{ lib.nombre }}</option>
+              {% endfor %}
+            </select>
+            <div class="flex gap-2">
+              <button type="button" data-accion="confirmar-reasignar"
+                class="tap flex-1 btn-primario border-celeste rounded-lg text-sm font-medium">
+                Confirmar
+              </button>
+              <button type="button" data-accion="cancelar-reasignar"
+                class="tap flex-1 btn-secundario rounded-lg text-sm font-medium">
+                Cancelar
+              </button>
+            </div>
+          </div>
+          <div data-rol="panel-historial" class="hidden mt-3 pt-3 border-t border-borde text-sm space-y-2"></div>
+        </div>
+        {% else %}
+        <p class="text-gris text-sm">Todavía no generaste ningún código.</p>
         {% endfor %}
       </div>
     </div>
@@ -203,6 +284,71 @@
         btnConfirmar.disabled = false;
         btnCancelar.disabled = false;
         btnConfirmar.textContent = 'Sí, borrar para siempre';
+      }
+    });
+  });
+
+  // Códigos QR: reasignar (siempre disponible para el superadmin, a
+  // diferencia del panel del librero, que solo puede tomar un código libre)
+  // e historial completo por código.
+  document.querySelectorAll('[data-qr-id]').forEach((tarjeta) => {
+    const id = tarjeta.dataset.qrId;
+    const btnReasignar = tarjeta.querySelector('[data-accion="reasignar"]');
+    const panelReasignar = tarjeta.querySelector('[data-rol="panel-reasignar"]');
+    const selectLibreria = tarjeta.querySelector('[data-rol="select-libreria"]');
+    const btnConfirmarReasignar = tarjeta.querySelector('[data-accion="confirmar-reasignar"]');
+    const btnCancelarReasignar = tarjeta.querySelector('[data-accion="cancelar-reasignar"]');
+    const btnHistorial = tarjeta.querySelector('[data-accion="historial"]');
+    const panelHistorial = tarjeta.querySelector('[data-rol="panel-historial"]');
+    let historialCargado = false;
+
+    btnReasignar.addEventListener('click', () => {
+      panelHistorial.classList.add('hidden');
+      panelReasignar.classList.toggle('hidden');
+    });
+    btnCancelarReasignar.addEventListener('click', () => {
+      panelReasignar.classList.add('hidden');
+    });
+    btnConfirmarReasignar.addEventListener('click', async () => {
+      btnConfirmarReasignar.disabled = true;
+      try {
+        const libreriaId = selectLibreria.value ? parseInt(selectLibreria.value, 10) : null;
+        const resp = await fetch(`/admin/${TOKEN_ADMIN}/qr-codigos/${id}/reasignar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ libreria_id: libreriaId }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        window.location.reload();
+      } catch (err) {
+        alert('No se pudo reasignar. Probá de nuevo.');
+        btnConfirmarReasignar.disabled = false;
+      }
+    });
+
+    btnHistorial.addEventListener('click', async () => {
+      panelReasignar.classList.add('hidden');
+      const abrir = panelHistorial.classList.contains('hidden');
+      panelHistorial.classList.toggle('hidden');
+      if (!abrir || historialCargado) return;
+      panelHistorial.textContent = 'Cargando…';
+      try {
+        const resp = await fetch(`/admin/${TOKEN_ADMIN}/qr-codigos/${id}/historial`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const datos = await resp.json();
+        historialCargado = true;
+        panelHistorial.innerHTML = '';
+        datos.historial.forEach((h) => {
+          const fecha = new Date(h.vinculado_en).toLocaleDateString('es-AR');
+          const fila = document.createElement('p');
+          fila.className = 'flex items-center gap-2';
+          fila.innerHTML =
+            `<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: rgb(var(--celeste))"></span>` +
+            `<span><strong>${h.libreria_nombre || 'Sin vincular'}</strong> · ${fecha} · ${h.vinculado_por}</span>`;
+          panelHistorial.appendChild(fila);
+        });
+      } catch (err) {
+        panelHistorial.textContent = 'No se pudo cargar el historial.';
       }
     });
   });

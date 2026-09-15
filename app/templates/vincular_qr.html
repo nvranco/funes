@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block titulo %}Vincular QR — {{ libreria.nombre }}{% endblock %}
+{% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
+{% block head %}
+{# jsQR: primer uso de camara/QR-scanning del proyecto, no hay nada previo
+   para reusar. Solo lo necesita esta pantalla. #}
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+{% endblock %}
+{% block contenido %}
+<header class="bg-celeste px-5 pt-8 pb-6">
+  <div class="max-w-2xl mx-auto">
+    <a href="{{ url_atras }}" class="text-tinta text-sm font-medium">← Volver</a>
+    <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Vincular QR</h1>
+    <p class="text-sm text-tinta/80 mt-1">
+      Sacale una foto al código QR de la carpita para asociarla a {{ libreria.nombre }}.
+    </p>
+  </div>
+</header>
+
+<div class="min-h-screen max-w-2xl mx-auto flex flex-col">
+  <main class="flex-1 px-5 py-5 pb-10">
+
+    <div id="pantalla-inicial">
+
+      <!-- Camara: componente unico, se muestra/oculta segun el modo (ver JS) -->
+      <div id="bloque-camara" class="hidden">
+        <div class="relative rounded-xl2 overflow-hidden bg-black" style="aspect-ratio: 3 / 4;">
+          <video id="video-camara" class="w-full h-full object-cover" playsinline muted></video>
+          <canvas id="canvas-camara" class="hidden"></canvas>
+          <!-- Marco de escaneo -->
+          <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div class="relative" style="width: 62%; aspect-ratio: 1;">
+              <span class="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-celeste rounded-tl-md"></span>
+              <span class="absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-celeste rounded-tr-md"></span>
+              <span class="absolute bottom-0 left-0 w-7 h-7 border-b-4 border-l-4 border-celeste rounded-bl-md"></span>
+              <span class="absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-celeste rounded-br-md"></span>
+            </div>
+          </div>
+          <p id="camara-estado" class="absolute bottom-0 left-0 right-0 text-center text-white text-xs py-2"
+            style="background: linear-gradient(0deg, rgba(0,0,0,.55), transparent)">
+            Apuntá a la etiqueta QR de la carpita
+          </p>
+        </div>
+        <button type="button" id="btn-ir-manual" class="tap w-full text-center text-sm text-gris font-medium mt-3">
+          ¿No funciona la cámara? Escribí el código
+        </button>
+      </div>
+
+      <!-- Entrada manual: componente unico, mismo criterio -->
+      <div id="bloque-manual" class="hidden">
+        <label class="block text-sm font-medium mb-1" for="input-token">Pegá el link o el código del QR</label>
+        <input id="input-token" type="text" inputmode="text" autocomplete="off"
+          class="tap w-full rounded-lg border border-borde px-3 py-2"
+          placeholder="https://funes.app/qr/… o el código solo">
+        <button type="button" id="btn-vincular-manual" class="tap btn-primario border-celeste w-full rounded-xl2 font-bold mt-3">
+          Vincular
+        </button>
+        <button type="button" id="btn-ir-camara" class="tap w-full text-center text-sm text-gris font-medium mt-3">
+          Usar la cámara
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Resultado: exito / bloqueado / invalido / error. Reemplaza a pantalla-inicial. -->
+    <div id="pantalla-resultado" class="hidden text-center py-10">
+      <p id="resultado-emoji" class="text-2xl mb-3"></p>
+      <p id="resultado-titulo" class="font-bold text-lg mb-1"></p>
+      <p id="resultado-texto" class="text-sm text-gris mb-6"></p>
+      <button type="button" id="btn-resultado" class="tap btn-secundario w-full max-w-[260px] mx-auto rounded-xl2 font-medium">
+        Volver
+      </button>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  const URL_API = "{{ url_vincular_api }}";
+  const URL_ATRAS = "{{ url_atras }}";
+
+  const pantallaInicial = document.getElementById('pantalla-inicial');
+  const pantallaResultado = document.getElementById('pantalla-resultado');
+  const bloqueCamara = document.getElementById('bloque-camara');
+  const bloqueManual = document.getElementById('bloque-manual');
+  const video = document.getElementById('video-camara');
+  const canvas = document.getElementById('canvas-camara');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const camaraEstado = document.getElementById('camara-estado');
+  const inputToken = document.getElementById('input-token');
+
+  let stream = null;
+  let escaneando = false;
+  let vinculando = false;
+
+  // En el celular la camara es lo primero que se ve (apuntar el telefono a
+  // un papel es natural); en desktop lo primero es escribir el codigo a
+  // mano (una webcam de escritorio no sirve para apuntarle a una carpita
+  // impresa) y la camara queda como opcion secundaria detras de "Usar la
+  // cámara". Un solo set de elementos, no dos pantallas duplicadas.
+  const ES_DESKTOP = window.matchMedia('(min-width: 1024px)').matches;
+
+  function mostrarCamara() {
+    detenerCamara();
+    bloqueManual.classList.add('hidden');
+    bloqueCamara.classList.remove('hidden');
+    iniciarCamara();
+  }
+
+  function mostrarManual() {
+    detenerCamara();
+    bloqueCamara.classList.add('hidden');
+    bloqueManual.classList.remove('hidden');
+    inputToken.focus();
+  }
+
+  document.getElementById('btn-ir-manual').addEventListener('click', mostrarManual);
+  document.getElementById('btn-ir-camara').addEventListener('click', mostrarCamara);
+
+  if (ES_DESKTOP) {
+    mostrarManual();
+  } else {
+    mostrarCamara();
+  }
+
+  async function iniciarCamara() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      mostrarManual();
+      return;
+    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      video.srcObject = stream;
+      await video.play();
+      escaneando = true;
+      requestAnimationFrame(escanearFrame);
+    } catch (err) {
+      // Sin permiso de camara o sin camara disponible: la entrada manual
+      // sigue siendo un camino completo, no un parche.
+      mostrarManual();
+    }
+  }
+
+  function detenerCamara() {
+    escaneando = false;
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+      stream = null;
+    }
+  }
+
+  function escanearFrame() {
+    if (!escaneando) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA && !vinculando) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const cuadro = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const codigo = jsQR(cuadro.data, cuadro.width, cuadro.height);
+      if (codigo && codigo.data) {
+        vincular(codigo.data);
+        return;
+      }
+    }
+    requestAnimationFrame(escanearFrame);
+  }
+
+  document.getElementById('btn-vincular-manual').addEventListener('click', () => {
+    const texto = inputToken.value.trim();
+    if (!texto) { inputToken.focus(); return; }
+    vincular(texto);
+  });
+  inputToken.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') document.getElementById('btn-vincular-manual').click();
+  });
+
+  // Tolera que peguen la URL completa (https://funes.app/qr/<token>) o solo
+  // el token: si no es una URL valida, se toma el ultimo segmento igual.
+  function extraerToken(texto) {
+    texto = texto.trim();
+    try {
+      const url = new URL(texto);
+      const partes = url.pathname.split('/').filter(Boolean);
+      if (partes.length) return partes[partes.length - 1];
+    } catch (err) { /* no era una URL, sigue abajo */ }
+    const partes = texto.split('/').filter(Boolean);
+    return partes.length ? partes[partes.length - 1] : texto;
+  }
+
+  async function vincular(textoEscaneado) {
+    if (vinculando) return;
+    vinculando = true;
+    if (camaraEstado) camaraEstado.textContent = 'Vinculando…';
+
+    const token = extraerToken(textoEscaneado);
+    try {
+      const resp = await fetch(URL_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qr_token: token }),
+      });
+      if (resp.ok) {
+        const datos = await resp.json();
+        mostrarResultado('exito', datos.libreria);
+      } else if (resp.status === 409) {
+        mostrarResultado('en_uso');
+      } else if (resp.status === 404) {
+        mostrarResultado('invalido');
+      } else {
+        mostrarResultado('error');
+      }
+    } catch (err) {
+      mostrarResultado('error');
+    }
+  }
+
+  const RESULTADOS = {
+    exito: {
+      emoji: '✅',
+      titulo: 'QR vinculado',
+      texto: (libreria) => `Este código ahora apunta a ${libreria}.`,
+      boton: 'Listo',
+    },
+    en_uso: {
+      emoji: '🔒',
+      titulo: 'Este código ya está en uso',
+      texto: () => 'Está vinculado a otra librería. Para reasignarlo, escribinos a soporte@funes.app.',
+      boton: 'Volver',
+    },
+    invalido: {
+      emoji: '⚠️',
+      titulo: 'Código inválido',
+      texto: () => 'Este QR no corresponde a una carpita de Funes.',
+      boton: 'Volver',
+    },
+    error: {
+      emoji: '⚠️',
+      titulo: 'Algo falló',
+      texto: () => 'No se pudo conectar. Probá de nuevo.',
+      boton: 'Volver',
+    },
+  };
+
+  function mostrarResultado(clave, libreria) {
+    detenerCamara();
+    const r = RESULTADOS[clave];
+    document.getElementById('resultado-emoji').textContent = r.emoji;
+    document.getElementById('resultado-titulo').textContent = r.titulo;
+    document.getElementById('resultado-texto').textContent = r.texto(libreria);
+    const boton = document.getElementById('btn-resultado');
+    boton.textContent = r.boton;
+    pantallaInicial.classList.add('hidden');
+    pantallaResultado.classList.remove('hidden');
+
+    boton.onclick = () => {
+      if (clave === 'exito') {
+        window.location.href = URL_ATRAS;
+        return;
+      }
+      vinculando = false;
+      pantallaResultado.classList.add('hidden');
+      pantallaInicial.classList.remove('hidden');
+      if (ES_DESKTOP) mostrarManual(); else mostrarCamara();
+    };
+  }
+</script>
+{% endblock %}

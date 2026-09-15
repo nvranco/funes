@@ -67,6 +67,10 @@ class AsignarPadre(BaseModel):
     padre_id: int | None = None
 
 
+class VincularQr(BaseModel):
+    qr_token: str
+
+
 async def _libreria_por_slug_y_token(slug: str, token: str):
     fila = await db.pool().fetchrow(
         "SELECT * FROM librerias WHERE slug = $1 AND activa", slug
@@ -857,3 +861,35 @@ async def qr_png(slug: str, token: str, request: Request, catalogo: str | None =
     buffer = io.BytesIO()
     imagen.save(buffer, format="PNG")
     return Response(content=buffer.getvalue(), media_type="image/png")
+
+
+@router.post("/api/{slug}/{token}/vincular-qr")
+async def vincular_qr(slug: str, token: str, datos: VincularQr):
+    """Vincula una carpita (codigo qr_codigos, impreso con /qr/<token>) a esta
+    libreria. Un librero solo puede tomar un codigo LIBRE (o que ya sea
+    suyo) -pisar el de otra libreria es exclusivo de /admin (ver
+    routers/admin.py:qr_reasignar)-, para que reasignar una carpita ya en
+    uso siempre quede en manos de una sola persona y trazado en el
+    historial."""
+    libreria = await _libreria_por_slug_y_token(slug, token)
+
+    codigo = await db.pool().fetchrow(
+        "SELECT id, libreria_id FROM qr_codigos WHERE token = $1", datos.qr_token
+    )
+    if codigo is None:
+        raise HTTPException(status_code=404, detail="invalido")
+    if codigo["libreria_id"] is not None and codigo["libreria_id"] != libreria["id"]:
+        raise HTTPException(status_code=409, detail="en_uso")
+
+    async with db.pool().acquire() as con:
+        async with con.transaction():
+            await con.execute(
+                "UPDATE qr_codigos SET libreria_id = $1 WHERE id = $2",
+                libreria["id"], codigo["id"],
+            )
+            await con.execute(
+                "INSERT INTO qr_codigos_historial (qr_codigo_id, libreria_id, vinculado_por) "
+                "VALUES ($1, $2, 'librero')",
+                codigo["id"], libreria["id"],
+            )
+    return {"ok": True, "libreria": libreria["nombre"]}
