@@ -300,6 +300,12 @@ const LIBRERIA_SLUG = {{ libreria_slug_js | default('null', true) | safe }};
 // invita a preguntarle a su personal). Viaja junto a LIBRERIA_SLUG, nunca
 // solo: los dos los inyecta pagina_libreria a la vez.
 const NOMBRE_LIBRERIA = {{ nombre_libreria_js | default('null', true) | safe }};
+// Cuantos libros PROPIOS de esta libreria puede recomendar Funes de verdad
+// (nucleo.cobertura_libreria: el cruce contra Babilonia, no el total
+// publicado). Es un numero chico -decenas, no miles- y por eso el saludo lo
+// dice tal cual en vez de redondearlo a la centena como CANT_LIBROS: "mas de
+// 0" o redondear 47 a "mas de 0" no dice nada.
+const CANT_LIBROS_LIBRERIA = {{ cant_libros_libreria_js | default('null', true) | safe }};
 const WHATSAPP = {{ whatsapp_js | default('null', true) | safe }};
 const MENSAJE_TEMPLATE = {{ mensaje_wa_template_js | default('null', true) | safe }};
 // El orden lo manda el servidor (routers/funes_chat.py inyecta PREGUNTAS
@@ -2086,46 +2092,53 @@ function saludo() {
   // Y cuando el piloto ofrece un solo estante, esta misma frase es donde se
   // dice cual. No una linea aparte: el saludo son TRES lineas a proposito
   // (MAX_MENSAJES_POR_RESPUESTA), y una cuarta se fusionaria con la anterior en
-  // la misma burbuja. Sale de MACRO_FIJA y no cableado, asi el dia que vuelvan
-  // las tres macros la frase se corrige sola en vez de quedar mintiendo.
-  // "obras de literatura" y no la enumeracion de generos: nombra el estante
-  // igual pero sin leerse como un catalogo de secciones. El cierre concuerda
-  // con lo que se nombro y por eso viaja al lado, no cableado en las frases.
+  // la misma burbuja.
   //
-  // El cierre dice "se para quien es cada una" y no "me acuerdo hasta el
+  // El cierre dice "se para quien es cada uno" y no "me acuerdo hasta el
   // ultimo detalle", que era el rasgo del Funes del cuento -la memoria total-
   // y contradecia lo que /privacidad explica de este: que es su antitesis, y
   // que lo suyo es abstraer, no retener. Ahi el saludo prometia una cosa y la
   // pagina de al lado explicaba la contraria.
+  // "libros de literatura" y no "obras de literatura": nombra el estante
+  // igual, en el mismo lenguaje llano que el resto de la app. "cada uno"
+  // sirve para las dos formas -"libros" y "libros de literatura" concuerdan
+  // igual-, asi que no hace falta variarlo por macro.
   const esLiteratura = MACRO_FIJA === "literatura";
-  const que = esLiteratura ? "obras de literatura" : "libros";
-  const cada = esLiteratura ? "cada una" : "cada uno";
+  const que = esLiteratura ? "libros de literatura" : "libros";
+  const cada = "cada uno";
   // Con libreria (Funes acotado a su stock, ver LIBRERIA_SLUG), el saludo la
-  // nombra: es la segunda burbuja de la charla y el lugar donde se aclara
-  // que ese catalogo puntual lo curo el personal de esa libreria, no un
-  // catalogo generico. Reemplaza la frase de siempre en vez de sumarse al
-  // lado -son dos formas de decir lo mismo, no dos datos distintos.
+  // nombra -en cursiva, mismo estilo markdown-lite que el resto del chat
+  // (ver parsearCursivas)- y por eso mismo NO puede usar CANT_LIBROS: ese es
+  // el tamano de Babilonia entera, no el de esta libreria puntual, y
+  // deciendolo ahi el numero mentia (2.100 libros en una libreria que tiene
+  // 40). CANT_LIBROS_LIBRERIA es la cobertura real (nucleo.cobertura_libreria)
+  // -cuantos de SUS libros puede recomendar Funes de verdad-, y por ser un
+  // numero chico (decenas, no miles) se dice tal cual, sin redondear a la
+  // centena ni esconderse por debajo de un piso de 200 como hace CANT_LIBROS
+  // mas abajo. Reemplaza la frase de siempre en vez de sumarse al lado -son
+  // dos formas de decir lo mismo, no dos datos distintos.
   if (NOMBRE_LIBRERIA) {
-    if (!CANT_LIBROS || CANT_LIBROS < 200) {
-      return MACRO_FIJA
-        ? "Tengo a mi disposición una biblioteca curada de " + que +
-          " disponibles en " + NOMBRE_LIBRERIA + " y sé para qué tipo de lector es " + cada + "."
-        : "Tengo a mi disposición una biblioteca curada disponible en " +
-          NOMBRE_LIBRERIA + " y sé para qué tipo de lector es cada libro.";
+    const nombreCursiva = "*" + NOMBRE_LIBRERIA.replace(/\*/g, "") + "*";
+    if (!CANT_LIBROS_LIBRERIA) {
+      return "Tengo a mi disposición una biblioteca seleccionada, disponible en " +
+             nombreCursiva + ", y sé para qué tipo de lector es cada libro.";
     }
-    const redondoLibreria = Math.floor(CANT_LIBROS / 100) * 100;
-    return "Tengo a mi disposición una biblioteca curada de más de " +
-           redondoLibreria.toLocaleString("es-AR") + " " + que + " disponibles en " +
-           NOMBRE_LIBRERIA + " y sé para qué tipo de lector es " + cada + ".";
+    const esUno = CANT_LIBROS_LIBRERIA === 1;
+    const queLibreria = esLiteratura
+      ? (esUno ? "libro de literatura" : "libros de literatura")
+      : (esUno ? "libro" : "libros");
+    return "Tengo a mi disposición una biblioteca seleccionada de " + CANT_LIBROS_LIBRERIA +
+           " " + queLibreria + " " + (esUno ? "disponible" : "disponibles") + " en " +
+           nombreCursiva + " y sé para qué tipo de lector es " + cada + ".";
   }
   if (!CANT_LIBROS || CANT_LIBROS < 200) {
     return MACRO_FIJA
-      ? "Tengo a mi disposición una biblioteca curada de " + que +
+      ? "Tengo a mi disposición una biblioteca seleccionada de " + que +
         " y sé para quién es " + cada + "."
-      : "Tengo a mi disposición una biblioteca curada y sé para quién es cada libro.";
+      : "Tengo a mi disposición una biblioteca seleccionada y sé para quién es cada libro.";
   }
   const redondo = Math.floor(CANT_LIBROS / 100) * 100;
-  return "Tengo a mi disposición una biblioteca curada de más de " +
+  return "Tengo a mi disposición una biblioteca seleccionada de más de " +
          redondo.toLocaleString("es-AR") + " " + que +
          " y sé para quién es " + cada + ".";
 }

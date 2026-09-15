@@ -404,10 +404,15 @@ async def pagina_libreria(request: Request, slug: str):
     )
     if libreria is None:
         raise HTTPException(status_code=404)
+    # Cuantos libros PROPIOS de esta libreria puede recomendar Funes de
+    # verdad -no el tamano del catalogo entero de Babilonia, que es lo que
+    # dice CANT_LIBROS y no tiene nada que ver con esta libreria puntual.
+    cobertura = await nucleo.cobertura_libreria(slug)
     contexto = await _contexto_chat(request)
     contexto.update({
         "libreria_slug_js": _js(slug),
         "nombre_libreria_js": _js(libreria["nombre"]),
+        "cant_libros_libreria_js": _js(cobertura["matched"] if cobertura else None),
         "whatsapp_js": _js(libreria["whatsapp"]),
         "mensaje_wa_template_js": _js(libreria["mensaje_wa_template"]),
     })
