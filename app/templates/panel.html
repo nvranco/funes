@@ -282,18 +282,23 @@
     {# Solo desktop: debajo de las dos bifurcaciones, en la misma columna
        -ancho 420px-, no al lado de los indicadores. Titulo afuera de la
        tarjeta, mismo patron que "Lo que mas funciono" en la columna de al
-       lado. alto=420 empareja el resto de la columna derecha. En mobile esta
-       misma info va al final de la pagina (ver el bloque lg:hidden despues
-       de "Lo que mas funciono", mas abajo) -no tiene con que igualar el
-       alto aca, asi que no vale la pena repetirlo. #}
-    <div class="hidden lg:block mt-6">
+       lado. alto=420 es solo el arranque -antes de que corra el JS de mas
+       abajo-: un alto fijo en CSS nunca puede igualar el de la columna
+       derecha porque esa columna no tiene un alto fijo tampoco (depende de
+       si Funes esta prendido y de cuantos catalogos hay), asi que
+       igualarAlturaActividad() mide #columna-metricas despues de pintar la
+       pagina y pisa este alto con el real (ver el script al final del
+       archivo). En mobile esta misma info va al final de la pagina (ver el
+       bloque lg:hidden despues de "Catálogos", mas abajo) -no tiene con que
+       igualar el alto aca, asi que ahi si se deja el alto=420 fijo. #}
+    <div id="bloque-actividad-desktop" class="hidden lg:block mt-6">
       <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Actividad</h2>
       {{ log_actividad(eventos_combinados, TONOS, alto=420, mostrar_titulo=false) }}
     </div>
     {% endif %}
     </div>
 
-    <div class="min-w-0">
+    <div id="columna-metricas" class="min-w-0">
       {# Bateria basica: la misma para todas las librerias. Libros publicados
          es nuevo (existia el dato, cant_libros, pero no tenia tarjeta propia
          -antes solo se usaba para decidir el estado vacio). Catalogo/libros
@@ -406,18 +411,25 @@
       {% if top_catalogos %}
       <div>
         <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5 lg:mb-2">Catálogos</h2>
-        <div class="space-y-2">
-          {% for c in top_catalogos %}
-          <div class="{{ c.color.bg }} border {{ c.color.borde }} rounded-xl2 p-3 flex items-center gap-3">
-            <span class="shrink-0 w-5 text-center text-lg font-bold text-tinta/50">{{ loop.index }}</span>
-            <div class="min-w-0 flex-1">
-              <p class="font-bold truncate">{{ c.nombre }}</p>
-              <p class="text-xs text-gris mt-0.5">
-                👀 {{ c.vistas }} vista{{ 's' if c.vistas != 1 else '' }} · 💬 {{ c.clics }} consulta{{ 's' if c.clics != 1 else '' }}
-              </p>
+        {# Un solo contenedor (mismo tratamiento que Visitas/Recomendaciones
+           de al lado), sin el color propio de cada catalogo -ese color
+           identifica un catalogo puntual en Inventario/Catalogos, pero aca
+           es una lista de metricas y tres franjas de colores distintos
+           competian con los numeros en vez de ordenarlos. #}
+        <div class="bg-papel border border-borde rounded-xl2 p-3">
+          <div class="space-y-2.5">
+            {% for c in top_catalogos %}
+            <div class="flex items-center gap-3 pb-2.5 border-b border-borde/60 last:border-0 last:pb-0">
+              <span class="shrink-0 w-5 text-center text-lg font-bold text-tinta/50">{{ loop.index }}</span>
+              <div class="min-w-0 flex-1">
+                <p class="font-bold truncate">{{ c.nombre }}</p>
+                <p class="text-xs text-gris mt-0.5">
+                  👀 {{ c.vistas }} vista{{ 's' if c.vistas != 1 else '' }} · 💬 {{ c.clics }} consulta{{ 's' if c.clics != 1 else '' }}
+                </p>
+              </div>
             </div>
+            {% endfor %}
           </div>
-          {% endfor %}
         </div>
       </div>
       {% endif %}
@@ -509,6 +521,35 @@
     });
     document.querySelectorAll('.log-actividad-scroll').forEach((log) => {
       log.scrollTop = log.scrollHeight;
+    });
+  })();
+
+  // Actividad (columna izquierda, solo desktop) se estira hasta el alto que
+  // termine midiendo la columna de metricas de al lado -variable segun si
+  // Funes esta prendido y cuantos catalogos hay, asi que no hay un numero
+  // fijo en CSS que sirva para las dos. No hay forma de lograr esto solo con
+  // CSS: un grid/flex con alto "auto" no tiene ningun presupuesto de alto
+  // real contra el cual achicar el lado mas largo -"stretch" solo empareja
+  // ambos lados al contenido MAS alto de los dos, nunca al mas corto-, asi
+  // que hace falta medir la columna ya pintada y pisar el alto=420 inicial
+  // (el que se ve un instante antes de que esto corra, o sin JS) con el real.
+  (function () {
+    const columna = document.getElementById('columna-metricas');
+    const bloque = document.getElementById('bloque-actividad-desktop');
+    if (!columna || !bloque) return;
+    const seccion = bloque.querySelector('section');
+    function igualarAlturaActividad() {
+      // Debajo de lg el bloque esta en hidden (ver clase del div): no tiene
+      // sentido medir ni pisar nada ahi.
+      if (window.innerWidth < 1024) return;
+      const alto = columna.getBoundingClientRect().height;
+      if (alto > 0) seccion.style.height = alto + 'px';
+    }
+    igualarAlturaActividad();
+    let temporizador;
+    window.addEventListener('resize', () => {
+      clearTimeout(temporizador);
+      temporizador = setTimeout(igualarAlturaActividad, 150);
     });
   })();
 
