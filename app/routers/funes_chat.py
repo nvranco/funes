@@ -23,7 +23,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator
 
 from app import db
-from app.config import ADMIN_TOKEN, FUNES_CONTACTO, POSTHOG_HOST, POSTHOG_KEY
+from app.config import ADMIN_TOKEN, DOMINIO_FUNES, FUNES_CONTACTO, POSTHOG_HOST, POSTHOG_KEY
 from app.funes_chat import bitacora, limite, nucleo, piloto, precios, qr
 from app.funes_chat.nucleo import ErrorFunesChat
 
@@ -327,6 +327,23 @@ async def _contexto_chat(request: Request) -> dict:
     }
 
 
+@router.get("/", response_class=HTMLResponse)
+async def pagina_landing(request: Request):
+    """La mision de Funes, en la raiz de su propio dominio.
+
+    Solo responde ahi: en cualquier otro host (el panel de LIBRERO, o local
+    sin DOMINIO_FUNES configurado) sigue dando 404, igual que la raiz daba
+    antes de este cambio -la raiz de otro host no es de Funes."""
+    if not DOMINIO_FUNES or (request.url.hostname or "").lower() != DOMINIO_FUNES:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(request, "funes_landing.html", {
+        "posthog_key": POSTHOG_KEY,
+        "posthog_host": POSTHOG_HOST,
+        "base_url": _base_absoluta(request),
+        "og_version": _version_og(),
+    })
+
+
 @router.get("/funes", response_class=HTMLResponse)
 async def pagina(request: Request):
     return templates.TemplateResponse(request, "funes_chat.html", await _contexto_chat(request))
@@ -390,6 +407,7 @@ async def pagina_libreria(request: Request, slug: str):
     contexto = await _contexto_chat(request)
     contexto.update({
         "libreria_slug_js": _js(slug),
+        "nombre_libreria_js": _js(libreria["nombre"]),
         "whatsapp_js": _js(libreria["whatsapp"]),
         "mensaje_wa_template_js": _js(libreria["mensaje_wa_template"]),
     })

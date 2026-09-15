@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block titulo %}Funes{% endblock %}
+{% block head %}
+{# Mismas etiquetas Open Graph que funes_chat.html: la raiz es ahora el link
+   que se comparte, asi que necesita su propia tarjeta y no la del chat. #}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Funes">
+<meta property="og:title" content="Funes">
+<meta property="og:description" content="Inteligencia artificial hiperlocal para descubrir tu próximo libro en el catálogo curado de tu librero de barrio.">
+<meta property="og:url" content="{{ base_url }}/">
+<meta property="og:image" content="{{ base_url }}/static/funes-og.png?v={{ og_version }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Funes, un recomendador de libros">
+<meta property="og:locale" content="es_AR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="description" content="Inteligencia artificial hiperlocal para descubrir tu próximo libro en el catálogo curado de tu librero de barrio.">
+{% if posthog_key %}
+<script src="{{ posthog_host }}/static/array.js"></script>
+<script>
+  posthog.init({{ posthog_key | tojson }}, {
+    api_host: {{ posthog_host | tojson }},
+    persistence: "sessionStorage",
+    person_profiles: "identified_only",
+  });
+</script>
+{% endif %}
+<style>
+  /* Mismo escape de columna que el resto de las paginas "de flujo" (guia.html,
+     vender.html): en pantalla ancha el contenido no se estira de punta a
+     punta, se centra en una columna de lectura comoda. */
+  @media (min-width: 768px) {
+    #hero { padding-top: 4.5rem; padding-bottom: 3.5rem; }
+    #hero h1 { font-size: 3rem; }
+    #hero p.mision { font-size: 1.25rem; }
+  }
+</style>
+{% endblock %}
+
+{% block contenido %}
+<div class="min-h-screen max-w-2xl mx-auto flex flex-col">
+  <main class="flex-1 px-5 pb-14">
+
+    {# El anillo/laberinto es el mismo icono que encabeza el chat y la pagina
+       de privacidad -no se inventa un logo nuevo para esta pagina. #}
+    <section id="hero" class="text-center pt-10 pb-8">
+      <svg viewBox="0 0 32 32" class="w-14 h-14 mx-auto text-celeste" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
+        <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
+        <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
+        <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
+      </svg>
+      <h1 class="font-sans text-4xl font-bold text-tinta leading-tight mt-3">Funes</h1>
+      <p class="mision text-base text-gris leading-relaxed mt-4 max-w-md mx-auto">
+        Usamos inteligencia artificial hiperlocal para reconectarte con el
+        catálogo curado de tu librero de barrio, y convertir la búsqueda de
+        tu próximo libro en un ejercicio de autodescubrimiento.
+      </p>
+      <a href="/funes"
+         class="tap btn-primario border-celeste inline-flex items-center justify-center rounded-xl2 font-bold px-8 mt-6">
+        Hablar con Funes
+      </a>
+    </section>
+
+    {# Los 4 pilares de la mision, en el orden que arma un argumento: primero
+       el beneficio para quien lee (engancha), despues que hace distinto a
+       Funes de una plataforma (diferenciacion), despues como funciona la
+       charla (mecanismo), y al final el motivo mas importante -que la
+       tecnologia empuje hacia el mostrador y no lo reemplace-, que es el
+       puente natural hacia el CTA de cierre. #}
+    <section class="space-y-8 mt-4">
+
+      <div class="flex gap-4">
+        <span class="tap shrink-0 w-9 h-9 rounded-full bg-celeste-claro text-celeste font-bold text-sm flex items-center justify-center border-2 border-celeste">1</span>
+        <div>
+          <h2 class="font-bold text-lg leading-tight">Una pausa de papel</h2>
+          <p class="text-sm text-gris mt-1 leading-relaxed">
+            Leer es de las pocas cosas que calman la cabeza en un mundo
+            hiperestimulado. Funes no compite por tu atención: te invita a
+            soltar la pantalla y volver al papel.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <span class="tap shrink-0 w-9 h-9 rounded-full bg-celeste-claro text-celeste font-bold text-sm flex items-center justify-center border-2 border-celeste">2</span>
+        <div>
+          <h2 class="font-bold text-lg leading-tight">El sesgo de tu librero, no el de una plataforma</h2>
+          <p class="text-sm text-gris mt-1 leading-relaxed">
+            Los algoritmos y las grandes plataformas empujan lo más bancado
+            por marketing editorial y lo que ya es famoso — un sesgo
+            natural, pero que entierra joyas que nadie descubre porque nadie
+            las recomienda. El sesgo de un librero es otro: puede rescatar
+            una obra vieja u olvidada que en un algoritmo nunca aparecería.
+            Funes hereda ese sesgo.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <span class="tap shrink-0 w-9 h-9 rounded-full bg-celeste-claro text-celeste font-bold text-sm flex items-center justify-center border-2 border-celeste">3</span>
+        <div>
+          <h2 class="font-bold text-lg leading-tight">Un espejo, no un buscador</h2>
+          <p class="text-sm text-gris mt-1 leading-relaxed">
+            No te preguntamos qué género buscás. Te preguntamos cómo estás
+            hoy. La charla te hace pensar quién sos como lector antes de
+            darte un libro — no es velocidad, es introspección.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <span class="tap shrink-0 w-9 h-9 rounded-full bg-celeste-claro text-celeste font-bold text-sm flex items-center justify-center border-2 border-celeste">4</span>
+        <div>
+          <h2 class="font-bold text-lg leading-tight">El chat abre la charla, no la cierra</h2>
+          <p class="text-sm text-gris mt-1 leading-relaxed">
+            Cuando termina la conversación, te invitamos a seguirla con el
+            personal de tu librería — presencial o por WhatsApp. La IA hace
+            el emparejamiento; el vínculo humano en el mostrador queda
+            intacto.
+          </p>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="text-center mt-12">
+      <a href="/funes"
+         class="tap btn-primario border-celeste inline-flex items-center justify-center rounded-xl2 font-bold px-8">
+        Hablar con Funes
+      </a>
+      <p class="text-xs text-gris mt-3">
+        También podés encontrarlo escaneando el código en tu librería aliada.
+      </p>
+    </section>
+
+  </main>
+</div>
+{% endblock %}

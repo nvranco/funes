@@ -79,11 +79,12 @@ def destino_de_funes(host: str, metodo: str, camino: str, query: str = "") -> st
     camino = camino.rstrip("/") or "/"
     cola = f"?{query}" if query else ""
     if (host or "").lower() == DOMINIO_FUNES:
-        # La raiz del dominio propio es el chat. Asi el link mas corto que se
-        # puede repartir -ireneofunes.up.railway.app?src=whatsapp- entra
-        # derecho, sin que nadie tenga que acordarse de escribir /funes.
-        if camino == "/":
-            return f"https://{DOMINIO_FUNES}/funes{cola}"
+        # Nada se mueve dentro del propio dominio: la raiz la sirve directo
+        # pagina_landing (routers/funes_chat.py) y el resto de rutas ya estan
+        # donde tienen que estar. Sin este return temprano, un pedido a
+        # /funes o /funes/{slug} en el propio host caeria en el chequeo de
+        # abajo -pensado para mover paginas desde OTROS hosts- y se
+        # redirigiria a si mismo (loop).
         return None
     if metodo == "GET" and (
         camino in PAGINAS_DE_FUNES

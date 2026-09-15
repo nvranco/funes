@@ -296,6 +296,10 @@ const MACRO_FIJA = {{ macro_fija_js | default('null', true) | safe }};
 // Los tres vienen juntos o ninguno: la pagina los inyecta solo cuando resuelve
 // la libreria por el slug de la URL.
 const LIBRERIA_SLUG = {{ libreria_slug_js | default('null', true) | safe }};
+// El nombre para mostrar de esa libreria (el saludo lo nombra, y el cierre
+// invita a preguntarle a su personal). Viaja junto a LIBRERIA_SLUG, nunca
+// solo: los dos los inyecta pagina_libreria a la vez.
+const NOMBRE_LIBRERIA = {{ nombre_libreria_js | default('null', true) | safe }};
 const WHATSAPP = {{ whatsapp_js | default('null', true) | safe }};
 const MENSAJE_TEMPLATE = {{ mensaje_wa_template_js | default('null', true) | safe }};
 // El orden lo manda el servidor (routers/funes_chat.py inyecta PREGUNTAS
@@ -1872,6 +1876,20 @@ async function caminoPrecisa() {
   const partes = [celebracion, empujonActual ? empujonActual + " " + cierre : cierre];
   partes.push("¿Cómo continuamos?");
   await mostrarRespuestaFunes(partes.join("\n"), null, "end");
+  // Con libreria, dos burbujas mas antes de los botones: el puente de
+  // vuelta al mostrador que pide el producto -la IA abre la charla, no la
+  // reemplaza. Van separadas (dos llamadas, no una) porque son dos ideas
+  // distintas -"si estas ahi" / "si no estas ahi"- y asi cada una tipea
+  // con su propio ritmo, no un parrafo largo de una.
+  if (LIBRERIA_SLUG && NOMBRE_LIBRERIA) {
+    await mostrarRespuestaFunes(
+      "Si estás en " + NOMBRE_LIBRERIA + " ahora mismo, te invito a que " +
+      "consultes sobre la recomendación que te di con el personal de la librería.",
+      null, "end");
+    await mostrarRespuestaFunes(
+      "Si no, podés consultar sobre este libro directamente por WhatsApp.",
+      null, "end");
+  }
   mostrarBotonesRecomendacion();
 }
 
@@ -2082,6 +2100,24 @@ function saludo() {
   const esLiteratura = MACRO_FIJA === "literatura";
   const que = esLiteratura ? "obras de literatura" : "libros";
   const cada = esLiteratura ? "cada una" : "cada uno";
+  // Con libreria (Funes acotado a su stock, ver LIBRERIA_SLUG), el saludo la
+  // nombra: es la segunda burbuja de la charla y el lugar donde se aclara
+  // que ese catalogo puntual lo curo el personal de esa libreria, no un
+  // catalogo generico. Reemplaza la frase de siempre en vez de sumarse al
+  // lado -son dos formas de decir lo mismo, no dos datos distintos.
+  if (NOMBRE_LIBRERIA) {
+    if (!CANT_LIBROS || CANT_LIBROS < 200) {
+      return MACRO_FIJA
+        ? "Tengo a mi disposición una biblioteca curada de " + que +
+          " disponibles en " + NOMBRE_LIBRERIA + " y sé para qué tipo de lector es " + cada + "."
+        : "Tengo a mi disposición una biblioteca curada disponible en " +
+          NOMBRE_LIBRERIA + " y sé para qué tipo de lector es cada libro.";
+    }
+    const redondoLibreria = Math.floor(CANT_LIBROS / 100) * 100;
+    return "Tengo a mi disposición una biblioteca curada de más de " +
+           redondoLibreria.toLocaleString("es-AR") + " " + que + " disponibles en " +
+           NOMBRE_LIBRERIA + " y sé para qué tipo de lector es " + cada + ".";
+  }
   if (!CANT_LIBROS || CANT_LIBROS < 200) {
     return MACRO_FIJA
       ? "Tengo a mi disposición una biblioteca curada de " + que +
