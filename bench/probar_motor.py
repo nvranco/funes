@@ -580,6 +580,15 @@ def probar_empujon() -> None:
     voz, emp = nucleo._armar_voz({})
     ok(voz == "" and emp == "", "un JSON vacio da voz vacia, que _generar_voz reintenta")
 
+    print()
+    print("segunda red: cualquier ':' en lo que se muestra se marca como fuga")
+    ok(nucleo._fuga_de_marcador("todo bien por aca", "esto tambien") is None,
+       "sin ':' en ningun texto, no hay fuga")
+    ok(nucleo._fuga_de_marcador("todo bien", "ACA: algo se escapo") == "ACA: algo se escapo",
+       "un ':' en CUALQUIERA de los textos se detecta, no solo la palabra EMPUJON")
+    ok(nucleo._fuga_de_marcador("otra vez EMPUNJON: viejo conocido") is not None,
+       "tambien agarra la variante exacta que ya se vio en produccion")
+
 
 def probar_dominio() -> None:
     """Que la mudanza de Funes a su dominio mueva lo que se comparte y nada mas.

@@ -2486,6 +2486,23 @@ def _armar_voz(datos: dict) -> tuple[str, str]:
     return voz, empujon
 
 
+def _fuga_de_marcador(*textos: str) -> str | None:
+    """Segunda red ademas del campo de JSON separado: si alguno de los
+    textos que va a leer el lector tiene un ':', devuelve cual.
+
+    _SYSTEM_VOZ prohibe los dos puntos sin excepcion en lo que el lector lee
+    (ver esa constante), y un ':' es justo la forma que tuvo el bug de
+    EMPUJON: una palabra seguida de dos puntos que se le escapa al modelo en
+    medio de una respuesta. El campo de JSON aparte ya cerro esa fuga de
+    raiz -no hay mas marcador que el modelo pueda escribir mal-, pero esto no
+    depende de reconocer esa marca puntual: agarra cualquier ':' futuro,
+    escriba lo que escriba el modelo alrededor."""
+    for t in textos:
+        if ":" in t:
+            return t
+    return None
+
+
 async def _generar_voz(respuestas: dict, profundas: list[dict], libro: dict) -> tuple[str, str]:
     dicho = _dicho_por_el_lector(respuestas)
     referencia, valorado = partes_del_ancla(respuestas)
@@ -2537,6 +2554,9 @@ async def _generar_voz(respuestas: dict, profundas: list[dict], libro: dict) -> 
             voz, empujon = _armar_voz(datos)
             if not voz:
                 raise ValueError("Voz vacia tras parsear el JSON.")
+            fuga = _fuga_de_marcador(voz, empujon)
+            if fuga is not None:
+                raise ValueError(f"Aparecio un ':' prohibido en texto del lector: {fuga!r}")
             latencia_ms = round((time.monotonic() - inicio) * 1000)
             logger.info(
                 "funes_chat_voz_ok intento=%s modelo=%s latencia_ms=%s libro=%r",
