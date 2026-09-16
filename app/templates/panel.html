@@ -542,7 +542,18 @@
       // Debajo de lg el bloque esta en hidden (ver clase del div): no tiene
       // sentido medir ni pisar nada ahi.
       if (window.innerWidth < 1024) return;
-      const alto = columna.getBoundingClientRect().height;
+      // NO es el alto de la columna entera: la tarjeta de Actividad no
+      // arranca en el mismo Y que la columna de al lado, arriba tiene los
+      // botones de "Gestion" (inventario + recomendaciones), que cambian de
+      // alto segun si Funes esta prendido. Restar el Y donde arranca la
+      // TARJETA (no el bloque, que ya incluye el titulo "Actividad" de
+      // arriba) contra donde termina la columna derecha es lo unico que da
+      // el espacio que sobra de verdad -medir columna.height a secas repetia
+      // arriba de la tarjeta el alto entero de la columna derecha, y por eso
+      // Actividad quedaba mucho mas larga que ella.
+      const finColumna = columna.getBoundingClientRect().bottom;
+      const inicioTarjeta = seccion.getBoundingClientRect().top;
+      const alto = finColumna - inicioTarjeta;
       if (alto > 0) seccion.style.height = alto + 'px';
     }
     igualarAlturaActividad();
