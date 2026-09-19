@@ -2127,20 +2127,21 @@ function saludo() {
   // 200 del catalogo global porque una libreria puntual nunca llega a esas
   // miles) el numero no suma nada y se omite; por encima, se redondea para
   // abajo a la centena -"mas de X"- para que la frase siga siendo cierta
-  // aunque entren o salgan libros del catalogo. Reemplaza la frase de
-  // siempre en vez de sumarse al lado -son dos formas de decir lo mismo, no
-  // dos datos distintos.
+  // aunque entren o salgan libros del catalogo. Version corta a proposito
+  // (el mensaje se sentia largo): sin el cierre "se para que tipo de lector
+  // es cada uno", que ya lo retoma el resto de la charla. Reemplaza la
+  // frase de siempre en vez de sumarse al lado -son dos formas de decir lo
+  // mismo, no dos datos distintos.
   if (NOMBRE_LIBRERIA) {
     const nombreCursiva = "*" + NOMBRE_LIBRERIA.replace(/\*/g, "") + "*";
     if (!CANT_LIBROS_LIBRERIA || CANT_LIBROS_LIBRERIA < 100) {
-      return "Tengo a mi disposición una biblioteca seleccionada, disponible en " +
-             nombreCursiva + ", y sé para qué tipo de lector es cada libro.";
+      return "Tengo a mi disposición una selección de " + que +
+             " ofrecidos por la librería " + nombreCursiva + ".";
     }
     const redondoLibreria = Math.floor(CANT_LIBROS_LIBRERIA / 100) * 100;
-    const queLibreria = esLiteratura ? "libros de literatura" : "libros";
-    return "Tengo a mi disposición una biblioteca seleccionada de más de " +
-           redondoLibreria.toLocaleString("es-AR") + " " + queLibreria + " disponibles en " +
-           nombreCursiva + " y sé para qué tipo de lector es " + cada + ".";
+    return "Tengo a mi disposición una selección de más de " +
+           redondoLibreria.toLocaleString("es-AR") + " " + que +
+           " ofrecidos por la librería " + nombreCursiva + ".";
   }
   if (!CANT_LIBROS || CANT_LIBROS < 200) {
     return MACRO_FIJA
