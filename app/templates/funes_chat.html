@@ -1880,21 +1880,31 @@ async function caminoPrecisa() {
   // flotando, y serian tres globos seguidos antes de los botones.
   const cierre = "Ojalá te guste.";
   const partes = [celebracion, empujonActual ? empujonActual + " " + cierre : cierre];
-  partes.push("¿Cómo continuamos?");
+  const conLibreria = LIBRERIA_SLUG && NOMBRE_LIBRERIA;
+  // Sin libreria, "Como continuamos" cierra esta misma burbuja, como
+  // siempre. Con libreria se corre al final de todo (ver mas abajo): asi la
+  // charla termina en una pregunta que invita a responder, no en una
+  // invitacion al mostrador que queda flotando despues de la pregunta.
+  if (!conLibreria) partes.push("¿Cómo continuamos?");
   await mostrarRespuestaFunes(partes.join("\n"), null, "end");
-  // Con libreria, dos burbujas mas antes de los botones: el puente de
+  // Con libreria, tres burbujas mas antes de los botones: el puente de
   // vuelta al mostrador que pide el producto -la IA abre la charla, no la
-  // reemplaza. Van separadas (dos llamadas, no una) porque son dos ideas
-  // distintas -"si estas ahi" / "si no estas ahi"- y asi cada una tipea
-  // con su propio ritmo, no un parrafo largo de una.
-  if (LIBRERIA_SLUG && NOMBRE_LIBRERIA) {
+  // reemplaza- y recien despues la pregunta de cierre. Van separadas (tres
+  // llamadas, no una) porque son tres ideas distintas y asi cada una tipea
+  // con su propio ritmo, no un parrafo largo de una. El nombre va en
+  // cursiva -mismo estilo markdown-lite que el resto del chat (ver
+  // parsearCursivas)- y no se menciona "personal": es una invitacion a
+  // seguir la charla ahi, no un tramite con un empleado.
+  if (conLibreria) {
+    const nombreCursiva = "*" + NOMBRE_LIBRERIA.replace(/\*/g, "") + "*";
     await mostrarRespuestaFunes(
-      "Si estás en " + NOMBRE_LIBRERIA + " ahora mismo, te invito a que " +
-      "consultes sobre la recomendación que te di con el personal de la librería.",
+      "Si estás en " + nombreCursiva + " ahora mismo, te invito a que " +
+      "consultes sobre esta recomendación.",
       null, "end");
     await mostrarRespuestaFunes(
-      "Si no, podés consultar sobre este libro directamente por WhatsApp.",
+      "Si no, podés consultar directamente por WhatsApp.",
       null, "end");
+    await mostrarRespuestaFunes("¿Cómo continuamos?", null, "end");
   }
   mostrarBotonesRecomendacion();
 }
@@ -2112,23 +2122,24 @@ function saludo() {
   // el tamano de Babilonia entera, no el de esta libreria puntual, y
   // deciendolo ahi el numero mentia (2.100 libros en una libreria que tiene
   // 40). CANT_LIBROS_LIBRERIA es la cobertura real (nucleo.cobertura_libreria)
-  // -cuantos de SUS libros puede recomendar Funes de verdad-, y por ser un
-  // numero chico (decenas, no miles) se dice tal cual, sin redondear a la
-  // centena ni esconderse por debajo de un piso de 200 como hace CANT_LIBROS
-  // mas abajo. Reemplaza la frase de siempre en vez de sumarse al lado -son
-  // dos formas de decir lo mismo, no dos datos distintos.
+  // -cuantos de SUS libros puede recomendar Funes de verdad. Mismo criterio
+  // que CANT_LIBROS mas abajo: por debajo de un piso (100, mas bajo que los
+  // 200 del catalogo global porque una libreria puntual nunca llega a esas
+  // miles) el numero no suma nada y se omite; por encima, se redondea para
+  // abajo a la centena -"mas de X"- para que la frase siga siendo cierta
+  // aunque entren o salgan libros del catalogo. Reemplaza la frase de
+  // siempre en vez de sumarse al lado -son dos formas de decir lo mismo, no
+  // dos datos distintos.
   if (NOMBRE_LIBRERIA) {
     const nombreCursiva = "*" + NOMBRE_LIBRERIA.replace(/\*/g, "") + "*";
-    if (!CANT_LIBROS_LIBRERIA) {
+    if (!CANT_LIBROS_LIBRERIA || CANT_LIBROS_LIBRERIA < 100) {
       return "Tengo a mi disposición una biblioteca seleccionada, disponible en " +
              nombreCursiva + ", y sé para qué tipo de lector es cada libro.";
     }
-    const esUno = CANT_LIBROS_LIBRERIA === 1;
-    const queLibreria = esLiteratura
-      ? (esUno ? "libro de literatura" : "libros de literatura")
-      : (esUno ? "libro" : "libros");
-    return "Tengo a mi disposición una biblioteca seleccionada de " + CANT_LIBROS_LIBRERIA +
-           " " + queLibreria + " " + (esUno ? "disponible" : "disponibles") + " en " +
+    const redondoLibreria = Math.floor(CANT_LIBROS_LIBRERIA / 100) * 100;
+    const queLibreria = esLiteratura ? "libros de literatura" : "libros";
+    return "Tengo a mi disposición una biblioteca seleccionada de más de " +
+           redondoLibreria.toLocaleString("es-AR") + " " + queLibreria + " disponibles en " +
            nombreCursiva + " y sé para qué tipo de lector es " + cada + ".";
   }
   if (!CANT_LIBROS || CANT_LIBROS < 200) {
