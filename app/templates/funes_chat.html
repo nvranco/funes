@@ -2100,9 +2100,10 @@ function saludo() {
   // numero, la misma que se usa si la base no contesta.
   //
   // Y cuando el piloto ofrece un solo estante, esta misma frase es donde se
-  // dice cual. No una linea aparte: el saludo son TRES lineas a proposito
-  // (MAX_MENSAJES_POR_RESPUESTA), y una cuarta se fusionaria con la anterior en
-  // la misma burbuja.
+  // dice cual. No una linea aparte: esta funcion entra en la primera burbuja
+  // de iniciar() (tres lineas, MAX_MENSAJES_POR_RESPUESTA), y una cuarta ahi
+  // se fusionaria con la anterior en la misma burbuja -el "¿Comenzamos?" que
+  // cierra la apertura va en una llamada aparte, ver iniciar().
   //
   // El cierre dice "se para quien es cada uno" y no "me acuerdo hasta el
   // ultimo detalle", que era el rasgo del Funes del cuento -la memoria total-
@@ -2121,26 +2122,12 @@ function saludo() {
   // (ver parsearCursivas)- y por eso mismo NO puede usar CANT_LIBROS: ese es
   // el tamano de Babilonia entera, no el de esta libreria puntual, y
   // deciendolo ahi el numero mentia (2.100 libros en una libreria que tiene
-  // 40). CANT_LIBROS_LIBRERIA es la cobertura real (nucleo.cobertura_libreria)
-  // -cuantos de SUS libros puede recomendar Funes de verdad. Mismo criterio
-  // que CANT_LIBROS mas abajo: por debajo de un piso (100, mas bajo que los
-  // 200 del catalogo global porque una libreria puntual nunca llega a esas
-  // miles) el numero no suma nada y se omite; por encima, se redondea para
-  // abajo a la centena -"mas de X"- para que la frase siga siendo cierta
-  // aunque entren o salgan libros del catalogo. Version corta a proposito
-  // (el mensaje se sentia largo): sin el cierre "se para que tipo de lector
-  // es cada uno", que ya lo retoma el resto de la charla. Reemplaza la
-  // frase de siempre en vez de sumarse al lado -son dos formas de decir lo
-  // mismo, no dos datos distintos.
+  // 40). Nunca dice CANT_LIBROS_LIBRERIA -ni siquiera redondeado-: un numero
+  // puntual por libreria genera comparaciones entre libreros que no aportan
+  // nada a la charla con el lector.
   if (NOMBRE_LIBRERIA) {
     const nombreCursiva = "*" + NOMBRE_LIBRERIA.replace(/\*/g, "") + "*";
-    if (!CANT_LIBROS_LIBRERIA || CANT_LIBROS_LIBRERIA < 100) {
-      return "Tengo a mi disposición una selección de " + que +
-             " ofrecidos por la librería " + nombreCursiva + ".";
-    }
-    const redondoLibreria = Math.floor(CANT_LIBROS_LIBRERIA / 100) * 100;
-    return "Tengo a mi disposición una selección de más de " +
-           redondoLibreria.toLocaleString("es-AR") + " " + que +
+    return "Tengo a mi disposición una selección de " + que +
            " ofrecidos por la librería " + nombreCursiva + ".";
   }
   if (!CANT_LIBROS || CANT_LIBROS < 200) {
@@ -2162,15 +2149,24 @@ async function iniciar() {
   // que tiene (que es el chiste borgeano y la explicacion de que hace, todo
   // junto), y para que le sirve eso a quien esta del otro lado.
   await mostrarRespuestaFunes(
-    // Tres lineas y ni una mas: el tipeo es caracter por caracter (ver
-    // MS_ENTRE_LETRAS, mas DELAY_TIPEO_MIN de "pensando" por burbuja), asi que
-    // cada linea extra son segundos en los que la persona mira la pantalla sin
-    // poder tocar nada. MAX_MENSAJES_POR_RESPUESTA es 3, ademas: una cuarta
-    // linea se fusionaria con la anterior en la misma burbuja.
+    // Tres lineas y ni una mas EN ESTA burbuja: el tipeo es caracter por
+    // caracter (ver MS_ENTRE_LETRAS, mas DELAY_TIPEO_MIN de "pensando" por
+    // burbuja), asi que cada linea extra son segundos en los que la persona
+    // mira la pantalla sin poder tocar nada. MAX_MENSAJES_POR_RESPUESTA es 3,
+    // ademas: una cuarta linea aca se fusionaria con la anterior en la misma
+    // burbuja -por eso "¿Comenzamos?" va en su propia llamada, abajo, no
+    // pegado a esta.
     "¡Hola! Mi nombre es *Ireneo Funes*.\n" +
     saludo() + "\n" +
     "Mi propósito es hacerte recomendaciones a partir de tu perfil *único* como lector y tus intereses actuales."
   );
+  // Cuarta burbuja, cierre de la apertura: una pregunta corta invita a tocar
+  // "Comenzar" en vez de dejar tres afirmaciones seguidas sin ningun gesto
+  // hacia el lector. anclaje "end" (no "start", el default): sigue siendo el
+  // mismo turno de Funes que el bloque de arriba, no un turno nuevo que deba
+  // scrollear la charla previa fuera de vista -mismo criterio que usa
+  // caminoPrecisa() para sus burbujas de cierre.
+  await mostrarRespuestaFunes("¿Comenzamos?", null, "end");
   mostrarContinuar();
 }
 

@@ -183,6 +183,7 @@ async def _listar_librerias():
     filas = await db.pool().fetch(
         """
         SELECT l.id, l.slug, l.nombre, l.token_panel, l.tipo_catalogo, l.funes_habilitado,
+               l.funes_catalogo_completo,
                COUNT(li.id) FILTER (
                    WHERE li.estado = 'publicado' AND li.archivado_en IS NULL
                ) AS cant_libros
@@ -373,6 +374,30 @@ async def admin_toggle_funes(token: str, libreria_id: int):
             detail="No existe esa librería, o cataloga CDs y Funes no aplica.",
         )
     return {"funes_habilitado": fila["funes_habilitado"]}
+
+
+@router.post("/admin/{token}/librerias/{libreria_id}/catalogo-completo")
+async def admin_toggle_catalogo_completo(token: str, libreria_id: int):
+    """Prende/apaga la excepcion de demo (ver schema.sql:funes_catalogo_completo):
+    con esto ON, Funes acotado a esta libreria deja de recortar por stock
+    propio y recomienda de Babilonia entera. Mismo togglear-no-setear que
+    admin_toggle_funes, mismo motivo."""
+    from app.funes_chat import nucleo
+
+    _validar_token(token)
+    fila = await db.pool().fetchrow(
+        "UPDATE librerias SET funes_catalogo_completo = NOT funes_catalogo_completo "
+        "WHERE id = $1 AND tipo_catalogo = 'libros' "
+        "RETURNING funes_catalogo_completo, slug",
+        libreria_id,
+    )
+    if fila is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No existe esa librería, o cataloga CDs y Funes no aplica.",
+        )
+    nucleo.invalidar_mascara_libreria(fila["slug"])
+    return {"funes_catalogo_completo": fila["funes_catalogo_completo"]}
 
 
 @router.post("/admin/{token}/librerias/{libreria_id}/borrar")

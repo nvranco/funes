@@ -1056,6 +1056,17 @@ async def ids_por_libreria(slug: str) -> set[str] | None:
         if libreria_id is None:
             return None
 
+        # Excepcion de demo (ver schema.sql:funes_catalogo_completo): esta
+        # libreria puntual no se recorta a su propio stock, recomienda de
+        # Babilonia entera -None es exactamente lo que _recomendar() interpreta
+        # como "no recortar nada" (misma rama que un slug inexistente).
+        catalogo_completo = await db.pool().fetchval(
+            "SELECT funes_catalogo_completo FROM librerias WHERE id = $1", libreria_id
+        )
+        if catalogo_completo:
+            _mascara_cache[slug] = (time.monotonic(), None)
+            return None
+
         propios = await db.pool().fetch(
             "SELECT titulo, autor FROM libros WHERE libreria_id = $1 "
             "AND estado = 'publicado' AND archivado_en IS NULL",

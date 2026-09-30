@@ -466,6 +466,15 @@ CREATE INDEX IF NOT EXISTS idx_funes_sesiones_fecha ON funes_sesiones(creado_en)
 -- tipo_catalogo='libros': Funes hoy no sabe nada de CDs.
 ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_habilitado BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- Excepcion de demo: con esto prendido, Funes por libreria (ver
+-- nucleo.ids_por_libreria) NO recorta el pool a lo que esa libreria tiene
+-- publicado -recomienda de Babilonia entera, como el Funes generico, pero
+-- con el saludo y el cierre en nombre de esta libreria puntual-. Pensado
+-- para una libreria de demostracion sin catalogo propio cargado todavia (o
+-- chico a proposito). Apagado por default: el recorte real es el
+-- comportamiento normal de Funes por libreria, esto es la excepcion.
+ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_catalogo_completo BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- Para que el dashboard de Funes por libreria (app/funes_chat/panel_funes.py,
 -- nucleo.cobertura_libreria) pueda filtrar/agrupar conversaciones por
 -- libreria. El scoping real de la RECOMENDACION no pasa por aca (funes_chat.py

@@ -109,6 +109,11 @@
                 class="tap rounded-lg px-3 flex items-center text-sm font-medium border-2 {{ 'border-celeste text-celeste' if lib.funes_habilitado else 'border-borde text-gris' }}">
                 Funes: {{ 'ON' if lib.funes_habilitado else 'OFF' }}
               </button>
+              <button type="button" data-accion="toggle-catalogo-completo"
+                title="Demo: recomienda de todo Funes, no solo del stock de esta librería"
+                class="tap rounded-lg px-3 flex items-center text-sm font-medium border-2 {{ 'border-ambar text-ambar' if lib.funes_catalogo_completo else 'border-borde text-gris' }}">
+                Catálogo completo: {{ 'ON' if lib.funes_catalogo_completo else 'OFF' }}
+              </button>
               {% endif %}
               <button type="button" data-accion="borrar"
                 class="tap rounded-lg px-3 flex items-center text-sm font-medium text-terracota border-2 border-terracota">
@@ -243,6 +248,7 @@
     const btnConfirmar = tarjeta.querySelector('[data-accion="confirmar-borrar"]');
     const btnCancelar = tarjeta.querySelector('[data-accion="cancelar-borrar"]');
     const btnFunes = tarjeta.querySelector('[data-accion="toggle-funes"]');
+    const btnCatalogoCompleto = tarjeta.querySelector('[data-accion="toggle-catalogo-completo"]');
 
     if (btnFunes) {
       btnFunes.addEventListener('click', async () => {
@@ -260,6 +266,27 @@
           alert('No se pudo cambiar. Probá de nuevo.');
         } finally {
           btnFunes.disabled = false;
+        }
+      });
+    }
+
+    if (btnCatalogoCompleto) {
+      btnCatalogoCompleto.addEventListener('click', async () => {
+        btnCatalogoCompleto.disabled = true;
+        try {
+          const resp = await fetch(`/admin/${TOKEN_ADMIN}/librerias/${id}/catalogo-completo`, { method: 'POST' });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const datos = await resp.json();
+          const on = datos.funes_catalogo_completo;
+          btnCatalogoCompleto.textContent = `Catálogo completo: ${on ? 'ON' : 'OFF'}`;
+          btnCatalogoCompleto.classList.toggle('border-ambar', on);
+          btnCatalogoCompleto.classList.toggle('text-ambar', on);
+          btnCatalogoCompleto.classList.toggle('border-borde', !on);
+          btnCatalogoCompleto.classList.toggle('text-gris', !on);
+        } catch (err) {
+          alert('No se pudo cambiar. Probá de nuevo.');
+        } finally {
+          btnCatalogoCompleto.disabled = false;
         }
       });
     }
