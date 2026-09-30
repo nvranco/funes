@@ -172,9 +172,11 @@
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="min-w-0">
               <p class="font-mono text-xs text-gris truncate">{{ c.token[:14] }}…</p>
-              <p class="font-medium truncate">{{ c.libreria_nombre or "Sin vincular" }}</p>
+              <p class="font-medium truncate">
+                {{ c.libreria_nombre or ("Funes (genérico)" if c.destino_generico else "Sin vincular") }}
+              </p>
               <p class="text-xs text-gris">
-                {{ "vinculado" if c.libreria_id else "creado" }} el
+                {{ "vinculado" if (c.libreria_id or c.destino_generico) else "creado" }} el
                 {{ (c.vinculado_en or c.creado_en).strftime('%d/%m/%Y') }}
               </p>
             </div>
@@ -188,14 +190,15 @@
                 Historial
               </button>
               <button type="button" data-accion="reasignar"
-                class="tap rounded-lg px-3 flex items-center text-sm font-medium border-2 {{ 'border-celeste text-celeste' if c.libreria_id else 'border-borde text-gris' }}">
-                {{ 'Reasignar' if c.libreria_id else 'Vincular' }}
+                class="tap rounded-lg px-3 flex items-center text-sm font-medium border-2 {{ 'border-celeste text-celeste' if (c.libreria_id or c.destino_generico) else 'border-borde text-gris' }}">
+                {{ 'Reasignar' if (c.libreria_id or c.destino_generico) else 'Vincular' }}
               </button>
             </div>
           </div>
           <div data-rol="panel-reasignar" class="hidden mt-3 pt-3 border-t border-borde">
             <select data-rol="select-libreria" class="tap w-full rounded-lg border border-borde px-3 py-2 text-sm mb-2">
-              <option value="">— Sin vincular —</option>
+              <option value="" {{ 'selected' if not c.libreria_id and not c.destino_generico else '' }}>— Sin vincular —</option>
+              <option value="generico" {{ 'selected' if c.destino_generico else '' }}>Funes (genérico, sin librería)</option>
               {% for lib in librerias %}
               <option value="{{ lib.id }}" {{ 'selected' if lib.id == c.libreria_id else '' }}>{{ lib.nombre }}</option>
               {% endfor %}
@@ -312,11 +315,13 @@
     btnConfirmarReasignar.addEventListener('click', async () => {
       btnConfirmarReasignar.disabled = true;
       try {
-        const libreriaId = selectLibreria.value ? parseInt(selectLibreria.value, 10) : null;
+        const valor = selectLibreria.value;
+        const destinoGenerico = valor === 'generico';
+        const libreriaId = (valor && !destinoGenerico) ? parseInt(valor, 10) : null;
         const resp = await fetch(`/admin/${TOKEN_ADMIN}/qr-codigos/${id}/reasignar`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ libreria_id: libreriaId }),
+          body: JSON.stringify({ libreria_id: libreriaId, destino_generico: destinoGenerico }),
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         window.location.reload();
@@ -344,7 +349,7 @@
           fila.className = 'flex items-center gap-2';
           fila.innerHTML =
             `<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: rgb(var(--celeste))"></span>` +
-            `<span><strong>${h.libreria_nombre || 'Sin vincular'}</strong> · ${fecha} · ${h.vinculado_por}</span>`;
+            `<span><strong>${h.libreria_nombre || (h.destino_generico ? 'Funes (genérico)' : 'Sin vincular')}</strong> · ${fecha} · ${h.vinculado_por}</span>`;
           panelHistorial.appendChild(fila);
         });
       } catch (err) {

@@ -884,7 +884,7 @@ async def vincular_qr(slug: str, token: str, datos: VincularQr):
     async with db.pool().acquire() as con:
         async with con.transaction():
             await con.execute(
-                "UPDATE qr_codigos SET libreria_id = $1 WHERE id = $2",
+                "UPDATE qr_codigos SET libreria_id = $1, destino_generico = FALSE WHERE id = $2",
                 libreria["id"], codigo["id"],
             )
             await con.execute(

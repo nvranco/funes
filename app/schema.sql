@@ -571,3 +571,15 @@ CREATE TABLE IF NOT EXISTS qr_codigos_historial (
     vinculado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_qr_codigos_historial_codigo ON qr_codigos_historial(qr_codigo_id, vinculado_en);
+
+-- Una carpita se puede vincular tambien al Funes generico (/funes, sin
+-- libreria), para QR que van a circular fuera de cualquier libreria puntual
+-- (ej. redes, flyer). No es el default de una carpita nueva -nace sin
+-- vincular, como siempre-, es una tercera opcion explicita ademas de "sin
+-- vincular" y "vinculada a una libreria": libreria_id sigue NULL en ese
+-- caso, esta columna es lo que distingue "todavia sin decidir" de "decidido
+-- que va al generico". Solo /admin puede ponerla (ver routers/admin.py);
+-- si un librero despues toma esa carpita para su libreria (vincular-qr),
+-- vuelve a FALSE porque deja de ser generica.
+ALTER TABLE qr_codigos ADD COLUMN IF NOT EXISTS destino_generico BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE qr_codigos_historial ADD COLUMN IF NOT EXISTS destino_generico BOOLEAN NOT NULL DEFAULT FALSE;

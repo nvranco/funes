@@ -204,7 +204,7 @@ async def _listar_qr_codigos():
     para saber desde cuando esta con la libreria actual."""
     filas = await db.pool().fetch(
         """
-        SELECT q.id, q.token, q.libreria_id, q.creado_en,
+        SELECT q.id, q.token, q.libreria_id, q.destino_generico, q.creado_en,
                l.nombre AS libreria_nombre,
                (SELECT h.vinculado_en FROM qr_codigos_historial h
                 WHERE h.qr_codigo_id = q.id ORDER BY h.vinculado_en DESC LIMIT 1) AS vinculado_en
@@ -457,11 +457,19 @@ async def admin_reasignar_qr_codigo(token: str, codigo_id: int, payload: dict = 
     """A diferencia de POST /api/.../vincular-qr (el librero, que solo puede
     tomar un codigo libre), esto puede pisar CUALQUIER vinculo o dejarlo
     libre (libreria_id=null) — es el unico lugar que puede reciclar una
-    carpita que ya esta en uso de otra libreria."""
+    carpita que ya esta en uso de otra libreria. destino_generico=true es una
+    tercera opcion ademas de "sin vincular" y "vinculada a una libreria": la
+    carpita manda al Funes generico (/funes) en vez de a una libreria
+    puntual. Requiere libreria_id=null -son excluyentes."""
     _validar_token(token)
     libreria_id = payload.get("libreria_id")
     if libreria_id is not None and not isinstance(libreria_id, int):
         raise HTTPException(status_code=400, detail="libreria_id debe ser un entero o null.")
+    destino_generico = bool(payload.get("destino_generico", False))
+    if destino_generico and libreria_id is not None:
+        raise HTTPException(
+            status_code=400, detail="destino_generico no puede combinarse con libreria_id."
+        )
 
     codigo = await db.pool().fetchrow("SELECT id FROM qr_codigos WHERE id = $1", codigo_id)
     if codigo is None:
@@ -475,12 +483,14 @@ async def admin_reasignar_qr_codigo(token: str, codigo_id: int, payload: dict = 
     async with db.pool().acquire() as con:
         async with con.transaction():
             await con.execute(
-                "UPDATE qr_codigos SET libreria_id = $1 WHERE id = $2", libreria_id, codigo_id
+                "UPDATE qr_codigos SET libreria_id = $1, destino_generico = $2 WHERE id = $3",
+                libreria_id, destino_generico, codigo_id,
             )
             await con.execute(
-                "INSERT INTO qr_codigos_historial (qr_codigo_id, libreria_id, vinculado_por) "
-                "VALUES ($1, $2, 'superadmin')",
-                codigo_id, libreria_id,
+                "INSERT INTO qr_codigos_historial "
+                "(qr_codigo_id, libreria_id, destino_generico, vinculado_por) "
+                "VALUES ($1, $2, $3, 'superadmin')",
+                codigo_id, libreria_id, destino_generico,
             )
     return {"ok": True}
 
@@ -490,7 +500,8 @@ async def admin_qr_codigo_historial(token: str, codigo_id: int):
     _validar_token(token)
     filas = await db.pool().fetch(
         """
-        SELECT h.libreria_id, h.vinculado_por, h.vinculado_en, l.nombre AS libreria_nombre
+        SELECT h.libreria_id, h.destino_generico, h.vinculado_por, h.vinculado_en,
+               l.nombre AS libreria_nombre
         FROM qr_codigos_historial h
         LEFT JOIN librerias l ON l.id = h.libreria_id
         WHERE h.qr_codigo_id = $1

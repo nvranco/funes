@@ -18,12 +18,18 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/qr/{token}")
 async def qr_redirigir(request: Request, token: str):
     codigo = await db.pool().fetchrow(
-        "SELECT libreria_id FROM qr_codigos WHERE token = $1", token
+        "SELECT libreria_id, destino_generico FROM qr_codigos WHERE token = $1", token
     )
     if codigo is None:
         raise HTTPException(status_code=404)
 
+    base = str(request.base_url).rstrip("/")
+
     if codigo["libreria_id"] is None:
+        if codigo["destino_generico"]:
+            return RedirectResponse(
+                f"{base}/funes", status_code=302, headers={"Cache-Control": "no-store"}
+            )
         return templates.TemplateResponse(
             request, "qr_sin_vincular.html", {}, status_code=200
         )
@@ -36,7 +42,6 @@ async def qr_redirigir(request: Request, token: str):
             request, "qr_sin_vincular.html", {}, status_code=200
         )
 
-    base = str(request.base_url).rstrip("/")
     # 302, nunca 301: si el codigo se reasigna (reciclaje de la carpita
     # fisica), el proximo scan tiene que poder llevar a otro lado sin que el
     # celular del cliente haya cacheado el destino viejo. Cache-Control
