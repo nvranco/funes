@@ -308,6 +308,14 @@ const NOMBRE_LIBRERIA = {{ nombre_libreria_js | default('null', true) | safe }};
 const CANT_LIBROS_LIBRERIA = {{ cant_libros_libreria_js | default('null', true) | safe }};
 const WHATSAPP = {{ whatsapp_js | default('null', true) | safe }};
 const MENSAJE_TEMPLATE = {{ mensaje_wa_template_js | default('null', true) | safe }};
+// El cierre propio de la libreria tras "Precisa" (schema.sql:funes_cierre):
+// una burbuja por linea, o null para las dos burbujas genericas de
+// caminoPrecisa(). Y las sedes con horario (funes_sedes), con las que el
+// cierre dice cual esta abierta ahora y el boton pasa de "Consultar por
+// WhatsApp" a "¿Como llego?": la libreria prefiere que el lector vaya a que
+// escriba.
+const CIERRE_LIBRERIA = {{ cierre_libreria_js | default('null', true) | safe }};
+const SEDES = {{ sedes_js | default('null', true) | safe }};
 // El orden lo manda el servidor (routers/funes_chat.py inyecta PREGUNTAS
 // entero). Antes estaba hardcodeado aca, y eso hacia que agregar una pregunta
 // en nucleo.py y olvidarse de tocar este archivo la dejara sin preguntar,
@@ -764,33 +772,40 @@ function burbuja(texto, propia) {
 // matchea y queda como asterisco: importa porque este mismo camino escribe
 // las respuestas del LLM, y no quiero que una comilla rara se coma medio
 // mensaje.
+//
+// Negrita con dos asteriscos: **asi**. Existe para el cierre por libreria
+// (el descuento va resaltado), no para la voz del modelo, que no la usa. La
+// alternancia del regex prueba primero el par doble, asi "**x**" no se lee
+// como un asterisco suelto + *x* + otro suelto.
 function parsearCursivas(texto) {
   const partes = [];
-  const re = /\*([^*\n]+)\*/g;
+  const re = /\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g;
   let desde = 0;
   let m;
   while ((m = re.exec(texto)) !== null) {
-    if (m.index > desde) partes.push({ texto: texto.slice(desde, m.index), cursiva: false });
-    partes.push({ texto: m[1], cursiva: true });
+    if (m.index > desde) partes.push({ texto: texto.slice(desde, m.index), cursiva: false, negrita: false });
+    if (m[1] !== undefined) partes.push({ texto: m[1], cursiva: false, negrita: true });
+    else partes.push({ texto: m[2], cursiva: true, negrita: false });
     desde = m.index + m[0].length;
   }
-  if (desde < texto.length) partes.push({ texto: texto.slice(desde), cursiva: false });
+  if (desde < texto.length) partes.push({ texto: texto.slice(desde), cursiva: false, negrita: false });
   return partes;
 }
 
 // Arma el nodo final de una burbuja ya escrita: texto suelto donde no hay
-// marca y un <em> por cada tramo en cursiva. Sin cursivas devuelve un unico
-// nodo de texto, que es exactamente lo que habia antes.
+// marca, un <em> por cada tramo en cursiva y un <strong> por cada uno en
+// negrita. Sin marcas devuelve un unico nodo de texto, que es exactamente lo
+// que habia antes.
 function pintarPartes(div, partes) {
   div.textContent = "";
   for (const parte of partes) {
-    if (!parte.cursiva) {
+    if (!parte.cursiva && !parte.negrita) {
       div.appendChild(document.createTextNode(parte.texto));
       continue;
     }
-    const em = document.createElement("em");
-    em.textContent = parte.texto;
-    div.appendChild(em);
+    const nodo = document.createElement(parte.negrita ? "strong" : "em");
+    nodo.textContent = parte.texto;
+    div.appendChild(nodo);
   }
 }
 
@@ -799,7 +814,7 @@ function revelarTexto(div, texto, seguirScroll = true) {
     div.textContent = "";
     const partes = parsearCursivas(texto);
     const caracteres = partes.flatMap(
-      (parte) => [...parte.texto].map((c) => ({ c, cursiva: parte.cursiva })));
+      (parte) => [...parte.texto].map((c) => ({ c, cursiva: parte.cursiva, negrita: parte.negrita })));
     let puestos = 0;
     let ultimoScroll = 0;
     const t0 = performance.now();
@@ -820,7 +835,9 @@ function revelarTexto(div, texto, seguirScroll = true) {
           div.appendChild(document.createTextNode(" "));
         } else {
           const span = document.createElement("span");
-          span.className = caracteres[puestos].cursiva ? "letra italic" : "letra";
+          span.className = "letra" +
+            (caracteres[puestos].cursiva ? " italic" : "") +
+            (caracteres[puestos].negrita ? " font-semibold" : "");
           span.textContent = caracter;
           div.appendChild(span);
         }
@@ -1405,7 +1422,16 @@ async function mostrarBotonesRecomendacion() {
     // buscarlo por ahi. Reemplaza al link de Google, no convive con el: son
     // dos promesas distintas ("lo tenemos nosotros" vs. "buscalo vos") y acá
     // corresponde la primera.
-    if (LIBRERIA_SLUG) {
+    // Y si la libreria cargo sedes con horario, el camino corto es ir: "¿Como
+    // llego?" al Maps de la sede abierta ahora (o la proxima en abrir), en vez
+    // de WhatsApp. Es el mismo boton para la bitacora (registrarClicConseguir,
+    // HF-3): lo que se mide es que la persona quiso moverse hacia el libro,
+    // no por que canal.
+    const sedeMaps = SEDES ? estadoSedes().destino : null;
+    if (LIBRERIA_SLUG && sedeMaps && sedeMaps.maps) {
+      btnConseguir.href = sedeMaps.maps;
+      btnConseguir.textContent = "¿Cómo llego?";
+    } else if (LIBRERIA_SLUG) {
       const mensaje = armarMensajeLibro(tituloActual, autorActual);
       btnConseguir.href = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(mensaje)}`;
       btnConseguir.textContent = "Consultar por WhatsApp";
@@ -1862,6 +1888,112 @@ async function mostrarVeredicto() {
   zonaInput.appendChild(cont);
 }
 
+// ---- Sedes con horario (SEDES, ver schema.sql:funes_sedes) ----
+//
+// Todo se calcula en la zona horaria de la libreria (SEDES.tz), no en la del
+// celular: alguien que scanea el poster desde el campus tiene el reloj bien,
+// pero el link viaja por WhatsApp a cualquier lado y "abierta ahora" tiene que
+// ser cierto en la librería, no donde esta el lector.
+const DIAS_NOMBRE = ["", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+
+function ahoraEn(tz) {
+  const partes = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date());
+  const v = Object.fromEntries(partes.map((p) => [p.type, p.value]));
+  const dias = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+  // "24" a medianoche en algunos motores con hour12:false; el % lo normaliza.
+  return { dia: dias[v.weekday], min: (parseInt(v.hour, 10) % 24) * 60 + parseInt(v.minute, 10) };
+}
+
+function minutosDe(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+
+// "16:00" -> "16", "16:30" -> "16:30": en la charla las horas en punto van sin
+// los minutos, como se dicen.
+function horaTexto(hhmm) {
+  const [h, m] = hhmm.split(":");
+  return m === "00" ? String(Number(h)) : Number(h) + ":" + m;
+}
+
+// [1,2,3,4,5] -> "de lunes a viernes"; [2] -> "los martes"; [1,3,5] -> "los
+// lunes, miércoles y viernes". Los dias ya vienen ordenados y sin repetir
+// (los normaliza el admin al guardar).
+function diasTexto(dias) {
+  const nombres = dias.map((d) => DIAS_NOMBRE[d]);
+  if (dias.length === 1) return "los " + nombres[0];
+  const seguidos = dias.every((d, i) => i === 0 || d === dias[i - 1] + 1);
+  if (seguidos && dias.length > 2) return "de " + nombres[0] + " a " + nombres[nombres.length - 1];
+  return "los " + nombres.slice(0, -1).join(", ") + " y " + nombres[nombres.length - 1];
+}
+
+// Que sedes estan abiertas en este instante, cual es la proxima en abrir (y
+// dentro de cuantos dias), y a cual mandar el boton "¿Como llego?": la
+// abierta si hay una, si no la proxima, si no la primera de la lista.
+function estadoSedes() {
+  const { dia, min } = ahoraEn(SEDES.tz || "America/Argentina/Buenos_Aires");
+  const sedes = SEDES.sedes;
+  const abiertas = sedes.filter(
+    (s) => s.dias.includes(dia) && min >= minutosDe(s.desde) && min < minutosDe(s.hasta));
+  let proxima = null;
+  for (const s of sedes) {
+    for (let d = 0; d < 8; d++) {
+      const diaN = ((dia - 1 + d) % 7) + 1;
+      if (!s.dias.includes(diaN)) continue;
+      const apertura = minutosDe(s.desde);
+      // Hoy ya abrio (este abierta o ya cerrada): su proxima apertura es otro dia.
+      if (d === 0 && apertura <= min) continue;
+      const faltan = d * 1440 + apertura - min;
+      if (!proxima || faltan < proxima.faltan) proxima = { sede: s, faltan, enDias: d };
+      break;
+    }
+  }
+  return { abiertas, proxima, destino: abiertas[0] || (proxima && proxima.sede) || sedes[0] };
+}
+
+// Las burbujas de sedes del cierre: la intro de la libreria pegada a "cual
+// esta abierta ahora" (o cuando abre la proxima), y despues "la otra". Los
+// nombres ya traen la preposicion ("del edificio X", "de la Torre Y") y aca
+// se les antepone "la": "abierta la del edificio X".
+function burbujasSedes() {
+  const { abiertas, proxima } = estadoSedes();
+  const sedes = SEDES.sedes;
+  const nombreDe = (s) => "la " + s.nombre;
+  const ref = (s) => (s.referencia ? ", " + s.referencia : "");
+  const horario = (s) => diasTexto(s.dias) + " de " + horaTexto(s.desde) + " a " + horaTexto(s.hasta);
+  let primera = "";
+  let mencionadas = [];
+  if (abiertas.length === 1) {
+    const s = abiertas[0];
+    primera = "Ahora está abierta " + nombreDe(s) + ref(s) + ", hasta las " + horaTexto(s.hasta) + ".";
+    mencionadas = abiertas;
+  } else if (abiertas.length > 1) {
+    primera = "Ahora están abiertas " +
+      abiertas.map((s) => nombreDe(s) + ref(s) + ", hasta las " + horaTexto(s.hasta)).join("; y ") + ".";
+    mencionadas = abiertas;
+  } else if (proxima) {
+    const s = proxima.sede;
+    const cuando = proxima.enDias === 0 ? "hoy"
+      : proxima.enDias === 1 ? "mañana"
+      : "el " + DIAS_NOMBRE[((proxima.enDias + ahoraEn(SEDES.tz || "America/Argentina/Buenos_Aires").dia - 1) % 7) + 1];
+    const cerradas = sedes.length === 1 ? "Está cerrada ahora: "
+      : sedes.length === 2 ? "Las dos están cerradas ahora: " : "Están cerradas ahora: ";
+    primera = cerradas + nombreDe(s) + ref(s) + ", abre " + cuando + " a las " + horaTexto(s.desde) + ".";
+    mencionadas = [s];
+  }
+  const intro = (SEDES.intro || "").trim();
+  const burbujas = [intro && primera ? intro + " " + primera : intro || primera].filter(Boolean);
+  const otras = sedes.filter((s) => !mencionadas.includes(s));
+  if (otras.length === 1) {
+    burbujas.push("La otra es " + nombreDe(otras[0]) + ref(otras[0]) + ", " + horario(otras[0]) + ".");
+  } else if (otras.length > 1) {
+    burbujas.push("Las otras son " + otras.map((s) => nombreDe(s) + ref(s) + ", " + horario(s)).join("; ") + ".");
+  }
+  return burbujas;
+}
+
 // Quien acepto el libro no tiene nada que corregir: se le celebra, se le da el
 // empujon que el modelo escribio para este momento y se le pregunta como sigue.
 // El empujon puede faltar (si el modelo no lo marco) y entonces no sale nada en
@@ -1895,7 +2027,28 @@ async function caminoPrecisa() {
   // cursiva -mismo estilo markdown-lite que el resto del chat (ver
   // parsearCursivas)- y no se menciona "personal": es una invitacion a
   // seguir la charla ahi, no un tramite con un empleado.
-  if (conLibreria) {
+  //
+  // Con CIERRE_LIBRERIA, esas burbujas las escribio la libreria (una por
+  // linea): sucursales, horarios, un descuento. Mismo lugar, mismo ritmo, y
+  // el "¿Cómo continuamos?" sigue cerrando igual.
+  //
+  // Y con SEDES, despues de esas lineas van las burbujas de sedes que arma
+  // burbujasSedes(): cual esta abierta ahora, cual es la otra. Se calculan
+  // recien aca, en el momento en que se muestran, no al cargar la pagina:
+  // una conversacion que arranco a las 15:55 tiene que decir "cerrada" si
+  // el lector acepto el libro a las 16:05.
+  if (conLibreria && (CIERRE_LIBRERIA || SEDES)) {
+    const lineas = (CIERRE_LIBRERIA || "").split("\n").map((l) => l.trim()).filter(Boolean);
+    for (const linea of lineas) {
+      await mostrarRespuestaFunes(linea, null, "end");
+    }
+    if (SEDES) {
+      for (const burbuja of burbujasSedes()) {
+        await mostrarRespuestaFunes(burbuja, null, "end");
+      }
+    }
+    await mostrarRespuestaFunes("¿Cómo continuamos?", null, "end");
+  } else if (conLibreria) {
     const nombreCursiva = "*" + NOMBRE_LIBRERIA.replace(/\*/g, "") + "*";
     await mostrarRespuestaFunes(
       "Si estás en " + nombreCursiva + " ahora mismo, te invito a que " +

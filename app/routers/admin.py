@@ -4,11 +4,14 @@ Un token incorrecto devuelve 404, no 401: no queremos confirmarle a nadie que
 la ruta existe (decisión D2, aplicada también acá).
 """
 
+import json
+import re
 import secrets
 
 from fastapi import APIRouter, Body, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field
 
 from app import db
 from app.config import ADMIN_TOKEN, MENSAJE_WA_DEFAULT
@@ -183,7 +186,7 @@ async def _listar_librerias():
     filas = await db.pool().fetch(
         """
         SELECT l.id, l.slug, l.nombre, l.token_panel, l.tipo_catalogo, l.funes_habilitado,
-               l.funes_catalogo_completo,
+               l.funes_catalogo_completo, l.funes_cierre, l.funes_sedes,
                COUNT(li.id) FILTER (
                    WHERE li.estado = 'publicado' AND li.archivado_en IS NULL
                ) AS cant_libros
@@ -398,6 +401,79 @@ async def admin_toggle_catalogo_completo(token: str, libreria_id: int):
         )
     nucleo.invalidar_mascara_libreria(fila["slug"])
     return {"funes_catalogo_completo": fila["funes_catalogo_completo"]}
+
+
+class CierreFunes(BaseModel):
+    cierre: str = Field("", max_length=1500)
+    sedes: str = Field("", max_length=6000)   # JSON crudo, ver schema.sql:funes_sedes
+
+
+_HORA = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def _validar_sedes(texto: str) -> str | None:
+    """El JSON de sedes tal como se va a guardar, o None si vino vacio. Levanta
+    400 con el motivo si esta mal armado: el chat lo lee sin defensas (es
+    nuestro dato, no del lector), asi que lo que entra tiene que estar bien.
+    Se guarda re-serializado, no el texto original: sin espacios raros y con
+    solo las claves que el chat usa."""
+    if not texto.strip():
+        return None
+    try:
+        datos = json.loads(texto)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"El JSON de sedes no parsea: {exc}.")
+    if not isinstance(datos, dict) or not isinstance(datos.get("sedes"), list) or not datos["sedes"]:
+        raise HTTPException(status_code=400, detail='Sedes: falta la lista "sedes" con al menos una.')
+    limpio = {
+        "intro": str(datos.get("intro") or "").strip(),
+        "tz": str(datos.get("tz") or "America/Argentina/Buenos_Aires"),
+        "sedes": [],
+    }
+    for i, s in enumerate(datos["sedes"], start=1):
+        if not isinstance(s, dict):
+            raise HTTPException(status_code=400, detail=f"Sede {i}: tiene que ser un objeto.")
+        nombre = str(s.get("nombre") or "").strip()
+        if not nombre:
+            raise HTTPException(status_code=400, detail=f"Sede {i}: falta nombre.")
+        dias = s.get("dias")
+        if (not isinstance(dias, list) or not dias
+                or any(not isinstance(d, int) or not 1 <= d <= 7 for d in dias)):
+            raise HTTPException(status_code=400, detail=f"Sede {i}: dias tiene que ser una lista de 1 (lunes) a 7 (domingo).")
+        desde, hasta = str(s.get("desde") or ""), str(s.get("hasta") or "")
+        if not _HORA.match(desde) or not _HORA.match(hasta) or desde >= hasta:
+            raise HTTPException(status_code=400, detail=f"Sede {i}: desde/hasta en HH:MM, y desde antes que hasta.")
+        maps = str(s.get("maps") or "").strip()
+        if maps and not maps.lower().startswith(("http://", "https://")):
+            raise HTTPException(status_code=400, detail=f"Sede {i}: el link de Maps tiene que empezar con http(s)://.")
+        limpio["sedes"].append({
+            "nombre": nombre,
+            "referencia": str(s.get("referencia") or "").strip(),
+            "dias": sorted(set(dias)),
+            "desde": desde, "hasta": hasta,
+            "maps": maps,
+        })
+    return json.dumps(limpio, ensure_ascii=False)
+
+
+@router.post("/admin/{token}/librerias/{libreria_id}/funes-cierre")
+async def admin_cierre_funes(token: str, libreria_id: int, cuerpo: CierreFunes):
+    """El cierre propio de Funes para esta libreria y sus sedes con horario
+    (ver schema.sql:funes_cierre / funes_sedes). Vacio = NULL = vuelve al
+    comportamiento generico; asi borrar el texto desde el formulario alcanza
+    para apagarlo, sin un toggle aparte."""
+    _validar_token(token)
+    cierre = cuerpo.cierre.strip() or None
+    sedes = _validar_sedes(cuerpo.sedes)
+    fila = await db.pool().fetchrow(
+        "UPDATE librerias SET funes_cierre = $2, funes_sedes = $3::jsonb "
+        "WHERE id = $1 AND tipo_catalogo = 'libros' "
+        "RETURNING funes_cierre, funes_sedes",
+        libreria_id, cierre, sedes,
+    )
+    if fila is None:
+        raise HTTPException(status_code=404, detail="No existe esa librería.")
+    return {"funes_cierre": fila["funes_cierre"], "funes_sedes": fila["funes_sedes"]}
 
 
 @router.post("/admin/{token}/librerias/{libreria_id}/borrar")

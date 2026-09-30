@@ -389,6 +389,22 @@ async def privacidad(request: Request):
 # las rutas, asi que arriba se come a las dos y las deja en 404 buscando una
 # libreria con slug "privacidad". Mismo cuidado que el /{slug} de LIBRERO en
 # main.py, pero adentro de /funes.
+def _sedes(valor) -> dict | None:
+    """funes_sedes tal como lo va a leer el chat, o None si no hay nada
+    usable. Tolera el str que devuelve asyncpg para JSONB y un JSON roto
+    guardado a mano: un cierre que no se puede armar cae al generico, no a
+    una pagina en blanco."""
+    if not valor:
+        return None
+    try:
+        datos = json.loads(valor) if isinstance(valor, str) else valor
+    except ValueError:
+        return None
+    if not isinstance(datos, dict) or not datos.get("sedes"):
+        return None
+    return datos
+
+
 @router.get("/funes/{slug}", response_class=HTMLResponse)
 async def pagina_libreria(request: Request, slug: str):
     """El mismo chat, acotado al catalogo de una libreria puntual (ver
@@ -398,7 +414,8 @@ async def pagina_libreria(request: Request, slug: str):
     no tiene Funes habilitado -mismo criterio 404-no-401 que el resto del
     panel, no confirmamos que la ruta existe."""
     libreria = await db.pool().fetchrow(
-        "SELECT nombre, whatsapp, mensaje_wa_template FROM librerias "
+        "SELECT nombre, whatsapp, mensaje_wa_template, funes_cierre, funes_sedes "
+        "FROM librerias "
         "WHERE slug = $1 AND activa AND funes_habilitado AND tipo_catalogo = 'libros'",
         slug,
     )
@@ -415,6 +432,12 @@ async def pagina_libreria(request: Request, slug: str):
         "cant_libros_libreria_js": _js(cobertura["matched"] if cobertura else None),
         "whatsapp_js": _js(libreria["whatsapp"]),
         "mensaje_wa_template_js": _js(libreria["mensaje_wa_template"]),
+        # El cierre propio y las sedes con horario (ver schema.sql). Vacios se
+        # pasan como null: el template distingue "no configurado" de "".
+        # asyncpg devuelve el JSONB como str; se decodifica aca para que el
+        # template reciba el objeto y no un string con JSON adentro.
+        "cierre_libreria_js": _js((libreria["funes_cierre"] or "").strip() or None),
+        "sedes_js": _js(_sedes(libreria["funes_sedes"])),
     })
     return templates.TemplateResponse(request, "funes_chat.html", contexto)
 

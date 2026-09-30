@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app import db
+from app.funes_chat import bitacora
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -24,11 +25,17 @@ async def qr_redirigir(request: Request, token: str):
         raise HTTPException(status_code=404)
 
     base = str(request.base_url).rstrip("/")
+    # La cohorte viaja en la redireccion. Sin esto cada scan de carpita
+    # llegaba a /funes sin ?src= y la bitacora lo contaba como 'link', la
+    # misma cohorte que un amigo que manda la URL. Default 'qr' (mostrador);
+    # un poster imprime /qr/<token>?src=flyer y se separa solo.
+    src = bitacora.normalizar_origen(request.query_params.get("src") or "qr")
 
     if codigo["libreria_id"] is None:
         if codigo["destino_generico"]:
             return RedirectResponse(
-                f"{base}/funes", status_code=302, headers={"Cache-Control": "no-store"}
+                f"{base}/funes?src={src}", status_code=302,
+                headers={"Cache-Control": "no-store"},
             )
         return templates.TemplateResponse(
             request, "qr_sin_vincular.html", {}, status_code=200
@@ -48,7 +55,7 @@ async def qr_redirigir(request: Request, token: str):
     # explicito por lo mismo -302 ya no es cacheable por default, pero no
     # queda a criterio del navegador/proxy intermedio.
     return RedirectResponse(
-        f"{base}/funes/{libreria['slug']}",
+        f"{base}/funes/{libreria['slug']}?src={src}",
         status_code=302,
         headers={"Cache-Control": "no-store"},
     )

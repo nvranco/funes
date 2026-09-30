@@ -475,6 +475,31 @@ ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_habilitado BOOLEAN NOT NULL
 -- comportamiento normal de Funes por libreria, esto es la excepcion.
 ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_catalogo_completo BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- El cierre de Funes por libreria, despues de que el lector acepta el libro.
+-- NULL o vacio = las dos burbujas genericas del template ("si estas en X ahora
+-- mismo..." + "si no, por WhatsApp"). Con texto, cada linea (\n) es una burbuja
+-- propia, en el mismo markdown-lite del chat (*cursiva*, **negrita**). Es
+-- donde una libreria dice lo que solo ella sabe: un descuento para la
+-- comunidad, una condicion. Se edita desde /admin, no hay UI en el panel del
+-- librero: el texto lo escribimos con la libreria, no lo carga ella sola.
+ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_cierre TEXT;
+
+-- Las sedes de la libreria con horario, para que el cierre diga cual esta
+-- abierta AHORA y el boton "¿Como llego?" apunte a esa (o a la proxima en
+-- abrir). NULL = sin sedes: el boton sigue siendo "Consultar por WhatsApp".
+-- Forma:
+--   {"intro": "*Festina Lente* tiene dos sedes en el campus.",
+--    "tz": "America/Argentina/Buenos_Aires",
+--    "sedes": [{"nombre": "del edificio Tornavias",
+--               "referencia": "en el primer piso, al lado de la Biblioteca Central",
+--               "dias": [1,2,3,4,5], "desde": "10:00", "hasta": "16:00",
+--               "maps": "https://..."}]}
+-- `nombre` lleva la preposicion ("del edificio X", "de la Torre Y") porque
+-- el chat lo pega despues de "la": "abierta la del edificio X". dias: 1=lunes
+-- ... 7=domingo. Se guarda como JSON y no en tablas propias: son dos filas por
+-- libreria que se cargan una vez, y el chat las lee enteras de un saque.
+ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_sedes JSONB;
+
 -- Para que el dashboard de Funes por libreria (app/funes_chat/panel_funes.py,
 -- nucleo.cobertura_libreria) pueda filtrar/agrupar conversaciones por
 -- libreria. El scoping real de la RECOMENDACION no pasa por aca (funes_chat.py

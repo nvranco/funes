@@ -114,6 +114,11 @@
                 class="tap rounded-lg px-3 flex items-center text-sm font-medium border-2 {{ 'border-ambar text-ambar' if lib.funes_catalogo_completo else 'border-borde text-gris' }}">
                 Catálogo completo: {{ 'ON' if lib.funes_catalogo_completo else 'OFF' }}
               </button>
+              <button type="button" data-accion="abrir-cierre"
+                title="Lo que Funes dice después de que el lector acepta el libro, y el link de Cómo llegar"
+                class="tap rounded-lg px-3 flex items-center text-sm font-medium border-2 {{ 'border-celeste text-celeste' if lib.funes_cierre or lib.funes_sedes else 'border-borde text-gris' }}">
+                Cierre
+              </button>
               {% endif %}
               <button type="button" data-accion="borrar"
                 class="tap rounded-lg px-3 flex items-center text-sm font-medium text-terracota border-2 border-terracota">
@@ -121,6 +126,34 @@
               </button>
             </div>
           </div>
+          {% if lib.tipo_catalogo == 'libros' %}
+          {# El cierre por libreria (schema.sql:funes_cierre). Se edita aca y no
+             en el panel del librero a proposito: es texto que escribimos con la
+             libreria, y una linea mal puesta sale en cada conversacion. #}
+          <form data-rol="cierre" class="hidden mt-3 pt-3 border-t border-borde space-y-2">
+            <p class="text-xs text-gris">
+              Una burbuja por línea, después de que el lector acepta el libro. Vacío = las burbujas genéricas.
+              Va <em>*cursiva*</em> y <strong>**negrita**</strong> como en el chat.
+            </p>
+            <textarea name="cierre" rows="2" maxlength="1500"
+              class="w-full rounded-lg border-2 border-borde px-3 py-2 text-sm"
+              placeholder="Si te interesa comprarlo, **tenés un 10% de descuento** por …">{{ lib.funes_cierre or '' }}</textarea>
+            <p class="text-xs text-gris">
+              Sedes con horario (JSON). Con esto el cierre dice cuál está abierta ahora y el botón pasa a
+              «¿Cómo llego?». Vacío = botón de WhatsApp. <code>nombre</code> con la preposición («del edificio X»),
+              <code>dias</code> 1=lunes … 7=domingo.
+            </p>
+            <textarea name="sedes" rows="6" maxlength="6000"
+              class="w-full rounded-lg border-2 border-borde px-3 py-2 text-xs font-mono"
+              placeholder='{"intro": "*Nombre* tiene dos sedes en el campus.",
+ "sedes": [{"nombre": "del edificio X", "referencia": "en el primer piso",
+            "dias": [1,2,3,4,5], "desde": "10:00", "hasta": "16:00", "maps": "https://…"}]}'>{{ lib.funes_sedes or '' }}</textarea>
+            <div class="flex gap-2">
+              <button type="submit" class="tap flex-1 btn-primario border-celeste rounded-lg text-sm font-bold">Guardar</button>
+              <button type="button" data-accion="cerrar-cierre" class="tap flex-1 btn-secundario rounded-lg text-sm font-medium">Cerrar</button>
+            </div>
+          </form>
+          {% endif %}
           <div data-rol="confirmar" class="hidden mt-3 pt-3 border-t border-borde">
             <p class="text-sm"><strong>¿Borrar "{{ lib.nombre }}" para siempre?</strong></p>
             <p class="text-xs text-gris mt-1">
@@ -287,6 +320,44 @@
           alert('No se pudo cambiar. Probá de nuevo.');
         } finally {
           btnCatalogoCompleto.disabled = false;
+        }
+      });
+    }
+
+    const btnCierre = tarjeta.querySelector('[data-accion="abrir-cierre"]');
+    const formCierre = tarjeta.querySelector('[data-rol="cierre"]');
+    if (btnCierre && formCierre) {
+      btnCierre.addEventListener('click', () => formCierre.classList.toggle('hidden'));
+      formCierre.querySelector('[data-accion="cerrar-cierre"]')
+        .addEventListener('click', () => formCierre.classList.add('hidden'));
+      formCierre.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const guardar = formCierre.querySelector('[type="submit"]');
+        guardar.disabled = true;
+        try {
+          const resp = await fetch(`/admin/${TOKEN_ADMIN}/librerias/${id}/funes-cierre`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cierre: formCierre.elements.cierre.value,
+              sedes: formCierre.elements.sedes.value,
+            }),
+          });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${resp.status}`);
+          }
+          const datos = await resp.json();
+          const on = Boolean(datos.funes_cierre || datos.funes_sedes);
+          btnCierre.classList.toggle('border-celeste', on);
+          btnCierre.classList.toggle('text-celeste', on);
+          btnCierre.classList.toggle('border-borde', !on);
+          btnCierre.classList.toggle('text-gris', !on);
+          formCierre.classList.add('hidden');
+        } catch (err) {
+          alert(err.message || 'No se pudo guardar. Probá de nuevo.');
+        } finally {
+          guardar.disabled = false;
         }
       });
     }
