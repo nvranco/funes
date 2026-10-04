@@ -581,14 +581,14 @@ function easeInOutQuad(t) {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 }
 
-function scrollSuaveHacia(el, block, duracionMs = 450) {
+function scrollSuaveHacia(el, block, duracionMs = 450, seguimiento = false, respiro = 0) {
   // "start" descuenta la cabecera pegajosa, que si no taparia el arranque de la
   // burbuja. "end" no la necesita: esta anclado abajo, donde no tapa nada.
   function objetivo() {
     const rect = el.getBoundingClientRect();
     const crudo = block === "start"
       ? window.scrollY + rect.top - altoCabecera()
-      : window.scrollY + rect.bottom - window.innerHeight;
+      : window.scrollY + rect.bottom + respiro - window.innerHeight;
     return Math.max(0, Math.min(crudo, limiteScroll()));
   }
   let destino = objetivo();
@@ -599,6 +599,13 @@ function scrollSuaveHacia(el, block, duracionMs = 450) {
   // acababa de dejar el turno arriba de todo. Todo lo que se scrollea con "end"
   // es contenido recien agregado al final, asi que retroceder nunca hace falta.
   if (block !== "start") destino = Math.max(destino, window.scrollY);
+  // La camara empezo a acompanar contenido que crecio mas alla de la pantalla:
+  // desde ahi reajustarColchon() ya no puede devolver el turno a su ancla (ver
+  // vistaSiguioContenido). Solo cuenta si de verdad se movio hacia abajo, y solo
+  // si lo pide quien escribe el turno (seguimiento): el campo de texto que
+  // crece mientras se tipea tambien scrollea con "end" y ese si tiene que
+  // seguir corrigiendo la deriva.
+  if (seguimiento && destino > window.scrollY + 1) vistaSiguioContenido = true;
 
   const miToken = ++scrollTokenActual;
   const inicio = window.scrollY;
@@ -642,6 +649,14 @@ let ultimaAncla = null;
 // apaga cada vez que se clava un turno nuevo. No se escucha el evento "scroll"
 // a secas porque lo disparan tambien nuestras propias animaciones.
 let usuarioMovioLaVista = false;
+// Mismo efecto que usuarioMovioLaVista pero lo prende el propio turno: una
+// respuesta larga (la recomendacion son tres globos) es mas alta que la
+// pantalla, y mientras se escribe la camara baja acompanandola. Si despues
+// reajustarColchon() "corrigiera la deriva" contra el ancla -el primer globo-,
+// la vista pegaria un salto hacia arriba, de vuelta al inicio de la respuesta,
+// justo cuando tiene que terminar en los botones. Se apaga en llevarArriba(),
+// cada vez que se clava un turno nuevo.
+let vistaSiguioContenido = false;
 for (const evento of ["wheel", "touchmove", "keydown"]) {
   window.addEventListener(evento, (e) => {
     // Tipear no es moverse por la conversacion. Sin esta guarda, la primera
@@ -691,7 +706,7 @@ function reajustarColchon() {
   // Si la persona se movio a mano desde que se clavo el turno, no se le toca la
   // vista: puede haber subido a releer algo mientras Funes escribe, y que la
   // pantalla se le vuelva sola seria peor que cualquier deriva.
-  if (usuarioMovioLaVista) return;
+  if (usuarioMovioLaVista || vistaSiguioContenido) return;
   const deriva = ultimaAncla.getBoundingClientRect().top - altoCabecera();
   if (Math.abs(deriva) <= DERIVA_TOLERADA) return;
   window.scrollTo(0, Math.max(0, Math.min(window.scrollY + deriva, limiteScroll())));
@@ -716,6 +731,7 @@ observadorColchon.observe(zonaInput, { childList: true });
 // contenido real y no reserve de mas.
 function llevarArriba(ancla) {
   usuarioMovioLaVista = false;
+  vistaSiguioContenido = false;
   abrirEspacio(ancla);
   scrollSuaveHacia(ancla, "start");
 }
@@ -740,7 +756,7 @@ function burbujaVacia(propia, scrollBlock = "end") {
     : "burbuja-entra self-start max-w-[90%] rounded-xl2 px-4 py-3 bg-papel border-2 border-borde whitespace-pre-line";
   hilo.appendChild(div);
   if (scrollBlock === "start") llevarArriba(div);
-  else scrollSuaveHacia(div, "end");
+  else scrollSuaveHacia(div, "end", 450, true);
   return div;
 }
 
@@ -845,7 +861,7 @@ function revelarTexto(div, texto, seguirScroll = true) {
       }
 
       if (seguirScroll && ahora - ultimoScroll >= MS_ENTRE_SCROLLS_ESCRITURA) {
-        scrollSuaveHacia(div, "end");
+        scrollSuaveHacia(div, "end", 450, true);
         ultimoScroll = ahora;
       }
 
@@ -853,7 +869,7 @@ function revelarTexto(div, texto, seguirScroll = true) {
         requestAnimationFrame(frame);
         return;
       }
-      if (seguirScroll) scrollSuaveHacia(div, "end");
+      if (seguirScroll) scrollSuaveHacia(div, "end", 450, true);
 
       setTimeout(() => {
         // Cierra colapsando a un unico nodo de texto: en pantalla es identico
@@ -1886,6 +1902,12 @@ async function mostrarVeredicto() {
     cont.appendChild(btn);
   });
   zonaInput.appendChild(cont);
+  // La respuesta larga termina con la camara en los tres botones, no en la
+  // pregunta de arriba: los botones aparecen DESPUES del ultimo globo, y sin
+  // este scroll quedaban debajo del borde de la pantalla. Con 28 px de aire
+  // debajo (mide el boton mientras todavia sube por .opcion-aparece, y pegado
+  // al borde se lee cortado).
+  scrollSuaveHacia(cont, "end", 450, true, 28);
 }
 
 // ---- Sedes con horario (SEDES, ver schema.sql:funes_sedes) ----
