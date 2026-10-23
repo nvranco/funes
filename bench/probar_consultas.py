@@ -7,8 +7,8 @@ import asyncio, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.stdout.reconfigure(encoding="utf-8")
-from app import db
-from app.funes_chat import nucleo
+from funes import db
+from funes.funes_chat import nucleo
 
 MACRO = "divulgacion"
 RESTO = "Un libro de extension media, con un desarrollo moderado."

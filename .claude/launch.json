@@ -7,7 +7,7 @@
       "runtimeArgs": [
         "-m",
         "uvicorn",
-        "app.main:app",
+        "funes.main:app",
         "--port",
         "8000",
         "--reload"
@@ -20,7 +20,7 @@
       "runtimeArgs": [
         "-m",
         "uvicorn",
-        "app.main:app",
+        "funes.main:app",
         "--port",
         "8011",
         "--reload"
@@ -33,7 +33,7 @@
       "runtimeArgs": [
         "-m",
         "uvicorn",
-        "app.main:app",
+        "funes.main:app",
         "--port",
         "8012",
         "--reload"

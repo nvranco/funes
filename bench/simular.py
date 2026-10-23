@@ -54,9 +54,9 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 import httpx  # noqa: E402
 
-from app import db  # noqa: E402
-from app.config import OPENROUTER_API_KEY  # noqa: E402
-from app.funes_chat import nucleo  # noqa: E402
+from funes import db  # noqa: E402
+from funes.config import OPENROUTER_API_KEY  # noqa: E402
+from funes.funes_chat import nucleo  # noqa: E402
 
 PERFILES = RAIZ / "bench" / "perfiles.json"
 CACHE = Path(os.environ.get("TEMP", ".")) / "funes_bench_cache.json"

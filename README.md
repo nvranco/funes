@@ -16,7 +16,7 @@ python -m venv .venv
 .venv/Scripts/activate        # Windows
 pip install -r requirements.txt
 cp .env.example .env          # completá DATABASE_URL y ADMIN_TOKEN
-uvicorn app.main:app --reload
+uvicorn funes.main:app --reload
 ```
 
 Generar un `ADMIN_TOKEN`:

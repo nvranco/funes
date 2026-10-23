@@ -8,7 +8,7 @@ documento no lo repite: guarda lo que el diagrama no puede decir, que es **por
 qué está así**, con lo que medimos.
 
 Si cambiás una pregunta, un filtro, un peso o un prompt en
-`app/funes_chat/nucleo.py`, actualizá el diagrama en el mismo commit.
+`funes/funes_chat/nucleo.py`, actualizá el diagrama en el mismo commit.
 
 El piloto expone una sola rama (`nucleo.MACRO_UNICA = "literatura"`, 2.167 de
 los 3.576 libros). Historia y divulgación están escritas y probadas, pero no se

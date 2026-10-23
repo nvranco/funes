@@ -26,9 +26,9 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 import httpx  # noqa: E402
 
-from app import db  # noqa: E402
-from app.funes_chat import nucleo  # noqa: E402
-from app.routers import funes_chat as router  # noqa: E402
+from funes import db  # noqa: E402
+from funes.funes_chat import nucleo  # noqa: E402
+from funes.routers import funes_chat as router  # noqa: E402
 
 PERFILES = RAIZ / "bench" / "perfiles.json"
 # El server local para el smoke HTTP. Configurable porque hay mas de una
@@ -600,7 +600,7 @@ def probar_dominio() -> None:
     pestaña de alguien. Las dos cosas se descubren tarde y no se pueden
     reconstruir, asi que se prueban antes.
     """
-    from app import main
+    from funes import main
 
     print()
     print("el dominio propio de Funes")
@@ -661,7 +661,7 @@ def probar_rutas() -> None:
     """
     from starlette.routing import Match
 
-    from app.main import app
+    from funes.main import app
 
     print()
     print("el orden de las rutas de Funes")

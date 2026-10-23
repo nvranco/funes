@@ -10,8 +10,8 @@ from itertools import combinations
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.stdout.reconfigure(encoding="utf-8")
-from app import db
-from app.funes_chat import nucleo
+from funes import db
+from funes.funes_chat import nucleo
 
 BASE = {"q0": "divulgacion", "q1": "vida", "q2": "intermedio", "q3": "explicacion"}
 ANCLAS = ["Merlin Sheldrake, La red oculta de la vida",

@@ -36,8 +36,8 @@ for linea in (RAIZ / ".env").read_text(encoding="utf-8").splitlines():
     if m:
         os.environ.setdefault(m.group(1), m.group(2))
 
-from app import db  # noqa: E402
-from app.funes_chat import nucleo  # noqa: E402
+from funes import db  # noqa: E402
+from funes.funes_chat import nucleo  # noqa: E402
 
 # El prompt tal como estaba antes, para poder comparar contra el nuevo sin
 # tener que ir a buscarlo al historial de git.
