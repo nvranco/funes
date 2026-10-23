@@ -2644,7 +2644,12 @@ async def _generar_voz(respuestas: dict, profundas: list[dict], libro: dict) -> 
             voz, empujon = _armar_voz(datos)
             if not voz:
                 raise ValueError("Voz vacia tras parsear el JSON.")
-            fuga = _fuga_de_marcador(voz, empujon)
+            # El titulo va tal cual lo manda el catalogo y muchos llevan subtitulo
+            # ("2001: Una odisea del espacio"): el modelo lo copia bien y la guarda
+            # lo rechazaba, asi que el libro nunca se recomendaba. Se mira todo
+            # menos el titulo, que no es texto que escriba el modelo.
+            fuga = _fuga_de_marcador(
+                *(t.replace(libro["titulo"], "") for t in (voz, empujon)))
             if fuga is not None:
                 raise ValueError(f"Aparecio un ':' prohibido en texto del lector: {fuga!r}")
             latencia_ms = round((time.monotonic() - inicio) * 1000)
