@@ -1,9 +1,27 @@
 # Instructivo para escribir abstractos con búsqueda (fase B)
 
 Tu tarea: para cada libro de tu tanda (`funes/_scraping/abstractos/abs_NN.txt`),
-buscar en internet, verificar que lo encontrado sea ESE libro, y escribir un
-abstracto — más los datos que el catálogo no trae. Al final escribís
+buscar en internet, verificar que lo encontrado sea ESE libro, y escribir
+**tres textos** — más los datos que el catálogo no trae. Al final escribís
 `funes/_scraping/abstractos/abs_NN.escritos.json` con el resultado de todos.
+
+Los tres textos, con investigación ÚNICA por libro (no busques dos veces):
+
+1. **`abstracto`** — el molde de esta página, más abajo. Es la voz con la que
+   Funes le habla al lector cuando pide "contame más" de un libro.
+2. **`sinopsis`** y **`experiencia`** — los dos textos que se vectorizan y
+   deciden el ranking. Reglas completas en
+   `funes/instructivo_reescritura_v5.md`, secciones 2 a 4 (leelas enteras).
+   Resumen para no perderte: `sinopsis` es de qué trata (80-120 palabras,
+   nombres/lugares/años concretos, nunca "este libro/la obra/el autor/esta
+   novela/el texto"); `experiencia` es qué es leerlo (50-70 palabras, arrancá
+   con un adjetivo o sustantivo, nunca con "se lee/pide una lectura/invita
+   a…", y no repitas ahí de qué trata — eso ya está en `sinopsis`). La regla
+   que más importa de las dos: **elegí 2-3 rasgos distintivos y omití el
+   resto** — un texto que nombra todos los ejes posibles no sirve para
+   diferenciar este libro de los demás. Ignorá las secciones 1, 5 (ya cubierta
+   abajo con el mismo vocabulario), 7, 8 y 9 de ese instructivo — son de otro
+   script con otro formato de entrada/salida.
 
 ## Por qué importa tanto acertar
 
@@ -116,37 +134,23 @@ recomendaciones reales. Por eso:
 - Si la búsqueda no confirma nada de la trama, **no inventes**. Preferí
   `confianza: baja` a rellenar con generalidades.
 
-## Los `rasgos` (vocabulario cerrado)
+## El `tema` (vocabulario cerrado)
 
-Leé `funes/curaduria/vocabulario_rasgos.json` antes de empezar. Los campos:
+Leé `funes/curaduria/vocabulario_rasgos.json` antes de empezar. Es UNA sola
+opción de la lista de temas de la macro de ESE libro (no uses la lista de las
+otras dos macros — historia tiene su lista, literatura la suya, divulgación
+la suya). **En literatura y divulgación, `tema` es lo que el motor usa para
+decidir si el libro se puede recomendar** (en literatura resuelve los libros
+sin género/subgénero; en divulgación filtra por exclusión). `otro` saca al
+libro de todos los baldes de forma: no es la opción segura para cuando
+dudás, es la que lo vuelve irrecomendable. Elegí el tema más cercano aunque
+no sea perfecto — `otro` es solo para lo que genuinely no encaja en ningún
+tema de su macro (cocina, autoayuda, diccionarios colados en el catálogo), no
+para la incomodidad de elegir entre dos opciones parecidas.
 
-- `tema`: UNA sola opción de la lista de temas de la macro de ESE libro (no
-  uses la lista de las otras dos macros — historia tiene su lista, literatura
-  la suya, divulgación la suya). **En literatura y divulgación, `tema` es lo
-  que el motor usa para decidir si el libro se puede recomendar** (en
-  literatura resuelve los libros sin género/subgénero; en divulgación filtra
-  por exclusión). `otro` saca al libro de todos los baldes de forma: no es la
-  opción segura para cuando dudás, es la que lo vuelve irrecomendable. Elegí
-  el tema más cercano aunque no sea perfecto — `otro` es solo para lo que
-  genuinely no encaja en ningún tema de su macro (cocina, autoayuda,
-  diccionarios colados en el catálogo), no para la incomodidad de elegir entre
-  dos opciones parecidas.
-- `tono`: 2 o 3 de la lista de tonos.
-- `exigencia`: 1 (se lee sin esfuerzo), 2 (pide atención) o 3 (difícil o
-  técnico).
-- `ritmo`: "lento" | "parejo" | "rapido".
-- `humor`: true | false.
-- `final`: "cerrado" | "abierto" | null si el libro no es un relato (ensayo,
-  divulgación).
-- `epoca`: el siglo o período del que habla (ej. "siglo XX", "1976-1983",
-  "antiguedad"), o null si no aplica.
-- `lugar`: país o región de la que habla (ej. "Argentina", "Europa"), o null.
-- `para`: una frase de menos de 12 palabras que empiece con "para quien" y
-  diga a qué lector le sirve.
-
-Si un valor no encaja exactamente en el vocabulario, elegí el más cercano —
-el validador de nuestro lado normaliza lo que sobra, así que no te trabes
-tratando de forzar un valor perfecto.
+(Antes se pedían acá 8 campos más — tono, exigencia, ritmo, humor, final,
+época, lugar, para. Se sacaron: no los lee el motor de recomendación, nadie
+los consulta nunca. No los completes, es esfuerzo tirado.)
 
 ## El JSON que escribís
 
@@ -158,17 +162,14 @@ esta forma:
   {
     "n": "7",
     "confianza": "alta",
-    "abstracto": "…110-130 palabras…",
+    "abstracto": "…110-130 palabras, la voz de Funes…",
+    "sinopsis": "…80-120 palabras, de que trata, concreto…",
+    "experiencia": "…50-70 palabras, que es leerlo, 2-3 rasgos nomas…",
     "autor": "Ursula K. Le Guin",
     "anio_obra": 1969,
     "titulo_original": "The Left Hand of Darkness",
     "nro_paginas": 320,
-    "rasgos": {
-      "tema": "genero", "tono": ["intimo", "sereno"], "exigencia": 2,
-      "ritmo": "parejo", "humor": false, "final": "cerrado",
-      "epoca": "futuro", "lugar": "otro planeta",
-      "para": "para quien quiere ciencia ficcion que piensa el genero"
-    },
+    "rasgos": {"tema": "genero"},
     "fuentes": ["https://es.wikipedia.org/wiki/...", "https://..."],
     "nota": "la sinopsis del catalogo era de otro libro"
   },
@@ -186,6 +187,12 @@ Notas sobre el formato:
   corresponde.
 - Si `confianza` es `"baja"`, no hace falta ningún otro campo (podés agregar
   `"nota"` explicando por qué, es opcional pero ayuda).
+- `nota` también sirve con `confianza: "alta"` o `"media"` para dejar
+  aclaraciones que le sirven a quien lea el catálogo después — por ejemplo
+  que el catálogo tiene el mismo libro cargado dos veces con títulos
+  distintos, o que un dato de la ficha no coincidía con lo que confirmó tu
+  búsqueda. Opcional, pero se guarda igual que en los libros que ya están en
+  Funes (ahí es donde vive esa aclaración, no en el abstracto).
 - `autor`, `anio_obra`, `titulo_original`, `nro_paginas` van SOLO si tu
   búsqueda los confirma. Si la ficha ya traía el dato correcto, repetilo
   igual (no lo dejes vacío por pereza); si no lo pudiste confirmar, omitilo
@@ -202,7 +209,46 @@ Repasá tu propio archivo de salida y confirmá:
 
 - Ningún abstracto nombra la editorial ni el año de la edición.
 - Los arranques de tus abstractos son variados entre sí (no todos "Una
-  novela sobre…" o "Un ensayo que…").
+  novela sobre…" o "Un ensayo que…"). Lo mismo para `sinopsis` y para
+  `experiencia`, cada una por separado — son tres arranques distintos por
+  libro, no repitas la misma estructura entre los tres campos de UN libro ni
+  entre libros de la tanda.
+- Ninguna `sinopsis` ni `experiencia` dice "este libro", "la obra", "el
+  autor", "la autora", "el texto", "esta novela", "este ensayo" ni "el
+  volumen" — en ninguna parte del texto.
+- Si tu `experiencia` describe una narración de voces/capítulos múltiples,
+  NO la arranques con "Coral" — convergió solo, en tandas de agentes
+  distintos que nunca se vieron entre sí, en la misma trampa de fórmula que
+  ya pasó con "insoslayable" e "ineludible" (ver más abajo): a fuerza de
+  repetirse deja de diferenciar nada. Describí en cambio qué hace distinta
+  a ESA narración coral (quién habla, cómo se cruzan las voces, el ritmo).
+- Mismo problema con "Ágil" como arranque de `experiencia` para describir
+  un libro de lectura rápida: apareció solo, en tandas distintas, 14 veces
+  seguidas apenas se corrigió lo de "Coral" — es la misma trampa mudándose
+  de palabra, no una casualidad. No la uses como arranque; decí en cambio
+  QUÉ hace rápida a esa lectura en particular (capítulos cortos, diálogo,
+  frases breves, poca descripción).
+- Tercera vuelta de la misma trampa: "Ritmo [de/sostenido/ágil]..." como
+  arranque de `experiencia` en thrillers/novela negra, 15 veces apenas se
+  corrigió "Ágil". El patrón real es más amplio que cualquier palabra
+  puntual que se te pueda prohibir acá: cada vez que se banea una, el
+  catálogo converge en la siguiente. No busques la palabra permitida
+  "de reemplazo" para el mismo molde ("es rápido de leer, con
+  capítulos cortos que...") — cambiá la ESTRUCTURA de la oración de
+  apertura, no solo el adjetivo inicial. Si tu primera frase de
+  `experiencia` tiene la forma "[Adjetivo/sustantivo de ritmo], con
+  capítulos cortos que...", es la misma trampa aunque la primera palabra
+  sea nueva. Ya pasó también con "Breve" para libros cortos (16 veces):
+  mismo molde "[Adjetivo] y [adjetivo], con/que...", ahora sobre extensión
+  en vez de ritmo. No arranques `experiencia` con "Breve" tampoco.
+  Tampoco con "Liviana"/"Liviano" (17 veces): mismo molde de nuevo, esta
+  vez para lecturas fáciles o de género liviano. Tampoco con
+  "Fragmentaria"/"Fragmentado" (17 veces) para narraciones no lineales o
+  en pedazos — mismo molde otra vez, ahora sobre estructura narrativa.
+- Ninguna `experiencia` cuenta de qué trata el libro (eso es trabajo de
+  `sinopsis`), ni arranca con "se lee", "pide una lectura", "es una lectura",
+  "se disfruta", "invita a" o "requiere una".
 - Todo libro con `confianza: alta` o `media` tiene al menos una fuente real
   en `fuentes`.
-- Contaste las palabras de cada abstracto: entre 70 y 170.
+- Contaste las palabras: abstracto 70-170, sinopsis 80-120, experiencia
+  50-70.

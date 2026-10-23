@@ -55,22 +55,72 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(RAIZ))
 
+from funes.curaduria.filtrar import normalizar  # noqa: E402
+
 BASE = RAIZ / "funes" / "_scraping" / "curaduria.sqlite3"
 DIR = RAIZ / "funes" / "_scraping" / "abstractos"
 VOCABULARIO = Path(__file__).resolve().parent / "vocabulario_rasgos.json"
 CUARENTENA = DIR / "cuarentena.txt"
 
-POR_TANDA = 40
-VERSION = "abs2"
+POR_TANDA = 25
+VERSION = "abs3"
 
 PALABRAS_MINIMAS = 70
 PALABRAS_MAXIMAS = 170
+
+# sinopsis/experiencia: mismos campos que escribe la migracion v5a
+# (funes/instructivo_reescritura_v5.md), pedidos en la misma pasada de
+# investigacion en vez de una migracion aparte -- ver el comentario de
+# CUPOS_FASE_B mas abajo sobre por que conviene escribirlos juntos.
+SINOPSIS_MINIMAS = 60
+SINOPSIS_MAXIMAS = 150
+EXPERIENCIA_MINIMAS = 35
+EXPERIENCIA_MAXIMAS = 90
+
+# "en ninguna parte del texto", por instructivo_reescritura_v5.md secciones 3
+# y 4: se verifica con codigo porque es una regla mecanica, no de criterio.
+# OJO: estas van prohibidas en cualquier posicion. "se trata de"/"se lee" NO
+# van aca -- el instructivo solo las prohibe como ARRANQUE ("no empieces
+# con..."), y "se lee" en particular aparece todo el tiempo a mitad de una
+# oracion de forma perfectamente legitima ("...se lee como una novela de
+# infiltracion..."). Iba aca por error y rechazo 6 libros buenos en la
+# primera ronda real (ver abs_01 2026-09-13, casos [6],[14],[15],[16],[21],[22]).
+_PROHIBIDAS_OBJETO = (
+    "este libro", "la obra", "el autor", "la autora", "el texto",
+    "esta novela", "este ensayo", "el volumen",
+)
+# Estas si son especificamente de ARRANQUE (ver _arranca_con_prohibida).
+_PROHIBIDAS_ARRANQUE_SINOPSIS = ("se trata de",)
+_PROHIBIDAS_ARRANQUE_EXPERIENCIA = (
+    "se lee", "pide una lectura", "es una lectura", "la lectura de",
+    "se disfruta", "invita a", "requiere una",
+)
+
+
+def _contiene_prohibida(texto: str, prohibidas: tuple[str, ...]) -> str | None:
+    t = (texto or "").lower()
+    return next((p for p in prohibidas if p in t), None)
+
+
+def _arranca_con_prohibida(texto: str, prohibidas: tuple[str, ...]) -> str | None:
+    t = (texto or "").strip().lower()
+    return next((p for p in prohibidas if t.startswith(p)), None)
 
 # Los primeros 1.000 de la fase B fueron proporcionales a como quedaron los
 # 2.496 elegidos (literatura 1.646 / historia 564 / divulgacion 286), despues
 # ampliado a 2.000 (2026-09-05, "1000 libros mas"). Ahora (mismo dia) el cupo
 # es el catalogo entero: no queda ningun elegido sin abstracto al terminar.
-CUPOS_FASE_B = {"literatura": 1646, "historia": 564, "divulgacion": 286}
+#
+# literatura subio a 3.300 (2026-09-11) cuando `elegir.py` sumo la puerta
+# "menor" para Funes por libreria (ver su CUOTAS_MENOR). Si se deja mas bajo,
+# `_pendientes_por_macro` corta por `ORDER BY puntaje_canon DESC LIMIT cupo` y
+# el bloque de puntaje_canon bajo por definicion nunca entra a una tanda.
+#
+# Subio de nuevo a 3.602 (2026-09-19) cuando `elegir.py` sumo la puerta
+# "actual_sin_stock" (302 libros "actual" ya juzgados sin stock verificado en
+# Yenny, gratis). Mismo motivo: son "actual"/"ambos" pero ordenan bajo en
+# `puntaje_canon`, asi que sin este bump quedarian afuera para siempre.
+CUPOS_FASE_B = {"literatura": 3602, "historia": 564, "divulgacion": 286}
 
 CONFIANZAS = ("alta", "media", "baja")
 
@@ -98,6 +148,14 @@ CREATE TABLE IF NOT EXISTS enriquecimiento (
 
 def _columnas(con: sqlite3.Connection) -> None:
     con.executescript(ESQUEMA)
+    # ALTER en vez de agregarlas al CREATE: la tabla ya existe con filas desde
+    # antes de que sinopsis/experiencia (protocolo v5a) se sumaran a esta
+    # fase. CREATE TABLE IF NOT EXISTS no toca una tabla ya creada.
+    for col in ("sinopsis TEXT", "experiencia TEXT", "nota TEXT"):
+        try:
+            con.execute(f"ALTER TABLE enriquecimiento ADD COLUMN {col}")
+        except sqlite3.OperationalError:
+            pass
     con.commit()
 
 
@@ -115,11 +173,30 @@ def _pendientes_por_macro(con: sqlite3.Connection, macro: str, cupo: int) -> lis
         "ORDER BY puntaje_canon DESC, clave_obra LIMIT ?",
         (macro, cupo),
     ))
+    # Literatura exige tambien sinopsis: los libros escritos antes de sumar
+    # sinopsis/experiencia a esta fase (VERSION "abs2") no la tienen, y esta
+    # condicion los hace reaparecer solos en la proxima tanda -- sin script
+    # de backfill aparte. Acotado a literatura a proposito: historia y
+    # divulgacion ya estaban con su cupo casi completo ANTES de sumar estos
+    # dos campos, y esta ronda de expansion es solo de literatura -- exigir
+    # sinopsis ahi tambien reabriria de golpe ~840 libros ya cerrados que
+    # nadie pidio tocar.
+    condicion_completo = (
+        "abstracto IS NOT NULL AND abstracto <> '' AND sinopsis IS NOT NULL AND sinopsis <> ''"
+        if macro == "literatura" else
+        "abstracto IS NOT NULL AND abstracto <> ''"
+    )
     hechos = {r[0] for r in con.execute(
-        "SELECT clave_obra FROM enriquecimiento WHERE abstracto IS NOT NULL AND abstracto <> ''"
+        f"SELECT clave_obra FROM enriquecimiento WHERE {condicion_completo}"
     )}
     hechos |= _en_cuarentena()
-    return [f for f in todos if f["clave_obra"] not in hechos]
+    pendientes = [f for f in todos if f["clave_obra"] not in hechos]
+
+    if macro == "literatura":
+        ya_en_produccion = _titulos_lit_con_sinopsis_en_produccion()
+        if ya_en_produccion:
+            pendientes = [f for f in pendientes if f["titulo_norm"] not in ya_en_produccion]
+    return pendientes
 
 
 def _entrelazar(por_macro: dict[str, list[sqlite3.Row]], cupos: dict[str, int]) -> list[sqlite3.Row]:
@@ -181,6 +258,45 @@ def _ficha(n: int, f: sqlite3.Row) -> str:
     if faltan:
         partes.append(f"    FALTA EN EL CATALOGO (confirmalo por busqueda si podes): {', '.join(faltan)}")
     return "\n".join(partes)
+
+
+def _titulos_lit_con_sinopsis_en_produccion() -> set[str]:
+    """Titulos (normalizados) de literatura que YA tienen sinopsis en
+    `funes_libros` (produccion), migrados por el pipeline v5a (otra sesion,
+    ver `funes/instructivo_reescritura_v5.md`).
+
+    Sin esto, `_pendientes_por_macro` reabriria los ~1.550 libros de
+    literatura que ya estan en el catalogo enriquecidos en produccion --
+    trabajo que otra sesion ya hizo, y mejor (ahi si se midio el coseno
+    contra el catalogo real). Solo hace falta pedirle sinopsis/experiencia a
+    un agente de esta fase cuando el libro NO esta todavia en produccion.
+    """
+    try:
+        import asyncio
+
+        import asyncpg
+    except ImportError:
+        print("  (falta asyncpg; no se puede excluir lo ya migrado a produccion)")
+        return set()
+
+    url = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:5433/librero")
+
+    async def _traer():
+        con = await asyncpg.connect(url, timeout=8)
+        try:
+            filas = await con.fetch(
+                "SELECT titulo FROM funes_libros WHERE macro = 'literatura' "
+                "AND sinopsis IS NOT NULL AND sinopsis <> ''"
+            )
+            return {normalizar(f["titulo"]) for f in filas}
+        finally:
+            await con.close()
+
+    try:
+        return asyncio.run(_traer())
+    except Exception as exc:  # noqa: BLE001
+        print(f"  (no se pudo leer funes_libros: {exc}; no se puede excluir lo ya migrado)")
+        return set()
 
 
 def _en_cuarentena() -> set[str]:
@@ -303,6 +419,31 @@ def aplicar(con: sqlite3.Connection) -> None:
                 malos += 1
                 continue
 
+            # sinopsis/experiencia (protocolo v5a): mismo criterio de puerta
+            # unica que el abstracto -- si fallan, todo el libro vuelve al
+            # pool en vez de aplicarse a medias con estos dos campos en NULL.
+            sinopsis = (item.get("sinopsis") or "").strip()
+            experiencia = (item.get("experiencia") or "").strip()
+            p_sin, p_exp = len(sinopsis.split()), len(experiencia.split())
+            if not (SINOPSIS_MINIMAS <= p_sin <= SINOPSIS_MAXIMAS):
+                malos += 1
+                continue
+            if not (EXPERIENCIA_MINIMAS <= p_exp <= EXPERIENCIA_MAXIMAS):
+                malos += 1
+                continue
+            if _contiene_prohibida(sinopsis, _PROHIBIDAS_OBJETO):
+                malos += 1
+                continue
+            if _arranca_con_prohibida(sinopsis, _PROHIBIDAS_ARRANQUE_SINOPSIS):
+                malos += 1
+                continue
+            if _contiene_prohibida(experiencia, _PROHIBIDAS_OBJETO):
+                malos += 1
+                continue
+            if _arranca_con_prohibida(experiencia, _PROHIBIDAS_ARRANQUE_EXPERIENCIA):
+                malos += 1
+                continue
+
             anio_obra = None
             try:
                 a = int(item.get("anio_obra"))
@@ -319,20 +460,29 @@ def aplicar(con: sqlite3.Connection) -> None:
 
             rasgos = _normalizar_rasgos(item.get("rasgos") or {}, macro, vocab)
 
+            # Mismo campo que ya usan los libros de produccion (ver el
+            # ejemplo de "El mayor de mis defectos": nota trae la
+            # desambiguacion "Mismo libro que..."). El instructivo ya se lo
+            # pide al agente; sin esto se pedia y se tiraba.
+            nota = (item.get("nota") or "").strip() or None
+
             con.execute(
-                "INSERT INTO enriquecimiento (clave_obra, abstracto, autor, anio_obra, "
-                "titulo_original, nro_paginas, rasgos, confianza, fuentes, version, escrito_en) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) "
+                "INSERT INTO enriquecimiento (clave_obra, abstracto, sinopsis, experiencia, "
+                "autor, anio_obra, titulo_original, nro_paginas, rasgos, confianza, fuentes, "
+                "nota, version, escrito_en) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) "
                 "ON CONFLICT(clave_obra) DO UPDATE SET "
-                "abstracto=excluded.abstracto, autor=excluded.autor, "
+                "abstracto=excluded.abstracto, sinopsis=excluded.sinopsis, "
+                "experiencia=excluded.experiencia, autor=excluded.autor, "
                 "anio_obra=excluded.anio_obra, titulo_original=excluded.titulo_original, "
                 "nro_paginas=excluded.nro_paginas, rasgos=excluded.rasgos, "
                 "confianza=excluded.confianza, fuentes=excluded.fuentes, "
-                "version=excluded.version, escrito_en=excluded.escrito_en",
-                (clave, texto, (item.get("autor") or "").strip() or None, anio_obra,
+                "nota=excluded.nota, version=excluded.version, escrito_en=excluded.escrito_en",
+                (clave, texto, sinopsis, experiencia,
+                 (item.get("autor") or "").strip() or None, anio_obra,
                  (item.get("titulo_original") or "").strip() or None, nro_paginas,
                  json.dumps(rasgos, ensure_ascii=False), confianza,
-                 json.dumps(fuentes, ensure_ascii=False), VERSION))
+                 json.dumps(fuentes, ensure_ascii=False), nota, VERSION))
             n_ok += 1
         con.commit()
         os.replace(ruta, ruta.with_suffix(".json.aplicado"))
@@ -357,18 +507,12 @@ def estado(con: sqlite3.Connection) -> None:
     objetivo = sum(CUPOS_FASE_B.values())
     print(f"fase B: {con_abs:,} de {objetivo:,} abstractos\n")
 
+    # Reusa _pendientes_por_macro (no reimplementa el criterio): asi
+    # "completo" siempre significa lo mismo aca y en preparar(), incluida la
+    # exclusion de literatura ya migrada a produccion con v5a.
     for macro, cupo in CUPOS_FASE_B.items():
-        claves = [r[0] for r in con.execute(
-            "SELECT clave_obra FROM elegibles WHERE elegido = 1 AND macro = ? "
-            "ORDER BY puntaje_canon DESC, clave_obra LIMIT ?", (macro, cupo))]
-        hechos = 0
-        if claves:
-            marcas = ",".join("?" for _ in claves)
-            hechos = con.execute(
-                f"SELECT COUNT(*) FROM enriquecimiento WHERE clave_obra IN ({marcas}) "
-                "AND abstracto IS NOT NULL AND abstracto <> ''", claves
-            ).fetchone()[0]
-        print(f"   {macro:12s} {hechos:5,d} de {cupo:5,d}")
+        pendientes = len(_pendientes_por_macro(con, macro, cupo))
+        print(f"   {macro:12s} {cupo - pendientes:5,d} de {cupo:5,d}")
 
     en_cuarentena = _en_cuarentena()
     if en_cuarentena:
@@ -396,6 +540,29 @@ def estado(con: sqlite3.Connection) -> None:
           f"x{arranques.most_common(1)[0][1]}")
     largos = [len(f[0].split()) for f in filas]
     print(f"   palabras: min {min(largos)}, media {sum(largos)//len(largos)}, max {max(largos)}")
+
+    # Acotado a literatura: es la unica macro donde sinopsis/experiencia son
+    # parte del criterio de "completo" (ver _pendientes_por_macro). Contarlas
+    # sobre historia/divulgacion daria un "faltante" que en realidad es
+    # esperado -- esas macros quedan fuera de esta ronda a proposito.
+    con_abs_lit = con.execute(
+        "SELECT COUNT(*) FROM enriquecimiento e JOIN elegibles g ON g.clave_obra = e.clave_obra "
+        "WHERE g.macro = 'literatura' AND e.abstracto IS NOT NULL AND e.abstracto <> ''"
+    ).fetchone()[0]
+    for campo in ("sinopsis", "experiencia"):
+        propias = list(con.execute(
+            f"SELECT e.{campo} FROM enriquecimiento e JOIN elegibles g ON g.clave_obra = e.clave_obra "
+            f"WHERE g.macro = 'literatura' AND e.{campo} IS NOT NULL AND e.{campo} <> ''"))
+        print(f"\n   literatura {campo}: {len(propias):,} de {con_abs_lit:,} (con abstracto pero "
+              f"sin {campo}: {con_abs_lit - len(propias):,} -- reaparecen solos en la proxima tanda)")
+        if not propias:
+            continue
+        arranques_c = collections.Counter(f[0].split()[0].lower().strip(",.") for f in propias)
+        print(f"   arranques distintos: {len(arranques_c)} en {len(propias)} "
+              f"({100*len(arranques_c)/len(propias):.0f}%), "
+              f"el mas repetido: '{arranques_c.most_common(1)[0][0]}' x{arranques_c.most_common(1)[0][1]}")
+        largos_c = [len(f[0].split()) for f in propias]
+        print(f"   palabras: min {min(largos_c)}, media {sum(largos_c)//len(largos_c)}, max {max(largos_c)}")
 
 
 def main() -> None:

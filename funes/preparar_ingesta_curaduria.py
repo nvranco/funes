@@ -26,6 +26,14 @@ el catalogo nuevo se puede recomendar o solo se puede guardar.
 3. El `id` se deriva del titulo y puede chocar contra los 1.381 que ya estan.
    Se resuelve con el mismo criterio que uso importar_ateneo_bbdd.py: sufijo de
    autor, y si tampoco alcanza, un numero.
+4. (2026-09) El embedding YA NO es obligatorio: el texto (abstracto/sinopsis/
+   experiencia) se escribe con agentes y el vector se calcula despues, aparte,
+   cuando haya credito de OpenRouter -- exigirlo aca rechazaria el 100% de los
+   libros nuevos. Y el `aplicar()` de mas abajo usa COALESCE, no pisado directo,
+   para no nulear `embedding_sinopsis`/`embedding_experiencia`/
+   `version_reescritura` en los libros que el pipeline v5a (otro script,
+   `funes/aplicar_tanda_reescritura.py`) ya migro -- este script no sabe nada
+   de esas columnas y las deja NULL en `funes_ingesta`.
 """
 import argparse
 import array
@@ -235,6 +243,10 @@ async def main() -> None:
                         help="(sin efecto: el dedupe decide solo cual pisa)")
     parser.add_argument("--aplicar", action="store_true",
                         help="ademas de armar funes_ingesta, volcarla a funes_libros LOCAL")
+    parser.add_argument("--solo-nuevos", action="store_true",
+                        help="con --aplicar: insertar SOLO los id que no existen "
+                             "todavia en funes_libros, sin tocar los que ya estan "
+                             "(esquiva el riesgo de re-fusion entre corridas)")
     args = parser.parse_args()
 
     if not CURADURIA.exists():
@@ -250,7 +262,8 @@ async def main() -> None:
         SELECT e.clave_obra, e.titulo, e.autor AS autor_scrap, e.isbn, e.macro,
                e.categoria, e.genero, e.subgenero, e.nro_paginas AS pag_scrap,
                e.anio, e.ya_en_funes,
-               n.abstracto, n.autor AS autor_ok, n.anio_obra, n.nro_paginas AS pag_ok,
+               n.abstracto, n.sinopsis, n.experiencia, n.nota AS nota_local,
+               n.autor AS autor_ok, n.anio_obra, n.nro_paginas AS pag_ok,
                n.rasgos, n.confianza, n.fuentes, n.version, n.embedding,
                n.titulo_presentable, n.autor_presentable
         FROM elegibles e JOIN enriquecimiento n USING (clave_obra)
@@ -276,9 +289,15 @@ async def main() -> None:
         # separado, cada uno emparejo con el suyo y el duplicado volvio. Un
         # merge que da un resultado distinto segun cuantas veces se corrio no es
         # un merge, asi que se corta.
+        #
+        # --solo-nuevos esquiva el riesgo de raiz en vez de ignorarlo: con esa
+        # bandera aplicar() ni siquiera toca los id que ya existen (ver mas
+        # abajo), asi que la re-fusion inconsistente no tiene donde pasar. El
+        # corte de aca abajo sigue en pie para el modo default (que si vuelve a
+        # derivar y potencialmente pisar todo).
         aplicado = await db.pool().fetchval(
             "SELECT count(*) FROM funes_libros WHERE fuente = $1", FUENTE)
-        if aplicado and args.aplicar:
+        if aplicado and args.aplicar and not args.solo_nuevos:
             respaldos = [f["table_name"] for f in await db.pool().fetch(
                 "SELECT table_name FROM information_schema.tables "
                 "WHERE table_name LIKE 'funes_libros_%' ORDER BY 1")]
@@ -322,7 +341,7 @@ async def main() -> None:
                 if _misma_obra(clave, c):
                     ganadora = _mejor(dict(existente), dict(f))
                     fusiones_internas.append(
-                        (f["titulo_presentable"], existente["titulo"], f["titulo"]))
+                        (f["titulo_presentable"] or f["titulo"], existente["titulo"], f["titulo"]))
                     unicos[i] = (c, ganadora)
                     break
             else:
@@ -335,14 +354,21 @@ async def main() -> None:
             if not abstracto:
                 rechazados.append((f["titulo"], "abstracto vacio"))
                 continue
-            if not f["embedding"]:
-                rechazados.append((f["titulo"], "sin embedding"))
-                continue
-            vector = array.array("f")
-            vector.frombytes(f["embedding"])
-            if len(vector) != 1536:
-                rechazados.append((f["titulo"], f"embedding de {len(vector)} dims"))
-                continue
+            # El embedding es OPCIONAL, no un motivo de rechazo: desde la
+            # expansion de 2026-09 el texto se escribe con agentes y el
+            # vector se calcula despues, aparte, cuando haya credito de
+            # OpenRouter (mismo criterio que ya documenta abstractos.py).
+            # Antes esto rechazaba el 100% de los libros nuevos, que nunca
+            # tuvieron embedding calculado en la curaduria local.
+            vector = None
+            if f["embedding"]:
+                candidato = array.array("f")
+                candidato.frombytes(f["embedding"])
+                if len(candidato) == 1536:
+                    vector = candidato
+                else:
+                    rechazados.append((f["titulo"], f"embedding de {len(candidato)} dims"))
+                    continue
 
             # Los campos `*_presentable` los escribio un LLM del lado de la
             # curaduria y son mejores que cualquier regla: reponen acentos que
@@ -404,12 +430,18 @@ async def main() -> None:
                     n += 1
             usados.add(id_)
 
+            fuentes_json = json.dumps(json.loads(f["fuentes"] or "[]"), ensure_ascii=False)
+            nota_local = (f["nota_local"] or "").strip()
+            nota = f"{nota_local} | fuentes: {fuentes_json}" if nota_local else fuentes_json
+
             registro = {
                 "id": id_,
                 "titulo": titulo,
                 "autor": autor,
                 "abstracto": abstracto,
-                "embedding": list(vector),
+                "sinopsis": (f["sinopsis"] or "").strip() or None,
+                "experiencia": (f["experiencia"] or "").strip() or None,
+                "embedding_abstracto": list(vector) if vector is not None else None,
                 "isbn": (f["isbn"] or "").strip() or None,
                 # anio_obra es el de la OBRA y `anio` el de la edicion; para el
                 # lector vale mas el primero.
@@ -419,12 +451,17 @@ async def main() -> None:
                 "subgenero": (f["subgenero"] or "").strip() or None,
                 "nro_paginas": _paginas(f["pag_ok"], f["pag_scrap"]),
                 "confianza_abstracto": f["confianza"],
-                "nota": json.dumps(json.loads(f["fuentes"] or "[]"), ensure_ascii=False)[:900],
+                "nota": nota[:900],
                 "fuente": FUENTE,
                 # SIEMPRE, ver la trampa 1 del docstring.
                 "macro_manual": f["macro"],
                 "rasgos": f["rasgos"],
-                "version_reescritura": f["version"],
+                # version_reescritura NO se toca aca a proposito: es del
+                # pipeline v5a (funes/instructivo_reescritura_v5.md), un
+                # concepto distinto de `enriquecimiento.version` (que versiona
+                # el prompt de Fase B). Escribirlo aca lo pisaria en el UPDATE
+                # de aplicar() -ver el COALESCE ahi- perdiendo el "v5a" real
+                # de los libros ya migrados por esa otra pasada.
             }
             if id_ in reclamados:
                 posicion, previa = reclamados[id_]
@@ -479,7 +516,7 @@ async def main() -> None:
         await auditar(preparados)
 
         if args.aplicar:
-            await aplicar()
+            await aplicar(solo_nuevos=args.solo_nuevos)
         else:
             print("\n(Para volcarla a funes_libros local: --aplicar. Railway no se toca")
             print(" desde aca en ningun caso.)")
@@ -487,13 +524,20 @@ async def main() -> None:
         await db.cerrar()
 
 
-async def aplicar() -> None:
+async def aplicar(solo_nuevos: bool = False) -> None:
     """Vuelca funes_ingesta a funes_libros, en la base LOCAL.
 
     Antes hace una copia de funes_libros. No es paranoia: el volcado PISA 269
     libros del catalogo viejo, y si el dedupe se equivoco en uno la unica forma
     de verlo es comparar contra el estado anterior. La copia se llama con la
-    fecha para que queden varias y se sepa cual es cual."""
+    fecha para que queden varias y se sepa cual es cual.
+
+    `solo_nuevos=True` inserta UNICAMENTE los id que todavia no existen en
+    funes_libros: los que ya estan no se tocan, ni siquiera para actualizarlos.
+    Es el modo seguro para sumar una tanda nueva de curaduria a un catalogo que
+    ya tiene libros de una corrida anterior -ver la nota de "Ana Frank" en
+    main()-, y ademas es inmune al riesgo de nulear con COALESCE-de-NULL algun
+    campo que otro pipeline (v5a) haya escrito despues de esta corrida."""
     import datetime
 
     # Con la hora y no solo la fecha: dos corridas el mismo dia se pisaban el
@@ -510,14 +554,33 @@ async def aplicar() -> None:
         "WHERE table_name = 'funes_ingesta' AND column_name <> 'creado_en' "
         "ORDER BY ordinal_position")]
     lista = ", ".join(columnas)
-    set_ = ", ".join(f"{c} = EXCLUDED.{c}" for c in columnas if c != "id")
-    await db.pool().execute(
-        f"INSERT INTO funes_libros ({lista}) SELECT {lista} FROM funes_ingesta "
-        f"ON CONFLICT (id) DO UPDATE SET {set_}")
+    if solo_nuevos:
+        # No toca ni un id existente -ni siquiera con COALESCE-: los libros
+        # que ya estan quedan exactamente como estaban, sin pasar por ningun
+        # UPDATE. Esquiva de raiz el riesgo de re-fusion entre corridas.
+        await db.pool().execute(
+            f"INSERT INTO funes_libros ({lista}) "
+            f"SELECT {lista} FROM funes_ingesta fi "
+            f"WHERE NOT EXISTS (SELECT 1 FROM funes_libros fl WHERE fl.id = fi.id)")
+    else:
+        # COALESCE, no pisado directo: este script no sabe nada de columnas
+        # que otro pipeline agrego despues (embedding_sinopsis,
+        # embedding_experiencia, version_reescritura, del pipeline v5a -- ver
+        # preparar()). Sin el COALESCE, un re-run de este script NULEARIA esos
+        # campos en los libros que la migracion v5a ya dejo completos, porque
+        # `registro` en preparar() nunca los toca y quedan NULL en
+        # funes_ingesta. Mismo principio que ya aplica el dedupe de arriba con
+        # autor/titulo: "pisar no puede significar empeorar un campo".
+        set_ = ", ".join(f"{c} = COALESCE(EXCLUDED.{c}, funes_libros.{c})" for c in columnas if c != "id")
+        await db.pool().execute(
+            f"INSERT INTO funes_libros ({lista}) SELECT {lista} FROM funes_ingesta "
+            f"ON CONFLICT (id) DO UPDATE SET {set_}")
 
     despues = await db.pool().fetchval("SELECT count(*) FROM funes_libros")
+    resto = await db.pool().fetchval("SELECT count(*) FROM funes_ingesta") - (despues - antes)
+    etiqueta_resto = "ya existian, sin tocar" if solo_nuevos else "pisados"
     print(f"funes_libros: {antes} -> {despues}  (+{despues - antes} nuevos, "
-          f"{await db.pool().fetchval('SELECT count(*) FROM funes_ingesta') - (despues - antes)} pisados)")
+          f"{resto} {etiqueta_resto})")
     for f in await db.pool().fetch(
             "SELECT coalesce(macro_manual, macro) m, count(*) n, "
             "count(rasgos) r, count(embedding_abstracto) e FROM funes_libros GROUP BY 1 ORDER BY 2 DESC"):
