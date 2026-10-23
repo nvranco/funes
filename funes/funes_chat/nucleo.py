@@ -253,11 +253,14 @@ _CANT_PREGUNTAS_PROFUNDAS = 2
 
 # Bandas de paginas por respuesta de q2, deliberadamente SOLAPADAS: un libro de
 # 200 paginas es "corto" para uno e "intermedio" para otro, y un corte limpio
-# produce fronteras absurdas. Calibradas contra la distribucion real del
-# catalogo (p33=228, mediana=288, p66=351).
+# produce fronteras absurdas. Calibradas contra la distribucion de literatura
+# (p10=120, p33=200, mediana=256, p66=328). "corto" llegaba a 260 y entregaba
+# 2001 (240 paginas) a quien pedia algo corto y conciso; ahora termina en 150,
+# y "intermedio" arranca en 130, asi que ningun libro de 151 a 179 paginas
+# queda sin banda y las dos se solapan en 20 paginas (antes eran 80).
 _BANDAS_PAGINAS = {
-    "corto": (None, 260),
-    "intermedio": (180, 420),
+    "corto": (None, 150),
+    "intermedio": (130, 420),
     "largo": (300, None),
 }
 

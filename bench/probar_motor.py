@@ -119,7 +119,7 @@ def probar_resolver() -> None:
 
 def probar_filtros() -> None:
     print("\n_filtrar_catalogo(): macro, banda de paginas y aflojado")
-    catalogo = ([libro(f"l{i}", f"Novela {i}", "literatura", 200) for i in range(100)]
+    catalogo = ([libro(f"l{i}", f"Novela {i}", "literatura", 140) for i in range(100)]
                 + [libro(f"h{i}", f"Historia {i}", "historia", 500) for i in range(100)]
                 + [libro("sin", "Sin paginas", "literatura", None)])
 

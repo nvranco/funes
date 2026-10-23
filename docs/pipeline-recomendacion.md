@@ -34,7 +34,7 @@ central, lo que quiere repetir).
 Orden de aplicación, de lo más elegido explícitamente a lo más derivado:
 macro, libro nombrado (por título, nunca por autor), forma (q1b), ya leídos
 (por título y autor, así otra edición tampoco vuelve) y banda de páginas (q2:
-corto ≤260, intermedio 180-420, largo ≥300; solapadas a propósito porque un
+corto ≤150, intermedio 130-420, largo ≥300; solapadas a propósito porque un
 libro de 200 páginas es «corto» para uno e «intermedio» para otro).
 
 **Escalera de aflojado.** Si el pool cae por debajo de 80 libros se suelta un
