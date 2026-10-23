@@ -1008,8 +1008,8 @@ def probar_caminos() -> None:
     nucleo.MACRO_UNICA = "literatura"
     try:
         publicas = nucleo.preguntas_publicas()
-        ok(list(publicas) == ["q2", "q4a", "q4c", "q1", "q1b", "q3", "q4b"],
-           "el cliente recorre q2, q4a, q4c, q1, q1b, q3, q4b en ese orden", str(list(publicas)))
+        ok(list(publicas) == ["q4a", "q4c", "q1", "q1b", "q2", "q3", "q4b"],
+           "el cliente recorre q4a, q4c, q1, q1b, q2, q3, q4b en ese orden", str(list(publicas)))
     finally:
         nucleo.MACRO_UNICA = nucleo_previa
 

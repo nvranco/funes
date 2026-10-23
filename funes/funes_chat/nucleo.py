@@ -621,9 +621,10 @@ PREGUNTAS = {
 
 # El orden en que el cliente recorre las preguntas. PREGUNTAS conserva el orden
 # historico (q1..q4b) porque de el depende como se arma el texto del perfil; este
-# es el del flujo de dos caminos: q2, la referencia, el desvio, y solo para quien
-# pide que le pregunten, q1/q1b/q3. q4b cierra siempre.
-_ORDEN_FLUJO = ["q0", "q2", "q4a", "q4c", "q1", "q1b", "q3", "q4", "q4b"]
+# es el del flujo de dos caminos: la referencia, el desvio, y solo para quien
+# pide que le pregunten, q1/q1b. q2 (desafio y longitud) va despues de la
+# referencia en A y B, y entre q1b y q3 en C. q4b cierra siempre.
+_ORDEN_FLUJO = ["q0", "q4a", "q4c", "q1", "q1b", "q2", "q3", "q4", "q4b"]
 
 # La macro con la que se resuelven las variantes cuando todavia no hay q0 (o
 # llego una invalida). Es la mas grande del catalogo y aquella para la que se

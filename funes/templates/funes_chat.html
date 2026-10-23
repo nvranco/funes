@@ -503,7 +503,7 @@ function pasosTotales() {
   // Literatura tiene dos caminos y cuanto dura cada uno se sabe recien al
   // contestar q4a y q4c. Hasta entonces se cuenta el mas largo, asi la barra
   // no llega a 100 con preguntas todavia por delante; al nombrar una lectura el
-  // total baja a 2 (q2 y q4a) y cierra.
+  // total baja a 2 (q4a y q2) y cierra.
   if ((respuestas.q0 || MACRO_FIJA) === "literatura") {
     if ((respuestas.q4a || "").trim()) return 2;
     if (respuestas.q4c === "decir") return 4;
@@ -1127,11 +1127,14 @@ function preguntaActual(clave) {
 function aplicaPregunta(clave) {
   const solo = PREGUNTAS[clave].solo_macros;
   if (solo && !solo.includes(respuestas.q0)) return false;
-  // Literatura tiene dos caminos (ver nucleo._ORDEN_FLUJO): q2, la referencia
-  // (q4a) y, solo si no nombro ninguna, el desvio (q4c). "preguntas" abre q1,
-  // q1b y q3; las dos ramas cierran con q4b. Con una lectura nombrada no se
-  // pregunta nada mas.
+  // Literatura tiene dos caminos (ver nucleo._ORDEN_FLUJO): la referencia (q4a)
+  // y, solo si no nombro ninguna, el desvio (q4c). "preguntas" abre q1, q1b, q2
+  // y q3; las dos ramas cierran con q4b. q2 (desafio y longitud) va despues de
+  // la referencia: tras q4a en A, tras q4b en B y entre q1b y q3 en C.
   if (respuestas.q0 === "literatura") {
+    if (clave === "q2") {
+      return !!(respuestas.q4a || "").trim() || respuestas.q4c === "preguntas" || "q4b" in respuestas;
+    }
     if (clave === "q4c") return "q4a" in respuestas && !(respuestas.q4a || "").trim();
     if (clave === "q1" || clave === "q1b" || clave === "q3") return respuestas.q4c === "preguntas";
     if (clave === "q4b") return !(respuestas.q4a || "").trim() && "q4c" in respuestas;

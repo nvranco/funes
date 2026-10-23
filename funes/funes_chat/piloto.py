@@ -145,12 +145,13 @@ ORIGEN = "CASE s.origen WHEN 'flyer' THEN 'qr' ELSE s.origen END"
 # recomendaciones tiene que valer uno, no tres.
 ESCALERA = [
     {"cond": "TRUE", "etiqueta": "Entraron"},
-    {"cond": "s.q2 <> ''", "etiqueta": "Densidad"},
     # Con el flujo de dos caminos q1, q1b y q3 solo las contesta quien pidio que
-    # le hagan preguntas, y el ancla vale tambien con solo q4a (nombro una
-    # lectura y el servidor ya no pregunta mas).
+    # le hagan preguntas; q2 la contesta todo el que llega al final de su camino
+    # (despues de la referencia en A y B). El ancla vale tambien con solo q4a
+    # (nombro una lectura).
     {"cond": "s.q1 <> ''", "etiqueta": "Qué busca"},
     {"cond": "s.q1b <> ''", "etiqueta": "La forma"},
+    {"cond": "s.q2 <> ''", "etiqueta": "Densidad"},
     {"cond": "s.q3 <> ''", "etiqueta": "Valor central"},
     {"cond": "s.q4 <> '' OR s.q4a <> '' OR s.q4b <> ''", "etiqueta": "El ancla"},
     {"cond": "EXISTS (SELECT 1 FROM funes_recomendaciones r WHERE r.sesion_id = s.id)",
@@ -293,7 +294,7 @@ async def _embudo_por_origen(desde, hasta, origenes):
         f"""
         SELECT {ORIGEN} AS origen,
                count(DISTINCT s.id) AS sesiones,
-               count(DISTINCT s.id) FILTER (WHERE s.q2 <> '') AS empezaron,
+               count(DISTINCT s.id) AS empezaron,
                count(DISTINCT s.id) FILTER (WHERE s.q4 <> '' OR s.q4a <> '' OR s.q4b <> '')
                    AS llegaron_al_final,
                count(DISTINCT r.sesion_id) AS con_recomendacion,

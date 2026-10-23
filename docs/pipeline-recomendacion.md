@@ -16,10 +16,11 @@ ofrecen; volver a ellas es poner la constante en `None`.
 
 ## El flujo, en una línea
 
-Todos arrancan con **q2** (desafío y longitud) y la pregunta del ancla **q4a**
-(¿un libro o autor que se parezca?). Quien nombra una lectura va directo a la
-recomendación (**camino A**). Quien no, elige entre escribir lo que quiere
-(**B**) o que le hagan preguntas q1, q1b y q3 (**C**). El ancla genera dos
+Todos arrancan con la pregunta del ancla **q4a** (¿un libro o autor que se
+parezca?). Quien nombra una lectura contesta solo **q2** (desafío y longitud) y
+va a la recomendación (**camino A**). Quien no, elige entre escribir lo que
+quiere (**B**, y después q2) o que le hagan preguntas q1, q1b, q2 y q3 (**C**).
+El ancla genera dos
 textos, qué es el libro y cómo se lee, y en A y B esos dos textos reemplazan a
 lo que q1 y q3 habrían aportado.
 
