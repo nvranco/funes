@@ -1042,6 +1042,18 @@ def probar_caminos() -> None:
     texto = nucleo._construir_texto_perfil({"q0": "literatura", "q2": "corto"})
     ok(bool(texto), "el perfil con solo q2 no queda vacio (la API de embeddings lo rechazaria)")
 
+    def nombrado(titulo, autor, q4):
+        return nucleo._menciono_el_libro(titulo, f" {nucleo._normalizar_texto(q4)} ", autor)
+
+    ok(nombrado("2001: Una odisea del espacio", "Arthur C. Clarke", "odisea en el espacio de clarke"),
+       "el libro escrito a medias y con su autor cuenta como nombrado")
+    ok(not nombrado("2001: Una odisea del espacio", "Arthur C. Clarke", "odisea en el espacio"),
+       "a medias y sin autor no alcanza: compartir un par de palabras no dice nada")
+    ok(not nombrado("Canticos de la lejana Tierra", "Arthur C. Clarke", "clarke"),
+       "nombrar solo al autor no saca sus libros (pide mas de el)")
+    ok(not nombrado("Historia de la eternidad", "Jorge Luis Borges", "borges ficciones"),
+       "otro libro del mismo autor no cuenta como nombrado")
+
 
 def probar_macro_unica() -> None:
     """El parche que expone una sola rama, probado por los dos lados.

@@ -1465,13 +1465,42 @@ def _es_la_misma_obra(uno: dict, otro: dict) -> bool:
     return _mismo_autor(uno.get("autor") or "", otro.get("autor") or "")
 
 
-def _menciono_el_libro(titulo: str, q4_normalizada: str) -> bool:
+# Palabras que no distinguen un titulo de otro, para comparar titulos escritos de
+# memoria ("odisea en el espacio") contra el del catalogo ("2001: Una odisea del
+# espacio").
+_PALABRAS_VACIAS_TITULO = {
+    "el", "la", "los", "las", "un", "una", "unos", "unas", "de", "del", "al", "en",
+    "y", "o", "a", "e", "u", "con", "sin", "por", "para", "que", "se", "lo", "su",
+}
+# Cuanto del titulo tiene que reconocerse, junto con el autor, para darlo por
+# nombrado cuando no esta escrito tal cual.
+_COBERTURA_TITULO_CON_AUTOR = 0.6
+
+
+def _menciono_el_libro(titulo: str, q4_normalizada: str, autor: str = "") -> bool:
     """True si el lector nombro este libro como referencia en q4.
 
     q4_normalizada viene con un espacio a cada punta, asi que buscar " clave "
     equivale a exigir limites de palabra sin necesidad de una expresion regular
-    por libro (esto corre sobre cientos de libros en cada request)."""
-    return any(f" {c} " in q4_normalizada for c in _claves_de_titulo(titulo))
+    por libro (esto corre sobre cientos de libros en cada request).
+
+    Ademas del titulo tal cual, se acepta el titulo escrito a medias cuando
+    viene acompanado de su autor: "odisea en el espacio de clarke" es 2001: Una
+    odisea del espacio, de Arthur C. Clarke, y ofrecerselo al lector que lo
+    acaba de nombrar es el peor resultado posible. Hace falta el autor porque
+    sin el, compartir un par de palabras con un titulo no dice nada."""
+    if any(f" {c} " in q4_normalizada for c in _claves_de_titulo(titulo)):
+        return True
+    palabras_q4 = set(q4_normalizada.split())
+    del_autor = [p for p in _tokens_autor(autor) if len(p) > 3]
+    if not del_autor or not any(p in palabras_q4 for p in del_autor):
+        return False
+    del_titulo = [p for p in _normalizar_texto(titulo).split()
+                  if p not in _PALABRAS_VACIAS_TITULO]
+    if len(del_titulo) < 2:
+        return False
+    cubiertas = sum(1 for p in del_titulo if p in palabras_q4)
+    return cubiertas / len(del_titulo) >= _COBERTURA_TITULO_CON_AUTOR
 
 
 # Los generos y subgeneros que arman cada una de las cuatro formas de
@@ -1687,7 +1716,8 @@ def _filtrar_catalogo(libros: list[dict], respuestas: dict) -> tuple[list[dict],
     q4 = partes_del_ancla(respuestas)[0]
     if q4:
         q4_norm = f" {_normalizar_texto(q4)} "
-        nombrados = [l for l in libros if _menciono_el_libro(l["titulo"], q4_norm)]
+        nombrados = [l for l in libros
+                     if _menciono_el_libro(l["titulo"], q4_norm, l.get("autor") or "")]
         if nombrados:
             logger.info(
                 "funes_chat_ancla_excluye libros=%s",
