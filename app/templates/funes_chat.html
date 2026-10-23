@@ -322,7 +322,6 @@ const SEDES = {{ sedes_js | default('null', true) | safe }};
 // sin ningun error.
 const ORDEN = Object.keys(PREGUNTAS);
 const MAX_RECOMENDACIONES = 3;
-const CANT_PREGUNTAS_PROFUNDAS = 2;
 const DELAY_TIPEO_MIN = 1400;
 // Lo que se espera entre letra y letra. Ritmo FIJO a proposito: la letra numero
 // 50 entra siempre 50 pasos despues de la primera, sea el mensaje corto o
@@ -412,6 +411,8 @@ function altoCabecera() {
 // eso no la cuenta contestadas().
 const respuestas = MACRO_FIJA ? { q0: MACRO_FIJA } : {};
 if (LIBRERIA_SLUG) respuestas.libreria = LIBRERIA_SLUG;
+// Las preguntas profundas ya no existen en el flujo; la lista viaja vacia
+// porque el servidor todavia la acepta en sus modelos.
 const profundas = [];
 const yaMostrados = [];
 let recomendacionesPedidas = 0;
@@ -420,8 +421,8 @@ let tituloActual = "";
 let autorActual = "";
 let agotadoActual = false;
 
-// Pasos hasta la recomendacion: las preguntas fijas que mande el servidor mas
-// las profundas. Derivado, nunca hardcodeado: si manana se agrega una pregunta
+// Pasos hasta la recomendacion: las preguntas fijas que mande el servidor.
+// Derivado, nunca hardcodeado: si manana se agrega una pregunta
 // en nucleo.py, la barra se reparte sola.
 let sesionId = "";
 // Si ya se le dijo a PostHog cual es esta conversacion. Ver guardarSesion().
@@ -499,9 +500,18 @@ function contestadas() {
 }
 
 function pasosTotales() {
+  // Literatura tiene dos caminos y cuanto dura cada uno se sabe recien al
+  // contestar q4a y q4c. Hasta entonces se cuenta el mas largo, asi la barra
+  // no llega a 100 con preguntas todavia por delante; al nombrar una lectura el
+  // total baja a 2 (q2 y q4a) y cierra.
+  if ((respuestas.q0 || MACRO_FIJA) === "literatura") {
+    if ((respuestas.q4a || "").trim()) return 2;
+    if (respuestas.q4c === "decir") return 4;
+    return 7;
+  }
   const sabemosLaMacro = "q0" in respuestas;
   const cuentan = ORDEN.filter((clave) => !sabemosLaMacro || aplicaPregunta(clave));
-  return cuentan.length + CANT_PREGUNTAS_PROFUNDAS;
+  return cuentan.length;
 }
 const barraProgreso = document.getElementById("barra-progreso");
 let progresoActual = 4;
@@ -554,7 +564,7 @@ function ponerBarra(pct) {
 }
 
 function actualizarBarra() {
-  ponerBarra(4 + 96 * ((contestadas() + profundas.length) / pasosTotales()));
+  ponerBarra(4 + 96 * (contestadas() / pasosTotales()));
 }
 
 function esperar(ms) {
@@ -1116,7 +1126,17 @@ function preguntaActual(clave) {
 // Si se tocan las de alla, se tocan las de aca.
 function aplicaPregunta(clave) {
   const solo = PREGUNTAS[clave].solo_macros;
-  return !solo || solo.includes(respuestas.q0);
+  if (solo && !solo.includes(respuestas.q0)) return false;
+  // Literatura tiene dos caminos (ver nucleo._ORDEN_FLUJO): q2, la referencia
+  // (q4a) y, solo si no nombro ninguna, el desvio (q4c). "preguntas" abre q1,
+  // q1b y q3; las dos ramas cierran con q4b. Con una lectura nombrada no se
+  // pregunta nada mas.
+  if (respuestas.q0 === "literatura") {
+    if (clave === "q4c") return "q4a" in respuestas && !(respuestas.q4a || "").trim();
+    if (clave === "q1" || clave === "q1b" || clave === "q3") return respuestas.q4c === "preguntas";
+    if (clave === "q4b") return !(respuestas.q4a || "").trim() && "q4c" in respuestas;
+  }
+  return true;
 }
 
 async function mostrarOpciones(clave) {
@@ -1228,7 +1248,7 @@ function avanzar() {
   if (contestadas() > 0) guardarSesion();
   const clave = siguientePregunta();
   if (!clave) {
-    pedirPreguntaProfunda();
+    pedirCandidato();
     return;
   }
   // El tipo lo declara la pregunta, no una lista de claves cableada aca: con
@@ -1243,69 +1263,6 @@ function avanzar() {
   }
 }
 
-// Comun a las 3 formas de contestar una pregunta profunda (opcion A, opcion
-// B, o texto libre via "Otra"): guarda la respuesta y sigue el flujo.
-function avanzarProfunda(pregunta, respuesta, consulta) {
-  profundas.push({ pregunta, respuesta, consulta: consulta || "" });
-  burbuja(respuesta, true);
-  limpiarInput();
-  actualizarBarra();
-  guardarSesion();
-  if (profundas.length < CANT_PREGUNTAS_PROFUNDAS) {
-    pedirPreguntaProfunda();
-  } else {
-    pedirCandidato();
-  }
-}
-
-function formularioTextoProfunda(pregunta) {
-  limpiarInput();
-  const form = document.createElement("form");
-  form.className = "flex gap-2 items-end";
-  form.innerHTML =
-    '<textarea rows="1" class="flex-1 rounded-xl2 border-2 px-3 py-3 resize-none overflow-hidden" ' +
-    'style="border-color: var(--borde-secundario)" placeholder="Tu respuesta..." required maxlength="600"></textarea>' +
-    '<button type="submit" class="btn-primario border-celeste tap rounded-xl2 px-4 py-3 font-semibold">Enviar</button>';
-  form.addEventListener("submit", (ev) => {
-    ev.preventDefault();
-    const valor = form.querySelector("textarea").value.trim();
-    if (!valor) return;
-    avanzarProfunda(pregunta, valor);
-  });
-  zonaInput.appendChild(form);
-}
-
-// 2 opciones generadas por el LLM (las posturas que la pregunta ya plantea)
-// mas un tercer boton "Otra" que abre el texto libre de siempre.
-function mostrarOpcionesProfundas(pregunta, opciones, consultas) {
-  limpiarInput();
-  const cont = document.createElement("div");
-  cont.className = "flex flex-col gap-2";
-  const etiquetas = [...opciones, "Otra"];
-  etiquetas.forEach((etiqueta, indice) => {
-    const esOtra = indice === etiquetas.length - 1;
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = esOtra
-      ? "opcion-aparece btn-secundario tap rounded-xl2 px-4 py-3 text-left text-base"
-      : "opcion-aparece tap rounded-xl2 px-4 py-3 text-left text-base bg-celeste-claro border-2 border-celeste text-texto-papel";
-    btn.style.animationDelay = `${indice * 160}ms`;
-    btn.textContent = etiqueta;
-    btn.addEventListener("click", () => {
-      if (esOtra) {
-        // No es una respuesta sino un cambio de modo de entrada: no hay burbuja
-        // propia, asi que se ancla en la pregunta para que quede arriba del input.
-        formularioTextoProfunda(pregunta);
-        llevarArriba(hilo.lastElementChild);
-      } else {
-        avanzarProfunda(pregunta, etiqueta, (consultas || [])[indice]);
-      }
-    });
-    cont.appendChild(btn);
-  });
-  zonaInput.appendChild(cont);
-}
-
 // Cuando una llamada falla (se corto la conexion, el modelo tardo de mas), la
 // unica salida que tenia la persona era recargar y empezar de cero. Esto le
 // deja reintentar el mismo paso.
@@ -1317,36 +1274,6 @@ function botonReintentar(accion, etiqueta) {
   btn.textContent = etiqueta || "Reintentar";
   btn.addEventListener("click", () => { limpiarInput(); accion(); });
   zonaInput.appendChild(btn);
-}
-
-async function pedirPreguntaProfunda() {
-  limpiarInput();
-  const promesa = (async () => {
-    try {
-      const resp = await fetch("/funes/pregunta-profunda", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...respuestas, profundas }),
-      });
-      if (!resp.ok) throw new Error("fallo el pedido");
-      const datos = await resp.json();
-      return { ok: true, texto: datos.pregunta, opciones: datos.opciones || [],
-               consultas: datos.consultas || [] };
-    } catch (err) {
-      return { ok: false, texto: MENSAJE_ERROR, opciones: [] };
-    }
-  })();
-
-  await mostrarRespuestaFunes(promesa.then((r) => r.texto));
-  const resultado = await promesa;
-  if (resultado.ok) {
-    mostrarOpcionesProfundas(resultado.texto, resultado.opciones, resultado.consultas);
-  } else {
-    // Sin esto la pantalla se quedaba sin un solo boton: el mensaje de error
-    // y nada mas, con la conversacion terminada de hecho aunque el problema
-    // fuera un tunel del subte.
-    botonReintentar(pedirPreguntaProfunda);
-  }
 }
 
 // Se dispara apenas llega la recomendacion, no cuando se muestran los botones:

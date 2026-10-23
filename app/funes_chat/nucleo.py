@@ -45,6 +45,14 @@ _TOP_K_CANDIDATOS = 8
 # justamente lo que q0 esta para impedir.
 _PESO_ANCLA = 0.5
 
+# Cuando el lector nombro una referencia o escribio lo que quiere SIN pasar por
+# q1/q1b/q3, el ancla es lo unico que dice como quiere leer, asi que pesa lo que
+# pesaria sin perfil (_MAX_SIN_PERFIL) y se reparte en dos: parte contra la
+# sinopsis (de que trata) y el resto contra la experiencia (como se lee), que es
+# lo que q1 y q3 habrian aportado. El tope real lo aplica _pesos().
+_PESO_ANCLA_RICA = 0.75
+_REPARTO_ANCLA_RICA = 0.55  # fraccion contra la sinopsis; el resto, contra la experiencia
+
 # Restarle a cada vector la media de su macro antes de comparar. Los embeddings
 # de un catalogo de libros no estan repartidos por todo el espacio: apuntan casi
 # todos en una direccion comun (el coseno medio entre dos libros cualquiera de la
@@ -591,7 +599,28 @@ PREGUNTAS = {
         ),
         "opciones": {},
     },
+    # El desvio de quien no tiene ninguna referencia para nombrar. No entra al
+    # vector ni al filtro: solo decide que se le pregunta despues. Quien elige
+    # "decir" escribe q4b (en su rama sin nombre) y quien elige "preguntas"
+    # contesta q1, q1b, q3 y despues q4b. Viaja en `respuestas` para que el
+    # orden se derive de lo ya contestado, sin estado aparte en el cliente.
+    "q4c": {
+        "titulo": "El Desvio",
+        "solo_macros": ["literatura"],
+        "pregunta": "¿Cómo preferís que te ayude?",
+        "opciones": {
+            "decir": "Te digo lo que quiero",
+            "preguntas": "Haceme preguntas",
+        },
+        "en_consulta": False,
+    },
 }
+
+# El orden en que el cliente recorre las preguntas. PREGUNTAS conserva el orden
+# historico (q1..q4b) porque de el depende como se arma el texto del perfil; este
+# es el del flujo de dos caminos: q2, la referencia, el desvio, y solo para quien
+# pide que le pregunten, q1/q1b/q3. q4b cierra siempre.
+_ORDEN_FLUJO = ["q0", "q2", "q4a", "q4c", "q1", "q1b", "q3", "q4", "q4b"]
 
 # La macro con la que se resuelven las variantes cuando todavia no hay q0 (o
 # llego una invalida). Es la mas grande del catalogo y aquella para la que se
@@ -662,7 +691,10 @@ def preguntas_publicas() -> dict:
         limpia = _sin_consultas(resolver(clave, {"q0": MACRO_UNICA}))
         limpia.pop("variantes", None)
         publicas[clave] = limpia
-    return publicas
+    # El orden de las claves es el que el cliente recorre (ORDEN en el HTML).
+    ordenadas = {k: publicas[k] for k in _ORDEN_FLUJO if k in publicas}
+    ordenadas.update({k: v for k, v in publicas.items() if k not in ordenadas})
+    return ordenadas
 
 
 def resolver(clave: str, respuestas: dict) -> dict:
@@ -739,7 +771,7 @@ _SYSTEM_ANCLA = (
     "que anda buscando. Tu trabajo es traducir eso a la ficha de catalogo del "
     "libro que habria que darle.\n\n"
     "Devolves SOLO un JSON con esta forma:\n"
-    '{"conocido": true, "descripcion": "..."}\n\n'
+    '{"conocido": true, "descripcion": "...", "experiencia": "..."}\n\n'
     "Lo que te dan viene en dos campos:\n\n"
     "OBRA_O_AUTOR: lo que el lector nombro, si nombro algo. Puede venir mal "
     "escrito, a medias o de memoria (\"sweig, el de las 24 horas\"): "
@@ -777,7 +809,16 @@ _SYSTEM_ANCLA = (
     '"descripcion": UN parrafo de 40 a 60 palabras, en tercera persona y en el '
     "idioma de una ficha de catalogo: el tema especifico, el enfoque y el tono. "
     "Nunca opines, nunca te dirijas al lector y nunca menciones que hay un "
-    "lector o una referencia. Sin inventar datos."
+    "lector o una referencia. Sin inventar datos.\n"
+    '"experiencia": UN parrafo de 40 a 60 palabras sobre COMO SE LEE el libro que '
+    "habria que darle, no de que trata: el ritmo, el tono emocional, el nivel de "
+    "exigencia, si se lee de un tiron o de a poco, y que se lleva quien lo lee "
+    "(ideas, personajes, trama o estilo). Se deduce de la obra o del rasgo que "
+    "nombro el lector, o de lo que dijo que busca. Elegi 2 o 3 rasgos distintivos "
+    "y omiti el resto: un texto que nombra todos los ejes posibles no distingue "
+    "un libro de otro. Arranca con un adjetivo o un sustantivo de ritmo o de "
+    "tono, nunca con \"se lee\" ni con \"invita a\". Mismas reglas que la "
+    "descripcion: tercera persona, sin opinar, sin mencionar al lector."
 )
 
 
@@ -1909,7 +1950,7 @@ def _texto_para_el_ancla(nombrado: str, valorado: str) -> str:
     return "\n".join(partes)
 
 
-async def _expandir_ancla(nombrado: str, valorado: str = "") -> tuple[str, bool]:
+async def _expandir_ancla(nombrado: str, valorado: str = "") -> tuple[str, str, bool]:
     """Convierte lo que el lector nombro y lo que valora en una ficha de catalogo.
 
     "Frans de Waal" son tres palabras que el catalogo no dice en ningun lado; su
@@ -1921,8 +1962,11 @@ async def _expandir_ancla(nombrado: str, valorado: str = "") -> tuple[str, bool]
     costo: medido, `:online` sale US$ 0,0080 contra US$ 0,0002 del modelo pelado
     (59 veces mas) y tarda casi el doble.
 
-    Devuelve (descripcion, la_reconocio). Si falla, ("", False) y el llamador usa
-    el texto crudo: es una mejora, nunca un requisito. `la_reconocio` va a la
+    Devuelve (descripcion, experiencia, la_reconocio). `descripcion` es la ficha
+    de catalogo (de que trata, contra la sinopsis) y `experiencia` como se lee
+    (contra la experiencia): es lo que q1/q1b/q3 aportarian si el lector las
+    hubiera contestado, y por eso es la mitad del perfil en los caminos rapidos.
+    Si falla, ("", "", False) y el llamador usa el texto crudo: es una mejora, nunca un requisito. `la_reconocio` va a la
     bitacora porque es la senal de cuando hubo que pagar la busqueda web.
 
     Ojo con `conocido` cuando el lector no nombro nada y solo dijo que valora:
@@ -1931,13 +1975,14 @@ async def _expandir_ancla(nombrado: str, valorado: str = "") -> tuple[str, bool]
     un rasgo se describe sin internet."""
     texto = _texto_para_el_ancla(nombrado, valorado)
     if not texto or not OPENROUTER_API_KEY:
-        return "", False
+        return "", "", False
     modelos = (_MODELO_VOZ, _MODELO_ANCLA_WEB) if nombrado else (_MODELO_VOZ,)
     inicio = time.monotonic()
     for modelo in modelos:
         try:
             datos = await _pedir_ancla(modelo, texto)
             descripcion = _limpiar_citas(str(datos.get("descripcion") or ""))
+            experiencia = _limpiar_citas(str(datos.get("experiencia") or ""))
             conocido = bool(datos.get("conocido"))
             # `modelos[-1]` y no `_MODELO_ANCLA_WEB`: cuando no hay obra
             # nombrada la lista tiene un solo modelo, y ahi un `conocido: false`
@@ -1949,14 +1994,14 @@ async def _expandir_ancla(nombrado: str, valorado: str = "") -> tuple[str, bool]
                     modelo, conocido, round((time.monotonic() - inicio) * 1000),
                     len(descripcion.split()),
                 )
-                return descripcion, conocido
+                return descripcion, experiencia, conocido
             # No la reconocio: se cae al modelo con busqueda web.
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "funes_chat_ancla_fallo modelo=%s latencia_ms=%s error=%s",
                 modelo, round((time.monotonic() - inicio) * 1000), exc,
             )
-    return "", False
+    return "", "", False
 
 
 async def _ancla(respuestas: dict) -> dict | None:
@@ -1974,14 +2019,23 @@ async def _ancla(respuestas: dict) -> dict | None:
     if not texto:
         return None
     macro = str(respuestas.get("q0") or "")
+    # Sin q1 ni q3 el ancla es el perfil entero (ver _PESO_ANCLA_RICA). Entra en
+    # la clave porque cambia lo que se guarda, no solo como se usa.
+    sin_perfil = not (respuestas.get("q1") or respuestas.get("q3"))
     # La macro entra en la clave porque el vector se guarda ya centrado, y la
     # media que se le resta es la del estante donde va a competir.
-    clave = f"{macro}|{texto.lower()}"
+    clave = f"{macro}|{int(sin_perfil)}|{texto.lower()}"
     guardado = _CACHE_ANCLAS.get(clave)
     if guardado is not None and time.monotonic() - guardado[1] < _TTL_CACHE_ANCLA:
         return guardado[0]
 
-    descripcion, conocida = await _expandir_ancla(nombrado, valorado)
+    expandida = await _expandir_ancla(nombrado, valorado)
+    # Tolera la forma vieja de dos valores (el banco cachea la expansion).
+    if len(expandida) == 2:
+        descripcion, conocida = expandida
+        experiencia = ""
+    else:
+        descripcion, experiencia, conocida = expandida
     crudo = await _embeber_cacheado(descripcion or texto)
     vector, norma = _preparar_consulta(crudo, macro)
     if norma == 0:
@@ -1991,8 +2045,20 @@ async def _ancla(respuestas: dict) -> dict | None:
         "norma": norma,
         "texto": texto,
         "expandida": descripcion,
+        "experiencia": experiencia,
         "conocida": conocida,
+        "vector_experiencia": None,
+        "norma_experiencia": 0.0,
+        # Solo es "rica" si ademas hay con que reemplazar al perfil.
+        "rica": False,
     }
+    if sin_perfil and experiencia:
+        vector_exp, norma_exp = _preparar_consulta(
+            await _embeber_cacheado(experiencia), macro)
+        if norma_exp:
+            ancla["vector_experiencia"] = vector_exp
+            ancla["norma_experiencia"] = norma_exp
+            ancla["rica"] = True
     if len(_CACHE_ANCLAS) >= _MAX_CACHE_ANCLAS:
         _CACHE_ANCLAS.pop(min(_CACHE_ANCLAS, key=lambda k: _CACHE_ANCLAS[k][1]), None)
     _CACHE_ANCLAS[clave] = (ancla, time.monotonic())
@@ -2013,7 +2079,7 @@ def _pesos(ancla, ajuste, correccion=None) -> tuple[float, float, float, float]:
     entre ellas. Sin correccion el resultado es identico al de antes, porque
     0,5 + 0,25 es exactamente _MAX_SIN_PERFIL."""
     pesos = [
-        _PESO_ANCLA if ancla else 0.0,
+        (_PESO_ANCLA_RICA if ancla.get("rica") else _PESO_ANCLA) if ancla else 0.0,
         _PESO_PROFUNDAS if ajuste else 0.0,
         _PESO_CORRECCION if correccion else 0.0,
     ]
@@ -2046,8 +2112,17 @@ def _puntaje(vector, norma: float, ancla, libro: dict, ajuste=None,
     if peso_ancla:
         # El ancla va contra la sinopsis: la referencia que trae el lector es
         # un contenido ("Sapiens", "Clarice Lispector"), no una forma de leer.
-        total += peso_ancla * _coseno_con_norma(
-            ancla["vector"], ancla["norma"], libro, "sinopsis")
+        if ancla.get("rica"):
+            # Sin q1/q3 tambien dice como quiere leer: ese pedazo va contra la
+            # experiencia, que es donde q1 y q3 compararian.
+            total += peso_ancla * _REPARTO_ANCLA_RICA * _coseno_con_norma(
+                ancla["vector"], ancla["norma"], libro, "sinopsis")
+            total += peso_ancla * (1 - _REPARTO_ANCLA_RICA) * _coseno_con_norma(
+                ancla["vector_experiencia"], ancla["norma_experiencia"],
+                libro, "experiencia")
+        else:
+            total += peso_ancla * _coseno_con_norma(
+                ancla["vector"], ancla["norma"], libro, "sinopsis")
     if peso_ajuste:
         total += peso_ajuste * _coseno_con_norma(
             ajuste["vector"], ajuste["norma"], libro, "experiencia")
@@ -2107,6 +2182,9 @@ def _puntaje_detalle(vector, norma: float, ancla, libro: dict, ajuste=None,
     perfil = _coseno_con_norma(vector, norma, libro, "experiencia")
     suyo = (_coseno_con_norma(ancla["vector"], ancla["norma"], libro, "sinopsis")
             if ancla else None)
+    suyo_exp = (_coseno_con_norma(
+        ancla["vector_experiencia"], ancla["norma_experiencia"], libro, "experiencia")
+        if ancla and ancla.get("rica") else None)
     propio = (_coseno_con_norma(ajuste["vector"], ajuste["norma"], libro, "experiencia")
               if ajuste else None)
     # Desde que la re-busqueda compite contra todo el pool, la correccion puede
@@ -2118,6 +2196,7 @@ def _puntaje_detalle(vector, norma: float, ancla, libro: dict, ajuste=None,
     return {
         "perfil": round(perfil, 6),
         "ancla": round(suyo, 6) if suyo is not None else None,
+        "ancla_experiencia": round(suyo_exp, 6) if suyo_exp is not None else None,
         "profundas": round(propio, 6) if propio is not None else None,
         "correccion": round(arreglo, 6) if arreglo is not None else None,
         "mezcla": round(_puntaje(vector, norma, ancla, libro, ajuste, correccion), 6),
@@ -2460,7 +2539,7 @@ def _dicho_por_el_lector(respuestas: dict) -> str:
         # El ancla es texto libre y va aparte, presentada como lo que es: la
         # lectura que la persona nombro y que quiere repetir de ella, no una
         # opcion que eligio de una lista.
-        if not elegida or clave in ("q4", "q4a", "q4b"):
+        if not elegida or clave in ("q4", "q4a", "q4b", "q4c"):
             continue
         # Y lo que no se pregunto tampoco lo dijo nadie. Con MACRO_UNICA la q0
         # la escribe el servidor, y colarla aca se la devolveria al lector como

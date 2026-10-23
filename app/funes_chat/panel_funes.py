@@ -50,7 +50,7 @@ async def _embudo(libreria_id: int):
     return await db.pool().fetchrow(
         """
         SELECT count(DISTINCT s.id) AS sesiones,
-               count(DISTINCT s.id) FILTER (WHERE s.q1 <> '') AS empezaron,
+               count(DISTINCT s.id) FILTER (WHERE s.q2 <> '') AS empezaron,
                count(DISTINCT r.sesion_id) AS con_recomendacion
         FROM funes_sesiones s
         LEFT JOIN funes_recomendaciones r ON r.sesion_id = s.id
@@ -162,7 +162,7 @@ async def _eventos(libreria_id: int, limite: int = EVENTOS_LIMITE) -> list[dict]
                c.titulo, c.autor, c.veredicto
         FROM funes_sesiones s
         LEFT JOIN candidatos c ON c.sesion_id = s.id AND c.rn = 1
-        WHERE s.libreria_id = $1 AND s.q1 <> ''
+        WHERE s.libreria_id = $1 AND s.q2 <> ''
         ORDER BY s.creado_en DESC
         LIMIT $2
         """,

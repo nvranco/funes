@@ -454,7 +454,8 @@ def probar_filtro_tema() -> None:
 
 def _q1b_en_el_router() -> None:
     print("\nq1b en el router: obligatoria donde se pregunta, prohibida donde no")
-    lit = {"q0": "literatura", "q1": "narrativa", "q2": "corto", "q3": "trama"}
+    lit = {"q0": "literatura", "q1": "narrativa", "q2": "corto", "q3": "trama",
+           "q4b": "algo que me atrape"}
     hist = {"q0": "historia", "q1": "argentina", "q2": "corto", "q3": "trama"}
     ok(_valida(router.RespuestasCompletas, {**lit, "q1b": "novela"}),
        "literatura con q1b pasa")
@@ -799,7 +800,8 @@ def _validadores() -> None:
 
     # Literatura completa incluye q1b: desde el filtro por forma, un pedido de
     # literatura sin la forma es un pedido incompleto.
-    base = {"q0": "literatura", "q1": "ideas", "q1b": "novela", "q2": "corto", "q3": "ideas"}
+    base = {"q0": "literatura", "q1": "ideas", "q1b": "novela", "q2": "corto", "q3": "ideas",
+            "q4b": "algo que me atrape"}
     ok(not acepta_chat({**base, "ya_mostrados": [f"id{i}" for i in range(7)]}),
        "ya_mostrados mas largo que _MAX_TOTAL_RECOMENDACIONES se rechaza")
     ok(acepta_chat({**base, "ya_mostrados": [f"id{i}" for i in range(6)]}),
@@ -998,6 +1000,49 @@ async def probar_http() -> None:
         ok(r.status_code == 200 and r.json().get("sesion_id"), "POST /sesion devuelve un id")
 
 
+def probar_caminos() -> None:
+    """El flujo de dos caminos: que exige el servidor en cada uno y como pesa
+    el ancla cuando reemplaza al perfil."""
+    print("\nflujo de dos caminos (q2, ancla, desvio)")
+    nucleo_previa = nucleo.MACRO_UNICA
+    nucleo.MACRO_UNICA = "literatura"
+    try:
+        publicas = nucleo.preguntas_publicas()
+        ok(list(publicas) == ["q2", "q4a", "q4c", "q1", "q1b", "q3", "q4b"],
+           "el cliente recorre q2, q4a, q4c, q1, q1b, q3, q4b en ese orden", str(list(publicas)))
+    finally:
+        nucleo.MACRO_UNICA = nucleo_previa
+
+    def acepta(datos: dict) -> bool:
+        try:
+            router.RespuestasCompletas(**{"q0": "literatura", **datos})
+            return True
+        except Exception:
+            return False
+
+    ok(acepta({"q2": "corto", "q4a": "Borges"}),
+       "camino A: q2 y una lectura nombrada alcanzan")
+    ok(acepta({"q2": "corto", "q4c": "decir", "q4b": "algo triste"}),
+       "camino B: q2 y lo que quiere, en texto libre")
+    ok(not acepta({"q2": "corto", "q4c": "decir"}),
+       "camino B sin texto se rechaza")
+    ok(acepta({"q2": "corto", "q4c": "preguntas", "q1": "ideas", "q1b": "novela",
+               "q3": "trama", "q4b": "x"}),
+       "camino C: q1, q1b, q3 y q4b")
+    ok(not acepta({"q2": "corto", "q4c": "preguntas", "q1": "ideas"}),
+       "camino C a medias se rechaza")
+    ok(not acepta({"q2": "corto", "q4c": "inventada", "q4a": "x"}),
+       "un desvio inventado se rechaza")
+    sin = nucleo._pesos({"rica": True}, None, None)
+    ok(abs(sum(sin) - 1.0) < 1e-9 and abs(sin[1] - nucleo._MAX_SIN_PERFIL) < 1e-9,
+       "ancla rica: pesa lo que el tope sin perfil y el perfil (q2) se queda con el resto", str(sin))
+    comun = nucleo._pesos({"rica": False}, None, None)
+    ok(abs(comun[1] - nucleo._PESO_ANCLA) < 1e-9, "ancla comun: el peso de siempre", str(comun))
+    ok(nucleo._pesos(None, None, None) == (1.0, 0.0, 0.0, 0.0), "sin ancla todo es perfil")
+    texto = nucleo._construir_texto_perfil({"q0": "literatura", "q2": "corto"})
+    ok(bool(texto), "el perfil con solo q2 no queda vacio (la API de embeddings lo rechazaria)")
+
+
 def probar_macro_unica() -> None:
     """El parche que expone una sola rama, probado por los dos lados.
 
@@ -1014,8 +1059,8 @@ def probar_macro_unica() -> None:
 
         ok("q0" not in publicas, "la pregunta del territorio no viaja al HTML")
         ok("q4" not in publicas, "el ancla vieja (historia/divulgacion) tampoco")
-        ok(set(publicas) == {"q1", "q1b", "q2", "q3", "q4a", "q4b"},
-           "viajan las 6 preguntas de literatura y ninguna mas", str(sorted(publicas)))
+        ok(set(publicas) == {"q1", "q1b", "q2", "q3", "q4a", "q4b", "q4c"},
+           "viajan las 7 preguntas de literatura y ninguna mas", str(sorted(publicas)))
         ok("variantes" not in publicas["q1"], "la q1 viaja ya resuelta, sin variantes")
         # El merge al reves dejaria la q1 base, que NO tiene "opciones": el
         # cliente moriria con un KeyError en la primera pregunta.
@@ -1090,6 +1135,7 @@ async def main() -> None:
     probar_empujon()
     probar_validadores()
     probar_macro_unica()
+    probar_caminos()
     probar_dominio()
     probar_rutas()
 

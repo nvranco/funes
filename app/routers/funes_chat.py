@@ -20,7 +20,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app import db
 from app.config import ADMIN_TOKEN, DOMINIO_FUNES, FUNES_CONTACTO, POSTHOG_HOST, POSTHOG_KEY
@@ -115,6 +115,10 @@ class RespuestasFijas(BaseModel):
     # q4b es la que se exige donde se pregunta (ver RespuestasCompletas).
     q4a: str = Field("", max_length=300)
     q4b: str = Field("", max_length=600)
+    # El desvio de quien no nombro ninguna lectura ("decir" o "preguntas"). Solo
+    # navegacion: el servidor deriva el camino de lo que llego (ver
+    # RespuestasCompletas) y esto se guarda por si la bitacora lo quiere.
+    q4c: str = ""
     # El slug de la libreria cuando la charla arranco en /funes/{slug}. No es
     # una pregunta -no entra al vector, no se le muestra a nadie-, solo acota
     # que libros puede recomendar el motor (ver nucleo._candidatos). Vacio es
@@ -123,7 +127,7 @@ class RespuestasFijas(BaseModel):
     # recorta (ver ahi el porque).
     libreria: str = Field("", max_length=80)
 
-    @field_validator("q0", "q1", "q1b", "q2", "q3")
+    @field_validator("q0", "q1", "q1b", "q2", "q3", "q4c")
     @classmethod
     def _opcion_conocida(cls, valor: str, info) -> str:
         """Rechaza opciones inventadas en vez de descartarlas en silencio.
@@ -196,28 +200,40 @@ class RespuestasCompletas(RespuestasFijas):
     una novela le podia salir un manual de cosmologia. El front nunca manda esto
     incompleto; los endpoints son publicos, y esa es toda la diferencia."""
 
-    @field_validator("q0", "q1", "q2", "q3")
+    @field_validator("q0", "q2")
     @classmethod
     def _no_vacia(cls, valor: str, info) -> str:
         if not valor:
             raise ValueError(f"Falta {info.field_name}.")
         return valor
 
-    @field_validator("q1b", "q4b")
-    @classmethod
-    def _no_vacia_si_aplica(cls, valor: str, info) -> str:
-        """Van aparte porque son obligatorias solo donde se preguntan.
+    @model_validator(mode="after")
+    def _camino_completo(self):
+        """Exige lo que pide el camino que la persona recorrio.
 
-        En historia y divulgacion vacias es lo correcto; en literatura, q1b
-        vacia significa que el filtro por forma no corrio y el lector recibiria
-        un pool sin recortar sin que nadie se entere, y q4b vacia significa que
-        no hay ancla, que es la mitad del vector.
+        El camino se deriva de lo que llego y no de un campo aparte, asi no hay
+        dos fuentes que puedan contradecirse:
 
-        q4a NO esta aca: puede venir vacia legitimamente, porque es la respuesta
-        de quien no tiene ninguna lectura para nombrar."""
-        if not valor and nucleo.aplica(info.field_name, info.data):
-            raise ValueError(f"Falta {info.field_name}.")
-        return valor
+        - Con q1, q1b o q3 es el camino de las preguntas (o un cliente anterior
+          al flujo nuevo): tienen que venir las tres y la q4b que cierra. q4a es
+          opcional, vacia es quien no tiene ninguna lectura para nombrar.
+        - Sin ellas y con q4a, nombro una lectura: el ancla alcanza para armar
+          el perfil, no se le pregunta nada mas.
+        - Sin ellas ni q4a, escribio lo que quiere: q4b es el pedido entero.
+
+        En historia y divulgacion q1b y q4b no se preguntan (ver nucleo.aplica):
+        ahi solo hacen falta q1 y q3."""
+        if self.q0 != "literatura":
+            faltan = [c for c in ("q1", "q3") if not getattr(self, c)]
+        elif self.q1 or self.q1b or self.q3:
+            faltan = [c for c in ("q1", "q1b", "q3", "q4b") if not getattr(self, c)]
+        elif self.q4a:
+            faltan = []
+        else:
+            faltan = [] if self.q4b else ["q4b"]
+        if faltan:
+            raise ValueError(f"Falta {', '.join(faltan)}.")
+        return self
 
 
 class PedidoPregunta(RespuestasCompletas):
