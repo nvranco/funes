@@ -323,6 +323,18 @@ const SEDES = {{ sedes_js | default('null', true) | safe }};
 const ORDEN = Object.keys(PREGUNTAS);
 const MAX_RECOMENDACIONES = 3;
 const DELAY_TIPEO_MIN = 1400;
+// Pausa de digestion entre dos mensajes seguidos de Funes: no es fija, depende de
+// lo que el lector acaba de leer. Un mensaje corto se lee de un vistazo y el
+// siguiente puede entrar enseguida; uno largo necesita un respiro. Hasta
+// UMBRAL_DIGESTION caracteres no hay pausa, y de ahi en mas crece por caracter
+// hasta un tope, para que un mensaje larguisimo no deje la pantalla quieta.
+const UMBRAL_DIGESTION = 90;
+const MS_DIGESTION_POR_CARACTER = 10;
+const MAX_DIGESTION = 2500;
+function pausaDigestion(mensajePrevio) {
+  const sobrante = String(mensajePrevio || "").length - UMBRAL_DIGESTION;
+  return Math.min(MAX_DIGESTION, Math.max(0, sobrante * MS_DIGESTION_POR_CARACTER));
+}
 // Lo que se espera entre letra y letra. Ritmo FIJO a proposito: la letra numero
 // 50 entra siempre 50 pasos despues de la primera, sea el mensaje corto o
 // largo. Repartir un total fijo entre las letras daria el efecto al reves -
@@ -960,13 +972,19 @@ function pensar(div) {
   };
 }
 
-async function escribirBurbuja(div, texto) {
-  // La 2da/3ra burbuja de un turno: el texto ya llego, asi que la espera es
-  // corta y el verbo alcanza a mostrarse uno solo. Igual va, para que cada
-  // burbuja del turno arranque con el mismo gesto.
-  const dejarDePensar = pensar(div);
-  await esperar(DELAY_TIPEO_MIN);
-  dejarDePensar();
+async function escribirBurbuja(div, texto, previo = "") {
+  // La 2da/3ra burbuja de un turno: el texto ya llego, asi que no hay nada que
+  // "pensar". La unica espera es la de digestion, que depende de lo largo que
+  // fue el mensaje anterior (ver pausaDigestion). Con una pausa muy corta no se
+  // muestra el indicador: aparecia y desaparecia en el mismo parpadeo.
+  const pausa = pausaDigestion(previo);
+  if (pausa >= 400) {
+    const dejarDePensar = pensar(div);
+    await esperar(pausa);
+    dejarDePensar();
+  } else if (pausa > 0) {
+    await esperar(pausa);
+  }
   await revelarTexto(div, texto);
 }
 
@@ -1038,12 +1056,19 @@ function enlazarLibro(div, titulo, autor) {
 // releer. Las burbujas siguientes (2da, 3ra oracion) sí seguyen el scroll
 // normal hacia abajo, para que la lectura fluya de corrido dentro del mismo
 // turno.
-async function mostrarRespuestaFunes(origen, alTerminarBurbuja, anclaje = "start") {
+async function mostrarRespuestaFunes(origen, alTerminarBurbuja, anclaje = "start", rapido = false) {
   const promesaTexto = typeof origen === "string" ? Promise.resolve(origen) : origen;
   const primera = burbujaVacia(false, anclaje);
-  const dejarDePensar = pensar(primera);
-  const [textoCompleto] = await Promise.all([promesaTexto, esperar(DELAY_TIPEO_MIN)]);
-  dejarDePensar();
+  // `rapido` es para el texto que ya esta escrito y no espera a nadie (el
+  // saludo): sin "pensando" y sin la espera de 1,4 s antes de empezar a tipear.
+  let textoCompleto;
+  if (rapido) {
+    textoCompleto = await promesaTexto;
+  } else {
+    const dejarDePensar = pensar(primera);
+    [textoCompleto] = await Promise.all([promesaTexto, esperar(DELAY_TIPEO_MIN)]);
+    dejarDePensar();
+  }
   // Texto vacio significa "al final no habia nada que decir". Pasa cuando la
   // burbuja se abre ANTES de saber si va a haber mensaje -para que el
   // indicador de "pensando" salga en el mismo toque- y la respuesta termina
@@ -1056,7 +1081,7 @@ async function mostrarRespuestaFunes(origen, alTerminarBurbuja, anclaje = "start
   if (alTerminarBurbuja) await alTerminarBurbuja(primera, mensajes[0]);
   for (let i = 1; i < mensajes.length; i++) {
     const div = burbujaVacia(false);
-    await escribirBurbuja(div, mensajes[i]);
+    await escribirBurbuja(div, mensajes[i], mensajes[i - 1]);
     if (alTerminarBurbuja) await alTerminarBurbuja(div, mensajes[i]);
   }
   return textoCompleto;
@@ -2176,6 +2201,9 @@ function mostrarContinuar() {
     const aviso = document.getElementById("aviso-datos");
     if (aviso) aviso.remove();
     girarAnillo();
+    // La barra arranca en 4 %: tocar "Comenzar" ya es un paso adelante y tiene
+    // que verse, aunque todavia no haya ninguna respuesta que contar.
+    ponerBarra(10);
     // Derecho a q0, sin preambulo: antes salia una burbuja de transicion
     // ("Contame como estas buscando leer hoy") y enseguida otra con la
     // pregunta. Eran dos burbujas para una sola cosa, y la primera hacia
@@ -2263,15 +2291,20 @@ async function iniciar() {
     // pegado a esta.
     "¡Hola! Mi nombre es *Ireneo Funes*.\n" +
     saludo() + "\n" +
-    "Mi propósito es hacerte recomendaciones a partir de tu perfil *único* como lector y tus intereses actuales."
+    "Mi propósito es hacerte recomendaciones a partir de tu perfil *único* como lector y tus intereses actuales.",
+    null, "start", true
   );
+  // Sin pausa fija entre el saludo y la pregunta: solo la de digestion, que
+  // depende de lo largo que fue el ultimo mensaje.
+  await esperar(pausaDigestion(
+    "Mi propósito es hacerte recomendaciones a partir de tu perfil único como lector y tus intereses actuales."));
   // Cuarta burbuja, cierre de la apertura: una pregunta corta invita a tocar
   // "Comenzar" en vez de dejar tres afirmaciones seguidas sin ningun gesto
   // hacia el lector. anclaje "end" (no "start", el default): sigue siendo el
   // mismo turno de Funes que el bloque de arriba, no un turno nuevo que deba
   // scrollear la charla previa fuera de vista -mismo criterio que usa
   // caminoPrecisa() para sus burbujas de cierre.
-  await mostrarRespuestaFunes("¿Comenzamos?", null, "end");
+  await mostrarRespuestaFunes("¿Comenzamos?", null, "end", true);
   mostrarContinuar();
 }
 
