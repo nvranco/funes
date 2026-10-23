@@ -572,7 +572,7 @@ _estado_oauth: dict[str, float] = {}
 
 
 @router.get("/funes/ml/callback", response_class=HTMLResponse)
-async def ml_callback(code: str = "", state: str = ""):
+async def ml_callback(request: Request, code: str = "", state: str = ""):
     """Vuelta del OAuth de MercadoLibre.
 
     No lleva el ADMIN_TOKEN en la ruta a proposito: el redirect URI queda
@@ -590,7 +590,7 @@ async def ml_callback(code: str = "", state: str = ""):
         if ok else
         "No se pudo canjear el codigo. Mira los logs y volve a intentar."
     )
-    return HTMLResponse(f"<p style='font-family:system-ui;padding:2rem'>{cuerpo}</p>")
+    return templates.TemplateResponse(request, "funes_mensaje.html", {"texto": cuerpo})
 
 
 @router.post("/funes/pregunta-profunda")

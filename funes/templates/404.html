@@ -1,12 +1,12 @@
-{% extends "base.html" %}
+{% extends "funes_pagina.html" %}
 {% block titulo %}No encontrado — Funes{% endblock %}
-{% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
-{% block contenido %}
-<div class="min-h-screen flex items-center justify-center px-6">
-  <div class="text-center max-w-sm">
-    <p class="text-6xl mb-4">📚</p>
-    <h1 class="text-2xl font-bold mb-2">No encontramos esta página</h1>
-    <p class="text-gris">Revisá el link. Si te lo pasó tu librería, pedile que te lo mande de nuevo.</p>
-  </div>
+{% block mensaje %}
+<div class="self-start max-w-[90%] rounded-xl2 px-4 py-3 bg-papel border-2 border-borde">
+  No encontramos esta página.
 </div>
+<div class="self-start max-w-[90%] rounded-xl2 px-4 py-3 bg-papel border-2 border-borde">
+  Revisá el link. Si te lo pasó tu librería, pedile que te lo mande de nuevo.
+</div>
+<a href="/funes" class="btn-primario border-celeste tap rounded-xl2 px-4 py-3 mt-2 w-full font-semibold
+                         flex items-center justify-center text-center">Ir a Funes</a>
 {% endblock %}
