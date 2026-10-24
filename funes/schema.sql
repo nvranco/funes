@@ -110,6 +110,23 @@ UPDATE fotos SET libreria_id = (SELECT l.libreria_id FROM lotes l WHERE l.id = f
     WHERE libreria_id IS NULL;
 ALTER TABLE fotos ALTER COLUMN lote_id DROP NOT NULL;
 
+-- Portadas de referencia traidas de fuentes externas (MercadoLibre, Open
+-- Library) para libros sin foto propia. La clave es el ISBN normalizado o, sin
+-- ISBN, titulo+autor normalizados; el archivo vive en DATA_DIR/portadas/ con
+-- nombre por sha256 (ver funes/portadas.py). 'sin_portada' se guarda para no
+-- repetir la busqueda en cada vista; se reintenta pasado un tiempo.
+CREATE TABLE IF NOT EXISTS portadas (
+    clave        TEXT PRIMARY KEY,
+    estado       TEXT NOT NULL,            -- 'ok' | 'sin_portada'
+    sha256       CHAR(64),
+    fuente       TEXT,                     -- 'ml-isbn' | 'ol-isbn' | 'ml-texto' | 'ol-texto'
+    origen_url   TEXT,
+    ancho        INTEGER,
+    alto         INTEGER,
+    bytes        INTEGER,
+    revisada_en  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Catalogo del recomendador "Funes Chat": independiente del catalogo de
 -- donaciones (tabla `libros`), no pertenece a ninguna libreria. isbn/
 -- fecha_publicacion/categoria/genero/subgenero/nro_paginas quedan NULL para

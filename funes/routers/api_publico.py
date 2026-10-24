@@ -2,13 +2,14 @@
 de eventos — la tabla que alimenta toda la contabilidad de la innovación."""
 
 import json
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from funes import db, vision
+from funes import db, portadas, vision
 
 router = APIRouter()
 
@@ -78,6 +79,22 @@ async def portada_libro(slug: str, libro_id: int):
     if not path.exists():
         raise HTTPException(status_code=404)
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@router.get("/portadas/{sha}.jpg")
+async def portada_de_referencia(sha: str):
+    """Portada de referencia traida de una fuente externa (ver funes/portadas.py).
+    El nombre es el sha256 del contenido, asi que no cambia nunca y se sirve
+    con cache inmutable."""
+    if not re.fullmatch(r"[0-9a-f]{64}", sha):
+        raise HTTPException(status_code=404)
+    ruta = portadas.ruta_de(sha)
+    if not ruta.exists():
+        raise HTTPException(status_code=404)
+    return FileResponse(
+        ruta, media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
 
 
 @router.post("/api/{slug}/evento")
