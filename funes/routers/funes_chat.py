@@ -8,6 +8,7 @@ los `max_length`, un cliente puede mandar `ya_mostrados` con 50 ids y sacarse 50
 recomendaciones, o un q4 de un megabyte que se va derecho al embedding.
 """
 
+import asyncio
 import datetime
 import hashlib
 import json
@@ -17,6 +18,7 @@ import uuid
 from pathlib import Path
 from typing import Literal
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
@@ -638,6 +640,49 @@ async def ml_conectar(token: str):
     estado = str(uuid.uuid4())
     _estado_oauth[estado] = 0.0
     return RedirectResponse(precios.url_autorizacion(estado), status_code=307)
+
+
+@router.get("/funes/admin/{token}/ml/probar-portadas")
+async def ml_probar_portadas(token: str, n: int = 30):
+    """TEMPORAL: mide cuantas portadas devuelve el catalogo de MercadoLibre al
+    buscar por ISBN, sobre una muestra al azar de funes_libros. Solo lee; se
+    borra cuando termine la investigacion de imagenes de preview."""
+    _validar_admin(token)
+    n = max(1, min(n, 60))
+    access = await precios._token()
+    if not access:
+        raise HTTPException(status_code=400, detail="Sin token de MercadoLibre vigente.")
+    filas = await db.pool().fetch(
+        "SELECT isbn, titulo FROM funes_libros WHERE isbn IS NOT NULL AND isbn <> '' "
+        "ORDER BY random() LIMIT $1", n,
+    )
+    api = "https://api.mercadolibre.com"
+    salida, hits = [], 0
+    async with httpx.AsyncClient(timeout=20, headers={"Authorization": f"Bearer {access}"}) as client:
+        for fila in filas:
+            item = {"isbn": fila["isbn"], "titulo": (fila["titulo"] or "")[:40]}
+            try:
+                busq = await client.get(f"{api}/products/search", params={
+                    "status": "active", "site_id": "MLA", "product_identifier": fila["isbn"],
+                })
+                item["http_busqueda"] = busq.status_code
+                resultados = busq.json().get("results", []) if busq.status_code == 200 else []
+                if resultados:
+                    prod = await client.get(f"{api}/products/{resultados[0]['id']}")
+                    datos = prod.json() if prod.status_code == 200 else {}
+                    fotos = datos.get("pictures", [])
+                    item["producto"] = str(datos.get("name", ""))[:40]
+                    item["fotos"] = len(fotos)
+                    if fotos:
+                        hits += 1
+                        item["tamano"] = f"{fotos[0].get('max_width')}x{fotos[0].get('max_height')}"
+                else:
+                    item["producto"] = None
+            except Exception as exc:  # noqa: BLE001
+                item["error"] = str(exc)[:80]
+            salida.append(item)
+            await asyncio.sleep(0.4)
+    return {"muestra": len(filas), "con_imagen": hits, "detalle": salida}
 
 
 @router.post("/funes/admin/{token}/recargar-catalogo")
