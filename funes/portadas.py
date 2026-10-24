@@ -87,26 +87,45 @@ def ruta_de(sha: str):
     return CARPETA / sha[:2] / f"{sha}.jpg"
 
 
-def _coincide(titulo: str, autor: str, nombre_encontrado: str) -> bool:
-    """El nombre devuelto por la fuente contiene el titulo pedido y, si hay
-    autor, al menos una de sus palabras significativas (apellido)."""
-    nombre = _normalizar(nombre_encontrado)
+class _Intento:
+    """Lo que paso en una pasada por la cascada. `fallo` distingue "ninguna
+    fuente la tiene" (se recuerda 30 dias) de "no pude preguntarle a alguna"
+    (timeout, 429, 5xx, token vencido): eso no se puede anotar como "sin
+    portada", porque cuando la fuente vuelva si la tendria."""
+
+    def __init__(self) -> None:
+        self.fallo = False
+
+
+def _coincide(titulo: str, autor: str, nombre: str, autores: str = "") -> bool:
+    """El resultado de la fuente corresponde al libro pedido.
+
+    El titulo tiene que aparecer como palabras completas ("eden" no esta en
+    "garden"). Con autor, al menos una de sus palabras significativas (el
+    apellido) tiene que estar en el resultado. Sin autor la prueba es mucho mas
+    debil, asi que solo se acepta un titulo distintivo (3 palabras o mas) o uno
+    identico al de la fuente: "Poemas" a secas no identifica ningun libro."""
+    texto = _normalizar(f"{nombre} {autores}")
     t = _normalizar(titulo)
-    if not t or t not in nombre:
+    if not t or not re.search(rf"(?<![a-z0-9]){re.escape(t)}(?![a-z0-9])", texto):
         return False
     palabras = [p for p in _normalizar(autor).split() if len(p) > 3]
-    return not palabras or any(p in nombre for p in palabras)
+    if palabras:
+        presentes = set(texto.split())
+        return any(p in presentes for p in palabras)
+    return len(t.split()) >= 3 or t == _normalizar(nombre)
 
 
 def _normalizar_imagen(contenido: bytes) -> tuple[bytes, int, int] | None:
     """Valida y normaliza a JPEG. None si no sirve (placeholder, muy chica,
-    ilegible)."""
+    ilegible). Las apaisadas pasan hasta cierto punto: las fotos de producto de
+    ML a veces vienen 4:3 y siguen siendo la tapa."""
     if not (_BYTES_MINIMOS <= len(contenido) <= _BYTES_MAXIMOS):
         return None
     try:
         with Image.open(io.BytesIO(contenido)) as img:
             ancho, alto = img.size
-        if ancho < _ANCHO_MINIMO or alto < ancho * 0.8:
+        if ancho < _ANCHO_MINIMO or alto < ancho * 0.6:
             return None
         normal = vision.redimensionar(contenido, lado_mayor=_LADO_MAYOR)
         with Image.open(io.BytesIO(normal)) as img:
@@ -115,18 +134,32 @@ def _normalizar_imagen(contenido: bytes) -> tuple[bytes, int, int] | None:
         return None
 
 
-async def _bajar(client: httpx.AsyncClient, url: str) -> bytes | None:
+def _es_fallo_de_fuente(status: int) -> bool:
+    """404 es una respuesta ("no la tengo"); lo demas que no sea 200 es la fuente
+    fallando."""
+    return status != 200 and status != 404
+
+
+async def _bajar(client: httpx.AsyncClient, url: str, intento: _Intento) -> bytes | None:
     try:
         resp = await client.get(url, follow_redirects=True)
     except httpx.HTTPError:
+        intento.fallo = True
         return None
+    if _es_fallo_de_fuente(resp.status_code):
+        intento.fallo = True
     if resp.status_code != 200 or not resp.headers.get("content-type", "").startswith("image/"):
         return None
     return resp.content
 
 
-async def _esperar_turno_ol() -> None:
+async def _esperar_turno_ol(prioritario: bool = False) -> None:
+    """Un pedido cada _INTERVALO_OL para la carga en lote, que es la que puede
+    pasarse del limite. El de alguien que esta mirando la pantalla (uno o dos
+    pedidos por libro) no espera nada: ni cola ni intervalo."""
     global _ultimo_ol
+    if prioritario:
+        return
     async with _lock_ol:
         espera = _INTERVALO_OL - (time.monotonic() - _ultimo_ol)
         if espera > 0:
@@ -136,7 +169,7 @@ async def _esperar_turno_ol() -> None:
 
 # --- Fuentes: cada una devuelve la URL de una imagen candidata, o None ---------
 
-async def _url_ml(client: httpx.AsyncClient, token: str, params: dict,
+async def _url_ml(client: httpx.AsyncClient, token: str, params: dict, intento: _Intento,
                   titulo: str = "", autor: str = "", validar: bool = False) -> str | None:
     cabecera = {"Authorization": f"Bearer {token}"}
     try:
@@ -145,10 +178,12 @@ async def _url_ml(client: httpx.AsyncClient, token: str, params: dict,
             params={"status": "active", "site_id": "MLA", **params},
         )
         if busq.status_code != 200:
+            intento.fallo = intento.fallo or _es_fallo_de_fuente(busq.status_code)
             return None
         for res in busq.json().get("results", [])[:5]:
             prod = await client.get(f"{_API_ML}/products/{res['id']}", headers=cabecera)
             if prod.status_code != 200:
+                intento.fallo = intento.fallo or _es_fallo_de_fuente(prod.status_code)
                 continue
             datos = prod.json()
             if validar and not _coincide(titulo, autor, str(datos.get("name", ""))):
@@ -157,17 +192,18 @@ async def _url_ml(client: httpx.AsyncClient, token: str, params: dict,
             if fotos and fotos[0].get("url"):
                 return fotos[0]["url"]
     except (httpx.HTTPError, ValueError, KeyError):
-        pass
+        intento.fallo = True
     return None
 
 
-async def _url_ol_isbn(isbn: str) -> str:
-    await _esperar_turno_ol()
+async def _url_ol_isbn(isbn: str, prioritario: bool = False) -> str:
+    await _esperar_turno_ol(prioritario)
     return f"{_COVERS_OL}/b/isbn/{isbn}-L.jpg?default=false"
 
 
-async def _url_ol_texto(client: httpx.AsyncClient, titulo: str, autor: str) -> str | None:
-    await _esperar_turno_ol()
+async def _url_ol_texto(client: httpx.AsyncClient, titulo: str, autor: str, intento: _Intento,
+                        prioritario: bool = False) -> str | None:
+    await _esperar_turno_ol(prioritario)
     try:
         resp = await client.get(
             f"{_API_OL}/search.json",
@@ -175,41 +211,44 @@ async def _url_ol_texto(client: httpx.AsyncClient, titulo: str, autor: str) -> s
                     "fields": "title,author_name,cover_i"},
         )
         if resp.status_code != 200:
+            intento.fallo = intento.fallo or _es_fallo_de_fuente(resp.status_code)
             return None
         for doc in resp.json().get("docs", []):
-            if not doc.get("cover_i"):
-                continue
-            nombre = f"{doc.get('title', '')} {' '.join(doc.get('author_name') or [])}"
-            if _coincide(titulo, autor, nombre):
+            if doc.get("cover_i") and _coincide(
+                    titulo, autor, doc.get("title", ""), " ".join(doc.get("author_name") or [])):
                 return f"{_COVERS_OL}/b/id/{doc['cover_i']}-L.jpg?default=false"
     except (httpx.HTTPError, ValueError):
-        pass
+        intento.fallo = True
     return None
 
 
 # --- Cascada y cache -----------------------------------------------------------
 
-async def _resolver(isbn: str | None, titulo: str, autor: str) -> tuple[bytes, int, int, str, str] | None:
+async def _resolver(isbn: str | None, titulo: str, autor: str, intento: _Intento,
+                    prioritario: bool = False) -> tuple[bytes, int, int, str, str] | None:
     """Recorre la cascada. Devuelve (jpeg, ancho, alto, fuente, origen_url)."""
     token = await precios._token()
+    if precios.hay_credenciales() and not token:
+        intento.fallo = True   # ML esta configurado pero su token no sirve: cascada incompleta
     async with httpx.AsyncClient(timeout=20, headers={"User-Agent": _USER_AGENT}) as client:
         pasos: list[tuple[str, object]] = []
         if isbn:
             if token:
-                pasos.append(("ml-isbn", lambda: _url_ml(client, token, {"product_identifier": isbn})))
-            pasos.append(("ol-isbn", lambda: _url_ol_isbn(isbn)))
+                pasos.append(("ml-isbn", lambda: _url_ml(
+                    client, token, {"product_identifier": isbn}, intento)))
+            pasos.append(("ol-isbn", lambda: _url_ol_isbn(isbn, prioritario)))
         if titulo:
             consulta = f"{titulo} {autor}".strip()
             if token:
                 pasos.append(("ml-texto", lambda: _url_ml(
-                    client, token, {"q": consulta}, titulo, autor, validar=True)))
-            pasos.append(("ol-texto", lambda: _url_ol_texto(client, titulo, autor)))
+                    client, token, {"q": consulta}, intento, titulo, autor, validar=True)))
+            pasos.append(("ol-texto", lambda: _url_ol_texto(client, titulo, autor, intento, prioritario)))
 
         for fuente, buscar in pasos:
             url = await buscar()
             if not url:
                 continue
-            contenido = await _bajar(client, url)
+            contenido = await _bajar(client, url, intento)
             if contenido is None:
                 continue
             listo = _normalizar_imagen(contenido)
@@ -221,8 +260,24 @@ async def _resolver(isbn: str | None, titulo: str, autor: str) -> tuple[bytes, i
     return None
 
 
+# Claves cuya ultima busqueda fallo por culpa de una fuente (no por no tener la
+# portada): no se anotan en la tabla, pero tampoco se reintentan de inmediato.
+_fallos_recientes: dict[str, float] = {}
+_ESPERA_TRAS_FALLO_S = 600
+
+
+def _fallo_reciente(clave: str) -> bool:
+    desde = _fallos_recientes.get(clave)
+    if desde is None:
+        return False
+    if time.monotonic() - desde < _ESPERA_TRAS_FALLO_S:
+        return True
+    del _fallos_recientes[clave]
+    return False
+
+
 async def obtener(isbn: str | None, titulo: str, autor: str = "",
-                  buscar_en_red: bool = True) -> str | None:
+                  buscar_en_red: bool = True, prioritario: bool = False) -> str | None:
     """URL local (`/portadas/<sha>.jpg`) de la portada del libro, o None.
 
     `buscar_en_red=False` solo consulta lo ya guardado: para las vistas donde
@@ -239,11 +294,16 @@ async def obtener(isbn: str | None, titulo: str, autor: str = "",
             return url_de(fila["sha256"])
         if fila["estado"] == "sin_portada" and not fila["vieja"]:
             return None
-    if not buscar_en_red:
+    if not buscar_en_red or _fallo_reciente(clave):
         return None
 
-    encontrada = await _resolver(isbn_limpio, titulo, autor)
+    intento = _Intento()
+    encontrada = await _resolver(isbn_limpio, titulo, autor, intento, prioritario)
     if encontrada is None:
+        if intento.fallo:
+            _fallos_recientes[clave] = time.monotonic()
+            logger.warning("portadas_fuente_fallo clave=%s (no se anota como sin_portada)", clave)
+            return None
         await db.pool().execute(
             """INSERT INTO portadas (clave, estado) VALUES ($1, 'sin_portada')
                ON CONFLICT (clave) DO UPDATE SET estado = 'sin_portada', sha256 = NULL,
@@ -251,6 +311,7 @@ async def obtener(isbn: str | None, titulo: str, autor: str = "",
             clave,
         )
         return None
+    _fallos_recientes.pop(clave, None)
 
     jpeg, ancho, alto, fuente, origen = encontrada
     sha = hashlib.sha256(jpeg).hexdigest()
@@ -268,6 +329,97 @@ async def obtener(isbn: str | None, titulo: str, autor: str = "",
     )
     logger.info("portadas_guardada clave=%s fuente=%s bytes=%d", clave, fuente, len(jpeg))
     return url_de(sha)
+
+
+# --- Uso desde las vistas ------------------------------------------------------
+#
+# Una vista no puede esperar a las APIs externas (Open Library se pacea a 3 s por
+# pedido). Dos patrones: `iniciar` + `esperar` para UN libro cuando alguien lo esta
+# mirando (Funes), y `consultar` + `buscar_en_segundo_plano` para una lista
+# (catalogos): lo que ya esta guardado sale en esta vista, lo que falta se
+# resuelve para la proxima.
+
+# clave -> tarea que la esta resolviendo. Sirve a la vez de referencia fuerte
+# (asyncio solo guarda una debil) y para no buscar dos veces el mismo libro: si
+# alguien lo mira mientras el lote ya lo esta buscando, se espera esa misma.
+_en_curso: dict[str, asyncio.Task] = {}
+_semaforo = asyncio.Semaphore(2)
+_MAX_EN_CURSO = 300
+
+
+async def _correr(isbn: str | None, titulo: str, autor: str, prioritario: bool) -> str | None:
+    try:
+        if prioritario:
+            return await obtener(isbn, titulo, autor, prioritario=True)
+        async with _semaforo:
+            return await obtener(isbn, titulo, autor)
+    except Exception:  # noqa: BLE001
+        logger.exception("portadas_fallo titulo=%r", titulo)
+        return None
+
+
+def _tarea_de(isbn: str | None, titulo: str, autor: str, prioritario: bool) -> asyncio.Task:
+    clave = clave_de(isbn, titulo, autor)
+    tarea = _en_curso.get(clave)
+    if tarea is None:
+        tarea = asyncio.create_task(_correr(isbn, titulo, autor, prioritario))
+        _en_curso[clave] = tarea
+        tarea.add_done_callback(lambda _t, c=clave: _en_curso.pop(c, None))
+    return tarea
+
+
+def iniciar(isbn: str | None, titulo: str, autor: str = "") -> asyncio.Task:
+    """Empieza a buscar YA la portada de un libro que alguien esta por ver, sin
+    hacer cola detras de la carga en lote. Se espera despues con `esperar`, asi la
+    busqueda corre mientras se arma el resto de la respuesta."""
+    return _tarea_de(isbn, titulo, autor, prioritario=True)
+
+
+async def esperar(tarea: asyncio.Task, segundos: float = 3.0) -> str | None:
+    """Resultado de `iniciar`, con tope de espera. Si vence, la busqueda sigue
+    (el escudo evita que wait_for la cancele) y la proxima vista ya la encuentra."""
+    try:
+        return await asyncio.wait_for(asyncio.shield(tarea), timeout=segundos)
+    except asyncio.TimeoutError:
+        return None
+    except Exception:  # noqa: BLE001
+        logger.exception("portadas_esperar_fallo")
+        return None
+
+
+async def consultar(libros: list[dict]) -> tuple[dict, set]:
+    """Para una lista de libros (dict con id, isbn?, titulo, autor) devuelve
+    ({id: url} de los que ya tienen portada guardada, {id} de los que se buscaron
+    hace poco y no la tienen). No sale a la red."""
+    claves = {l["id"]: clave_de(l.get("isbn"), l["titulo"], l.get("autor", "")) for l in libros}
+    if not claves:
+        return {}, set()
+    filas = await db.pool().fetch(
+        "SELECT clave, estado, sha256, "
+        "(revisada_en < now() - make_interval(days => $2)) AS vieja "
+        "FROM portadas WHERE clave = ANY($1::text[])",
+        list(set(claves.values())), _REINTENTO_SIN_PORTADA_DIAS,
+    )
+    con_archivo = [f for f in filas if f["estado"] == "ok"]
+    # Un stat por fila, fuera del event loop: en un volumen de red no es gratis.
+    existentes = await asyncio.to_thread(
+        lambda: {f["clave"]: url_de(f["sha256"]) for f in con_archivo if ruta_de(f["sha256"]).exists()})
+    descartadas = {f["clave"] for f in filas if f["estado"] == "sin_portada" and not f["vieja"]}
+    urls = {i: existentes[c] for i, c in claves.items() if c in existentes}
+    sin_portada = {i for i, c in claves.items() if c in descartadas}
+    return urls, sin_portada
+
+
+def buscar_en_segundo_plano(libros: list[dict]) -> None:
+    """Agenda la resolucion de los libros que aun no se buscaron. El que llama
+    ya saco los que tienen portada y los que figuran como 'sin_portada'."""
+    for libro in libros:
+        if len(_en_curso) >= _MAX_EN_CURSO:
+            return
+        isbn, titulo, autor = libro.get("isbn"), libro["titulo"], libro.get("autor", "")
+        clave = clave_de(isbn, titulo, autor)
+        if titulo.strip() and clave not in _en_curso and not _fallo_reciente(clave):
+            _tarea_de(isbn, titulo, autor, prioritario=False)
 
 
 async def retirar(clave: str) -> bool:

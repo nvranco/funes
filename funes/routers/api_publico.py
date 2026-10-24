@@ -25,7 +25,7 @@ class Evento(BaseModel):
 @router.get("/api/{slug}/catalogo.json")
 async def catalogo_json(slug: str):
     libreria = await db.pool().fetchrow(
-        "SELECT id FROM librerias WHERE slug = $1 AND activa", slug
+        "SELECT id, tipo_catalogo FROM librerias WHERE slug = $1 AND activa", slug
     )
     if libreria is None:
         raise HTTPException(status_code=404)
@@ -40,13 +40,24 @@ async def catalogo_json(slug: str):
         """,
         libreria["id"],
     )
+    # Los libros sin foto propia usan la portada de referencia ya guardada; los
+    # que todavia no se buscaron se buscan en segundo plano y aparecen en la
+    # proxima carga, sin hacer esperar a nadie. Solo en catalogos de libros: las
+    # fuentes son de libros, y buscar un album por titulo traeria tapas ajenas.
+    de_referencia: dict = {}
+    if libreria["tipo_catalogo"] == "libros":
+        sin_foto = [l for l in libros if not l["tiene_foto"]]
+        de_referencia, ya_descartados = await portadas.consultar(sin_foto)
+        portadas.buscar_en_segundo_plano(
+            [l for l in sin_foto if l["id"] not in de_referencia and l["id"] not in ya_descartados])
     datos = [
         {
             "id": l["id"],
             "titulo": l["titulo"],
             "autor": l["autor"],
             "catalogo_id": l["catalogo_id"],
-            "imagen_url": f"/api/{slug}/portada/{l['id']}.jpg" if l["tiene_foto"] else None,
+            "imagen_url": (f"/api/{slug}/portada/{l['id']}.jpg" if l["tiene_foto"]
+                           else de_referencia.get(l["id"])),
         }
         for l in libros
     ]

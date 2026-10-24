@@ -117,6 +117,9 @@
      le miente a esa medicion y el mensaje termina unos px por debajo del borde
      de la cabecera. El movimiento lo pone el texto creciendo adentro. */
   .burbuja-entra { animation: burbuja-entra 0.3s ease-out; }
+  /* La tapa de la recomendacion: 12rem en el celular, 16rem de 768px para arriba. */
+  .tapa-chat { display: block; width: 12rem; max-width: 100%; height: auto; border-radius: 0.5rem; }
+  @media (min-width: 768px) { .tapa-chat { width: 16rem; } }
   @keyframes burbuja-entra {
     from { opacity: 0; }
     to   { opacity: 1; }
@@ -354,10 +357,6 @@ const MS_ENTRE_LETRAS = 20;
 // golpe, sin ningun desvanecido, alcanza con cambiar el ease-out del CSS por
 // steps(1, end).
 const DURACION_LETRA_MS = 70;
-// Cada cuanto, como mucho, la escritura vuelve a pedir scroll mientras la
-// burbuja crece. Sin el techo lo pediria en cada frame, y como cada pedido
-// cancela al anterior, la vista no terminaria de llegar nunca a ningun lado.
-const MS_ENTRE_SCROLLS_ESCRITURA = 100;
 // Cuanto se puede bajar mas alla del final real de la conversacion. Un poco de
 // aire para que no termine cortado justo contra el borde, y nada mas.
 const RESPIRO_FINAL = 24;
@@ -603,7 +602,20 @@ function easeInOutQuad(t) {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 }
 
-function scrollSuaveHacia(el, block, duracionMs = 450, seguimiento = false, respiro = 0) {
+// Velocidad (px/ms) de la animacion de scroll en curso: la hereda la siguiente
+// si llega con la vista todavia en movimiento, para que no frene en seco ni
+// arranque de cero en el medio de un recorrido.
+let velocidadScroll = 0;
+const LENTO_MIN_MS = 900;
+const LENTO_MAX_MS = 1800;
+const LENTO_MS_POR_PX = 1.8;
+
+// `lento` es el gesto de "bajar a leer lo que acaba de terminar de aparecer":
+// la duracion crece con la distancia (900 a 1800 ms) y la curva es una
+// Hermite con velocidad final 0, o sea arranque y llegada suaves. Si la
+// animacion anterior seguia corriendo, la nueva sale con su velocidad y no
+// desde el reposo.
+function scrollSuaveHacia(el, block, duracionMs = 450, seguimiento = false, respiro = 0, lento = false) {
   // "start" descuenta la cabecera pegajosa, que si no taparia el arranque de la
   // burbuja. "end" no la necesita: esta anclado abajo, donde no tapa nada.
   function objetivo() {
@@ -633,10 +645,25 @@ function scrollSuaveHacia(el, block, duracionMs = 450, seguimiento = false, resp
   const inicio = window.scrollY;
   let distancia = destino - inicio;
   const t0 = performance.now();
+  const v0 = lento ? velocidadScroll : 0;
+  if (lento) {
+    duracionMs = Math.min(LENTO_MAX_MS, Math.max(LENTO_MIN_MS, 700 + Math.abs(distancia) * LENTO_MS_POR_PX));
+  }
+  let ultimaY = inicio;
+  let ultimoT = t0;
 
   function frame(ahora) {
     if (miToken !== scrollTokenActual) return; // una llamada mas nueva tomo el control
     const t = Math.min(1, (ahora - t0) / duracionMs);
+    if (lento) {
+      const y = inicio + distancia * (3 * t * t - 2 * t * t * t) +
+                v0 * duracionMs * (t * t * t - 2 * t * t + t);
+      window.scrollTo(0, y);
+      if (ahora > ultimoT) velocidadScroll = (y - ultimaY) / (ahora - ultimoT);
+      ultimaY = y; ultimoT = ahora;
+      if (t < 1) requestAnimationFrame(frame); else velocidadScroll = 0;
+      return;
+    }
     // El destino se relee en cada frame, no se fija al arrancar. Mientras el
     // scroll corre, el contenido de ARRIBA del ancla todavia se puede mover: la
     // burbuja de la respuesta recien elegida se parte en dos renglones cuando
@@ -686,6 +713,9 @@ for (const evento of ["wheel", "touchmove", "keydown"]) {
     // campo esta creciendo y corriendo todo lo de abajo.
     if (e.target && e.target.tagName === "TEXTAREA") return;
     usuarioMovioLaVista = true;
+    // Un scroll lento no se le puede pelear al dedo o a la rueda.
+    scrollTokenActual++;
+    velocidadScroll = 0;
   }, { passive: true });
 }
 
@@ -747,6 +777,43 @@ const observadorColchon = new MutationObserver(() => {
 observadorColchon.observe(hilo, { childList: true });
 observadorColchon.observe(zonaInput, { childList: true });
 
+// Cuando termina de aparecer lo que se puso en la zona de respuesta (botones o
+// formulario), la vista baja una vez, lenta, si no entraba en la pantalla. Va
+// por observador por la misma razon que el colchon: son ocho lugares que
+// dibujan botones. Espera al ultimo boton: su retraso escalonado mas lo que
+// dura .opcion-aparece (0,5 s).
+const DURACION_OPCION_APARECE_MS = 500;
+// El scroll de fin de mensaje espera este rato por si le siguen botones.
+const ESPERA_SCROLL_FINAL_MS = 300;
+let scrollFinalPendiente = null;
+const RESPIRO_BOTONES = 28;
+new MutationObserver((cambios) => {
+  let espera = 0;
+  let hayNuevo = false;
+  for (const cambio of cambios) {
+    for (const nodo of cambio.addedNodes) {
+      if (nodo.nodeType !== 1) continue;
+      hayNuevo = true;
+      const botones = nodo.matches(".opcion-aparece") ? [nodo] : [...nodo.querySelectorAll(".opcion-aparece")];
+      for (const b of botones) {
+        espera = Math.max(espera, (parseFloat(b.style.animationDelay) || 0) + DURACION_OPCION_APARECE_MS);
+      }
+    }
+  }
+  if (!hayNuevo) return;
+  // Aparecen botones o un formulario: el scroll de fin de mensaje, si estaba
+  // esperando, ya no hace falta; baja este, una sola vez, con todo junto.
+  clearTimeout(scrollFinalPendiente);
+  scrollFinalPendiente = null;
+  const ultimo = zonaInput.lastElementChild;
+  setTimeout(() => {
+    // Si la persona ya tocó un botón, el nodo se fue y no hay a dónde bajar.
+    if (ultimo && ultimo.isConnected) {
+      scrollSuaveHacia(ultimo, "end", 450, true, RESPIRO_BOTONES, true);
+    }
+  }, espera);
+}).observe(zonaInput, { childList: true });
+
 // "Guardar arriba lo que ya se contesto y dejar la pantalla para lo nuevo".
 // Es el unico gesto de scroll que se usa cuando el usuario acaba de responder,
 // y va SIEMPRE despues de renderizar lo nuevo, para que abrirEspacio() mida el
@@ -777,8 +844,20 @@ function burbujaVacia(propia, scrollBlock = "end") {
     ? "burbuja-entra self-end max-w-[85%] rounded-xl2 px-4 py-3 bg-celeste-claro border-2 border-celeste text-texto-papel"
     : "burbuja-entra self-start max-w-[90%] rounded-xl2 px-4 py-3 bg-papel border-2 border-borde whitespace-pre-line";
   hilo.appendChild(div);
+  // Una burbuja nueva de Funes vuelve inutil el scroll de fin de mensaje que
+  // dejo agendado la anterior: bajaria ahi y poco despues otra vez. El turno
+  // baja una sola vez, al terminar el ultimo mensaje o los botones.
+  if (!propia) {
+    clearTimeout(scrollFinalPendiente);
+    scrollFinalPendiente = null;
+  }
   if (scrollBlock === "start") llevarArriba(div);
-  else scrollSuaveHacia(div, "end", 450, true);
+  // Las burbujas de Funes nunca scrollean al nacer, ni con "end": la vista baja
+  // cuando termina de escribirse (revelarTexto) o cuando terminan de aparecer
+  // los botones que siguen. Solo la burbuja propia, que nace con su texto
+  // completo, baja de inmediato.
+  else if (scrollBlock === "end" && propia) scrollSuaveHacia(div, "end", 450, true);
+  // "ninguno": la burbuja de Funes que sigue en el mismo turno.
   return div;
 }
 
@@ -786,6 +865,47 @@ function burbuja(texto, propia) {
   const div = burbujaVacia(propia);
   div.textContent = texto;
   return div;
+}
+
+// Un mensaje aparte con la tapa, como cuando alguien te pasa una foto por
+// WhatsApp: una burbuja chica con solo la imagen. Si no carga, no queda un
+// recuadro vacio: se saca y la conversacion sigue como si nada.
+function burbujaImagen(url) {
+  return new Promise((resolver) => {
+    const img = new Image();
+    img.alt = "";
+    img.className = "tapa-chat";
+    img.addEventListener("error", () => resolver(null));
+    img.addEventListener("load", () => {
+      const div = burbujaVacia(false);
+      div.className = "burbuja-entra self-start rounded-xl2 p-1 bg-papel border-2 border-borde";
+      div.appendChild(img);
+      // Las burbujas de Funes no scrollean al nacer, y la tapa nace ya cargada y
+      // alta: sin esto queda fuera de pantalla hasta que termine el aviso.
+      scrollSuaveHacia(div, "end", 450, true, 0, true);
+      resolver(div);
+    });
+    img.src = url;
+  });
+}
+
+// Lo que se espera antes de la tapa (se lee la burbuja anterior) y antes del
+// aviso (se mira la tapa). Misma idea que la pausa de digestion entre mensajes.
+const PAUSA_ANTES_TAPA_MS = 900;
+const PAUSA_TRAS_TAPA_MS = 1200;
+const AVISO_TAPA = "Esta imagen es ilustrativa.";
+
+// La tapa y su aviso, con su respiro entre uno y otro. Si la imagen no cargo no
+// hay nada que aclarar: ni tapa ni aviso. El aviso se escribe letra por letra,
+// igual que el resto de los mensajes de Funes.
+async function mostrarTapa(url, mensajePrevio = "") {
+  await esperar(Math.max(PAUSA_ANTES_TAPA_MS, pausaDigestion(mensajePrevio)));
+  if (!(await burbujaImagen(url))) return;
+  const aviso = burbujaVacia(false, "ninguno");
+  const dejarDePensar = pensar(aviso);
+  await esperar(PAUSA_TRAS_TAPA_MS);
+  dejarDePensar();
+  await revelarTexto(aviso, AVISO_TAPA);
 }
 
 // seguirScroll=false deja la vista quieta: la primera burbuja de un turno ya
@@ -847,6 +967,29 @@ function pintarPartes(div, partes) {
   }
 }
 
+// Lectura "por paginas": la vista no se mueve mientras Funes escribe, salvo
+// cuando el texto llega al ultimo 20% de la pantalla: ahi baja media pantalla,
+// suave, y vuelve a quedarse quieta. Es el ritmo de pasar una pagina cuando se
+// llega al final del renglon, en vez de seguir cada linea o esperar a que
+// termine todo el mensaje.
+const PAGINA_ZONA_BAJA = 0.8;      // fraccion de la pantalla desde donde se pasa de pagina
+const PAGINA_SALTO = 0.5;          // cuanto baja: fraccion de la pantalla
+const PAGINA_REVISION_MS = 120;    // cada cuanto se mira donde esta la escritura
+let paginaLibreDesde = 0;          // no se pasa otra pagina hasta que termine la anterior
+
+function pasarPaginaSiHaceFalta(ultimoNodo, ahora) {
+  if (usuarioMovioLaVista || ahora < paginaLibreDesde) return;
+  const borde = ultimoNodo.getBoundingClientRect().bottom;
+  if (borde < window.innerHeight * PAGINA_ZONA_BAJA) return;
+  const salto = Math.round(window.innerHeight * PAGINA_SALTO);
+  // scrollSuaveHacia(..., "end") lleva el borde inferior del elemento al fondo de
+  // la pantalla; un elemento postizo que termina `salto` px mas abajo de lo que
+  // se ve produce, justamente, un desplazamiento de `salto` px.
+  const destino = { getBoundingClientRect: () => ({ bottom: window.innerHeight + salto }) };
+  scrollSuaveHacia(destino, "end", 450, true, 0, true);
+  paginaLibreDesde = ahora + LENTO_MIN_MS + salto * LENTO_MS_POR_PX * 0.5;
+}
+
 function revelarTexto(div, texto, seguirScroll = true) {
   return new Promise((resolve) => {
     div.textContent = "";
@@ -854,7 +997,7 @@ function revelarTexto(div, texto, seguirScroll = true) {
     const caracteres = partes.flatMap(
       (parte) => [...parte.texto].map((c) => ({ c, cursiva: parte.cursiva, negrita: parte.negrita })));
     let puestos = 0;
-    let ultimoScroll = 0;
+    let ultimaRevision = 0;
     const t0 = performance.now();
 
     function frame(ahora) {
@@ -882,17 +1025,15 @@ function revelarTexto(div, texto, seguirScroll = true) {
         puestos += 1;
       }
 
-      if (seguirScroll && ahora - ultimoScroll >= MS_ENTRE_SCROLLS_ESCRITURA) {
-        scrollSuaveHacia(div, "end", 450, true);
-        ultimoScroll = ahora;
+      if (div.lastElementChild && ahora - ultimaRevision >= PAGINA_REVISION_MS) {
+        ultimaRevision = ahora;
+        pasarPaginaSiHaceFalta(div.lastElementChild, ahora);
       }
 
       if (puestos < caracteres.length) {
         requestAnimationFrame(frame);
         return;
       }
-      if (seguirScroll) scrollSuaveHacia(div, "end", 450, true);
-
       setTimeout(() => {
         // Cierra colapsando a un unico nodo de texto: en pantalla es identico
         // (a esta altura todas las letras estan al 100%), le saca al DOM un
@@ -900,6 +1041,16 @@ function revelarTexto(div, texto, seguirScroll = true) {
         // despues lee el textContent y pisa el innerHTML entero (y le da lo
         // mismo que haya un <em>: textContent devuelve el texto pelado).
         pintarPartes(div, partes);
+        // Un solo scroll, lento, cuando el mensaje ya termino de escribirse. Se
+        // demora un instante: si enseguida aparecen botones, el observador de
+        // zonaInput cancela este y baja una sola vez, con texto y botones juntos.
+        if (seguirScroll) {
+          clearTimeout(scrollFinalPendiente);
+          scrollFinalPendiente = setTimeout(() => {
+            scrollFinalPendiente = null;
+            scrollSuaveHacia(div, "end", 450, true, 0, true);
+          }, ESPERA_SCROLL_FINAL_MS);
+        }
         resolve();
       }, DURACION_LETRA_MS);
     }
@@ -1077,10 +1228,13 @@ async function mostrarRespuestaFunes(origen, alTerminarBurbuja, anclaje = "start
   if (!textoCompleto) { primera.remove(); return ""; }
 
   const mensajes = dividirEnMensajes(textoCompleto);
-  await revelarTexto(primera, mensajes[0], false);
+  // En un turno anclado arriba ("start") la primera burbuja ya quedo donde
+  // tiene que estar. En los demas nace sin scroll, asi que tiene que bajar la
+  // vista al terminar, igual que las burbujas siguientes.
+  await revelarTexto(primera, mensajes[0], anclaje !== "start");
   if (alTerminarBurbuja) await alTerminarBurbuja(primera, mensajes[0]);
   for (let i = 1; i < mensajes.length; i++) {
-    const div = burbujaVacia(false);
+    const div = burbujaVacia(false, "ninguno");
     await escribirBurbuja(div, mensajes[i], mensajes[i - 1]);
     if (alTerminarBurbuja) await alTerminarBurbuja(div, mensajes[i]);
   }
@@ -1777,9 +1931,16 @@ async function pedirRecomendacion(motivoRechazo, libroFijado) {
 
   await mostrarRespuestaFunes(
     promesa.then((r) => (r.ok ? r.datos.voz : MENSAJE_ERROR)),
-    async (div) => {
+    async (div, mensaje) => {
       const r = await promesa;
-      if (r.ok) enlazarLibro(div, r.datos.titulo, r.datos.autor);
+      if (!r.ok) return;
+      enlazarLibro(div, r.datos.titulo, r.datos.autor);
+      // La tapa va como mensaje aparte, justo despues de la primera burbuja
+      // ("te recomiendo X, de Y") y antes de la sinopsis.
+      if (r.datos.portada && !r.portadaPuesta) {
+        r.portadaPuesta = true;
+        await mostrarTapa(r.datos.portada, mensaje);
+      }
     }
   );
   const resultado = await promesa;
@@ -1815,7 +1976,12 @@ async function mostrarVeredicto() {
   // del mismo momento, no un tema nuevo. Anclarlo empuja la recomendacion
   // fuera de la pantalla justo cuando hay que juzgarla, y un veredicto
   // sobre un libro que no se ve no mide nada.
-  await mostrarRespuestaFunes("¿Qué te parece esta recomendación?", null, "end");
+  // Nada que cancelar aca: crear la burbuja de la pregunta ya cancela el scroll
+  // de fin de mensaje que dejo agendado el ultimo globo de la recomendacion
+  // (ver burbujaVacia). La vista baja UNA vez, cuando terminan de aparecer los
+  // tres botones (observador de zonaInput), y trae el cierre de la
+  // recomendacion, la pregunta y los botones juntos.
+  await mostrarRespuestaFunes("¿Qué te parece esta recomendación?", null, "ninguno");
   limpiarInput();
   // En fila y no en columna: son tres palabras y un semaforo, y apiladas se
   // comian media pantalla justo abajo del libro que hay que estar mirando para
@@ -1856,13 +2022,8 @@ async function mostrarVeredicto() {
     });
     cont.appendChild(btn);
   });
+  // La camara baja a los botones sola: ver el observador de zonaInput.
   zonaInput.appendChild(cont);
-  // La respuesta larga termina con la camara en los tres botones, no en la
-  // pregunta de arriba: los botones aparecen DESPUES del ultimo globo, y sin
-  // este scroll quedaban debajo del borde de la pantalla. Con 28 px de aire
-  // debajo (mide el boton mientras todavia sube por .opcion-aparece, y pegado
-  // al borde se lee cortado).
-  scrollSuaveHacia(cont, "end", 450, true, 28);
 }
 
 // ---- Sedes con horario (SEDES, ver schema.sql:funes_sedes) ----

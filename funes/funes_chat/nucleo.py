@@ -21,7 +21,7 @@ import unicodedata
 
 import httpx
 
-from funes import db, tokens
+from funes import db, portadas, tokens
 from funes.config import OPENROUTER_API_KEY
 from funes.funes_chat import bitacora
 
@@ -1246,7 +1246,7 @@ async def _libros() -> list[dict]:
         # entero, asi que el costo es despreciable.
         filas = await db.pool().fetch(
             "SELECT id, titulo, autor, abstracto, sinopsis, experiencia, macro, "
-            "       nro_paginas, genero, subgenero, rasgos, "
+            "       nro_paginas, genero, subgenero, rasgos, isbn, "
             "       embedding_abstracto, embedding_sinopsis, embedding_experiencia "
             "FROM funes_libros WHERE embedding_abstracto IS NOT NULL"
         )
@@ -2924,6 +2924,9 @@ async def recomendar(
                                   motivo_rechazo, leidos, libro_fijado)
     mejor = eleccion["libro"]
     candidatos = eleccion["candidatos"]
+    # La portada se busca mientras el modelo escribe la voz: asi la espera de
+    # una no se suma a la de la otra.
+    tarea_portada = portadas.iniciar(mejor.get("isbn"), mejor["titulo"], mejor["autor"])
     voz, empujon = await _generar_voz(respuestas, profundas, mejor)
 
     mostrados_tras_este = len(ya_mostrados) + 1
@@ -2947,10 +2950,16 @@ async def recomendar(
         profundas,
     ) if sesion_id else None
 
+    # La portada no puede demorar la recomendacion: corre en paralelo a la voz y,
+    # si a los 4 s no esta lista, se manda sin ella y la busqueda sigue para la
+    # proxima vez.
+    portada = await portadas.esperar(tarea_portada, 4.0)
+
     return {
         "id": mejor["id"],
         "titulo": mejor["titulo"],
         "autor": mejor["autor"],
+        "portada": portada,
         "voz": voz,
         # Se manda con la recomendacion y el cliente lo guarda sin mostrarlo.
         # Viaja igual aunque la persona termine diciendo que estuvo floja:
