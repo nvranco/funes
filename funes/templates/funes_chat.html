@@ -536,6 +536,11 @@ const MAX_CICLOS = 2;
 // Viajan en cada pedido: el servidor los saca del catalogo y usa la opinion
 // para orientar la busqueda.
 let leidos = [];
+// El perfil del lector tal como lo dejo la ultima correccion (lo escribe el
+// servidor cuando rechaza una recomendacion y explica por que). Viaja en cada
+// pedido y vuelve actualizado: asi cada rechazo corrige al anterior. Null hasta
+// el primer rechazo, y se borra cuando las respuestas se reinician.
+let perfilVigente = null;
 // Cuantas veces seguidas se le puede preguntar "¿ya lo leiste?". Si alguien
 // leyo todo lo que le ofrecemos, seguir preguntando es un interrogatorio: a
 // partir de ahi se recomienda igual y que decida con el libro delante.
@@ -594,6 +599,16 @@ function esperar(ms) {
 // hay dos animaciones peleando por el control del scroll a la vez).
 let scrollTokenActual = 0;
 
+// Cuando un mensaje termina de escribirse, Funes pasa al "pensando" del
+// siguiente. Ese lugar se le da de antemano: la vista baja de mas, dejando
+// debajo del mensaje este espacio libre (una fraccion de la pantalla, con
+// piso), y el colchon nunca baja de eso para que el scroll pueda llegar.
+const ESPACIO_LO_QUE_VIENE_FRACCION = 0.08;
+const ESPACIO_LO_QUE_VIENE_MIN = 48;
+function espacioParaLoQueViene() {
+  return Math.round(Math.max(ESPACIO_LO_QUE_VIENE_MIN, window.innerHeight * ESPACIO_LO_QUE_VIENE_FRACCION));
+}
+
 function limiteScroll() {
   return Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 }
@@ -645,9 +660,19 @@ function scrollSuaveHacia(el, block, duracionMs = 450, seguimiento = false, resp
   const inicio = window.scrollY;
   let distancia = destino - inicio;
   const t0 = performance.now();
-  const v0 = lento ? velocidadScroll : 0;
+  let v0 = lento ? velocidadScroll : 0;
+  if (lento) {
+    // La velocidad heredada se acota para que la curva siga siendo monotona:
+    // una Hermite con velocidad final 0 se pasa del destino y vuelve (baja de
+    // mas y sube un poquito) cuando la velocidad de arranque, medida en
+    // distancias por duracion, supera 3. Pasa justo cuando una bajada chica
+    // arranca encima de una grande que todavia no termino. Solo hacia el
+    // destino y como mucho 3: la animacion no retrocede nunca.
+    v0 = Math.sign(distancia) === Math.sign(v0) ? v0 : 0;
+  }
   if (lento) {
     duracionMs = Math.min(LENTO_MAX_MS, Math.max(LENTO_MIN_MS, 700 + Math.abs(distancia) * LENTO_MS_POR_PX));
+    v0 = Math.sign(v0) * Math.min(Math.abs(v0), 3 * Math.abs(distancia) / duracionMs);
   }
   let ultimaY = inicio;
   let ultimoT = t0;
@@ -728,7 +753,7 @@ function abrirEspacio(ancla) {
   // arriba se comia esos 40 px reservando de mas.
   const debajoSinColchon = document.documentElement.scrollHeight - anclaTop - espaciador.offsetHeight;
   const necesario = window.innerHeight - altoCabecera() + RESPIRO_FINAL;
-  espaciador.style.minHeight = Math.max(0, necesario - debajoSinColchon) + "px";
+  espaciador.style.minHeight = Math.max(espacioParaLoQueViene(), necesario - debajoSinColchon) + "px";
 }
 
 // Se recalcula con el ancla de siempre y no con el scroll actual a proposito:
@@ -844,13 +869,6 @@ function burbujaVacia(propia, scrollBlock = "end") {
     ? "burbuja-entra self-end max-w-[85%] rounded-xl2 px-4 py-3 bg-celeste-claro border-2 border-celeste text-texto-papel"
     : "burbuja-entra self-start max-w-[90%] rounded-xl2 px-4 py-3 bg-papel border-2 border-borde whitespace-pre-line";
   hilo.appendChild(div);
-  // Una burbuja nueva de Funes vuelve inutil el scroll de fin de mensaje que
-  // dejo agendado la anterior: bajaria ahi y poco despues otra vez. El turno
-  // baja una sola vez, al terminar el ultimo mensaje o los botones.
-  if (!propia) {
-    clearTimeout(scrollFinalPendiente);
-    scrollFinalPendiente = null;
-  }
   if (scrollBlock === "start") llevarArriba(div);
   // Las burbujas de Funes nunca scrollean al nacer, ni con "end": la vista baja
   // cuando termina de escribirse (revelarTexto) o cuando terminan de aparecer
@@ -1048,7 +1066,7 @@ function revelarTexto(div, texto, seguirScroll = true) {
           clearTimeout(scrollFinalPendiente);
           scrollFinalPendiente = setTimeout(() => {
             scrollFinalPendiente = null;
-            scrollSuaveHacia(div, "end", 450, true, 0, true);
+            scrollSuaveHacia(div, "end", 450, true, espacioParaLoQueViene(), true);
           }, ESPERA_SCROLL_FINAL_MS);
         }
         resolve();
@@ -1720,6 +1738,7 @@ async function reiniciarDesdeQ0() {
   ciclos += 1;
   for (const clave of ORDEN) delete respuestas[clave];
   profundas.length = 0;
+  perfilVigente = null;
   recomendacionesPedidas = 0;
   agotadoActual = false;
   veredictoActual = null;
@@ -1744,6 +1763,7 @@ async function reiniciarDesdeQ1() {
     if (clave !== "q0") delete respuestas[clave];
   }
   profundas.length = 0;
+  perfilVigente = null;
   recomendacionesPedidas = 0;
   agotadoActual = false;
   veredictoActual = null;
@@ -1787,9 +1807,14 @@ async function pedirCandidato(motivoRechazo) {
         body: JSON.stringify({
           ...respuestas, profundas, ya_mostrados: yaMostrados, leidos,
           sesion_id: sesionId, motivo_rechazo: motivoRechazo || "",
+          perfil_vigente: perfilVigente,
         }),
       });
-      if (resp.ok) return await resp.json();
+      if (resp.ok) {
+        const candidato = await resp.json();
+        if (candidato.perfil_vigente) perfilVigente = candidato.perfil_vigente;
+        return candidato;
+      }
     } catch (err) { /* sin candidato se sigue por el camino de siempre */ }
     return null;
   })();
@@ -1918,11 +1943,12 @@ async function pedirRecomendacion(motivoRechazo, libroFijado) {
         body: JSON.stringify({
           ...respuestas, profundas, ya_mostrados: yaMostrados, leidos,
           sesion_id: sesionId, motivo_rechazo: motivoRechazo || "",
-          libro_id: libroFijado || "",
+          libro_id: libroFijado || "", perfil_vigente: perfilVigente,
         }),
       });
       if (!resp.ok) throw new Error("fallo el pedido");
       const datos = await resp.json();
+      if (datos.perfil_vigente) perfilVigente = datos.perfil_vigente;
       return { ok: true, datos };
     } catch (err) {
       return { ok: false, datos: null };
@@ -1976,11 +2002,10 @@ async function mostrarVeredicto() {
   // del mismo momento, no un tema nuevo. Anclarlo empuja la recomendacion
   // fuera de la pantalla justo cuando hay que juzgarla, y un veredicto
   // sobre un libro que no se ve no mide nada.
-  // Nada que cancelar aca: crear la burbuja de la pregunta ya cancela el scroll
-  // de fin de mensaje que dejo agendado el ultimo globo de la recomendacion
-  // (ver burbujaVacia). La vista baja UNA vez, cuando terminan de aparecer los
-  // tres botones (observador de zonaInput), y trae el cierre de la
-  // recomendacion, la pregunta y los botones juntos.
+  // El ultimo globo de la recomendacion ya bajo la vista dejando lugar debajo
+  // (espacioParaLoQueViene); la pregunta y los botones entran en ese lugar. Al
+  // terminar de aparecer los botones, el observador de zonaInput solo mueve la
+  // vista si todavia no entraban.
   await mostrarRespuestaFunes("¿Qué te parece esta recomendación?", null, "ninguno");
   limpiarInput();
   // En fila y no en columna: son tres palabras y un semaforo, y apiladas se

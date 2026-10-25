@@ -15,12 +15,12 @@ import logging
 import secrets
 import uuid
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
 from funes import db
 from funes.config import ADMIN_TOKEN, DOMINIO_FUNES, FUNES_CONTACTO, POSTHOG_HOST, POSTHOG_KEY
@@ -244,6 +244,22 @@ class PedidoPregunta(RespuestasCompletas):
     leidos: list[Leido] = Field([], max_length=nucleo._MAX_TOTAL_RECOMENDACIONES)
 
 
+class PerfilVigente(BaseModel):
+    """El perfil del lector tal como lo dejo la ultima correccion (ver
+    nucleo._reescribir_perfil). Lo escribe el servidor y el cliente solo lo
+    devuelve, asi que los campos y largos se acotan aca, en el borde; igual
+    nucleo._limpiar_perfil lo vuelve a limpiar antes de usarlo."""
+
+    perfil: str = Field("", max_length=nucleo._PERFIL_MAX)
+    nombrado: str = Field("", max_length=nucleo._REFERENCIA_MAX)
+    valorado: str = Field("", max_length=nucleo._REFERENCIA_MAX)
+    excluir: list[Annotated[str, StringConstraints(max_length=nucleo._EXCLUIR_LARGO)]] = Field(
+        [], max_length=nucleo._EXCLUIR_MAX)
+    forma: str = Field("", max_length=20)
+    motivo: str = Field("", max_length=500)
+    ronda: int = Field(0, ge=0, le=nucleo._RONDA_MAX)
+
+
 class RespuestaChat(RespuestasCompletas):
     profundas: list[Profunda] = Field([], max_length=nucleo._CANT_PREGUNTAS_PROFUNDAS)
     # Los libros que la persona ya leyo. Se sacan del catalogo y su opinion
@@ -253,6 +269,10 @@ class RespuestaChat(RespuestasCompletas):
     ya_mostrados: list[str] = Field([], max_length=nucleo._MAX_TOTAL_RECOMENDACIONES)
     sesion_id: str = Field("", max_length=64)
     motivo_rechazo: str = Field("", max_length=500)
+    # El perfil del lector tal como quedo despues de corregirlo con sus rechazos
+    # (lo devuelve /funes/candidato y /funes/recomendar). Se valida y se acota en
+    # nucleo._limpiar_perfil: entra a un embedding y a un prompt.
+    perfil_vigente: PerfilVigente | None = None
     # El libro por el que ya se pregunto "¿ya lo leiste?". Se fija para que la
     # recomendacion sea EXACTAMENTE ese: preguntar por un libro y presentar otro
     # seria una charla que no se acuerda de lo que acaba de decir. Si no viene, o
@@ -500,16 +520,23 @@ async def candidato(request: Request, cuerpo: RespuestaChat):
     de generarla. Es barato -embeddings, todos cacheados dentro de una charla-
     y no escribe nada en la bitacora: recien es una recomendacion cuando se
     muestra."""
-    limite.controlar(request, caro=False)
+    # Con motivo de rechazo hay un llamado al modelo (la reescritura en
+    # positivo), asi que cuenta como pedido caro; sin motivo son solo embeddings.
+    limite.controlar(request, caro=bool(cuerpo.motivo_rechazo.strip()))
     try:
+        # El motivo tiene que entrar aca: el libro de "¿Leiste X?" es el que despues
+        # se fija en /funes/recomendar (libro_fijado), asi que si se elige sin la
+        # correccion del lector, esa correccion no decide nada.
         eleccion = await nucleo.elegir_libro(
             _respuestas(cuerpo), [p.model_dump() for p in cuerpo.profundas],
-            cuerpo.ya_mostrados, "", [l.model_dump() for l in cuerpo.leidos],
+            cuerpo.ya_mostrados, cuerpo.motivo_rechazo, [l.model_dump() for l in cuerpo.leidos],
+            perfil_vigente=cuerpo.perfil_vigente.model_dump() if cuerpo.perfil_vigente else None,
         )
     except ErrorFunesChat as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     libro = eleccion["libro"]
-    return {"id": libro["id"], "titulo": libro["titulo"], "autor": libro["autor"]}
+    return {"id": libro["id"], "titulo": libro["titulo"], "autor": libro["autor"],
+            "perfil_vigente": eleccion["perfil_vigente"]}
 
 
 @router.post("/funes/ya-lei")
@@ -613,6 +640,7 @@ async def recomendar(request: Request, cuerpo: RespuestaChat):
             _respuestas(cuerpo), profundas, cuerpo.ya_mostrados,
             cuerpo.sesion_id or None, cuerpo.motivo_rechazo,
             [l.model_dump() for l in cuerpo.leidos], cuerpo.libro_id,
+            cuerpo.perfil_vigente.model_dump() if cuerpo.perfil_vigente else None,
         )
     except ErrorFunesChat as exc:
         logger.warning("funes_chat_recomendar_fallo error=%s", exc)

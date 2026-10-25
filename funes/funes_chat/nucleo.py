@@ -127,7 +127,7 @@ _ALFA_CENTRADO = 1.0
 # no contra el juez) antes de confiar en esto a ciegas.
 _DOS_VECTORES = True
 
-# La otra mitad del mismo diseño: que el ancla (q4) y la correccion compitan
+# La otra mitad del mismo diseño: que el ancla (q4) compita
 # contra `sinopsis` —contenido contra contenido— en vez de contra el abstracto,
 # que mezcla de que trata con que es leerlo.
 #
@@ -192,27 +192,10 @@ _PESO_DIVERSIDAD = 0.25
 # por vector propio, como se hizo con el ancla por la misma razon.
 _PESO_PROFUNDAS = 0.25
 
-# El peso de la correccion: lo que la persona escribe cuando pide otra
-# recomendacion ("quiero algo que tenga mas que ver con sistemas de castas").
-# Va aparte de las profundas y no adentro, que es como estaba, porque adentro
-# era casi inerte: el motivo se concatenaba con las dos respuestas profundas y
-# con los libros leidos en un solo texto de un solo vector, asi que le tocaba un
-# tercio de 0,25. Medido en una sesion real de produccion, dos recomendaciones
-# seguidas del mismo ciclo devolvieron la MISMA lista con los MISMOS puntajes
-# -delta maximo 0,005- y lo unico que cambio fue que bajo al segundo porque el
-# primero ya estaba mostrado. La persona habia escrito con todas las letras que
-# le erramos y el ranking no se movio.
-#
-# Es alto a proposito, mas que las profundas: es lo ultimo que dijo, lo dijo
-# escribiendo y no eligiendo, y lo dijo despues de ver un libro concreto y
-# decidir que no. Es la senal mas cara y mas informada de toda la conversacion.
-_PESO_CORRECCION = 0.35
-
 # Cuanto del puntaje pueden llevarse entre todas las partes que NO son el
-# perfil. Con tres componentes ademas del perfil los pesos fijos se pasarian de
-# 1 (0,5 + 0,25 + 0,35), asi que se escalan proporcionalmente y al perfil
-# siempre le queda este resto. El numero es el que ya regia antes de que
-# existiera la correccion (0,5 + 0,25), asi que sin correccion nada cambia.
+# perfil (el ancla y las profundas). Los pesos fijos pueden pasarse de 1 (0,75 +
+# 0,25 con el ancla rica), asi que se escalan proporcionalmente y al perfil
+# siempre le queda este resto.
 _MAX_SIN_PERFIL = 0.75
 # El fallback del ancla, el unico camino del pipeline que paga busqueda web.
 #
@@ -1364,7 +1347,7 @@ def _coseno_con_norma(vector: list[float], norma_vector: float, libro: dict,
 
       "experiencia"  el perfil (q1-q3) y el ajuste (las profundas), que hablan
                      de como se lee — solo si _DOS_VECTORES esta puesto.
-      "sinopsis"     el ancla (q4) y la correccion, que hablan de contenido —
+      "sinopsis"     el ancla (q4), que habla de contenido —
                      solo si _ANCLA_CONTRA_SINOPSIS esta puesto.
       "abstracto"    el de siempre, y el que queda cuando alguno de los dos
                      textos nuevos todavia no existe para este libro.
@@ -1678,6 +1661,16 @@ def _recorte_de(clave: str, libros: list[dict],
     return None, None
 
 
+def _es_de_genero(libro: dict, terminos: list[str]) -> bool:
+    """El genero o el subgenero del libro nombra alguno de los terminos (ya
+    normalizados). Se compara por palabras completas: "novela" no tiene que
+    matchear "novelas graficas" por accidente de prefijo, pero si "ciencia
+    ficcion" tiene que matchear "CIENCIA FICCION / FANTASTICA"."""
+    etiqueta = f" {_normalizar_texto(str(libro.get('genero') or ''))} " \
+               f" {_normalizar_texto(str(libro.get('subgenero') or ''))} "
+    return any(f" {t} " in etiqueta for t in terminos)
+
+
 def _filtrar_catalogo(libros: list[dict], respuestas: dict) -> tuple[list[dict], int, str | None]:
     """Aplica los filtros duros antes del coseno y devuelve
     (libros, tamano_del_pool, filtro_aflojado).
@@ -1702,6 +1695,22 @@ def _filtrar_catalogo(libros: list[dict], respuestas: dict) -> tuple[list[dict],
     solo_ids = respuestas.get("_solo_ids")
     if solo_ids is not None:
         libros = [l for l in libros if l["id"] in solo_ids]
+
+    # Generos que el lector rechazo de forma explicita ("no quiero ciencia
+    # ficcion"). Va como filtro y no como parte del vector porque los embeddings
+    # no entienden negaciones. Como la macro y la libreria, un dato faltante nunca
+    # excluye: un libro sin genero se queda. Y como la banda de paginas, si el pool
+    # cayera por debajo del piso se deja sin aplicar: quedarse sin libros es peor
+    # que mostrar uno del genero.
+    excluir = [_normalizar_texto(str(t)) for t in (respuestas.get("_excluir") or [])]
+    excluir = [t for t in excluir if t]
+    if excluir:
+        sin_excluidos = [l for l in libros if not _es_de_genero(l, excluir)]
+        if len(sin_excluidos) >= _PISO_POOL:
+            libros = sin_excluidos
+        else:
+            logger.info("funes_chat_exclusion_omitida excluir=%s quedarian=%s",
+                        excluir, len(sin_excluidos))
 
     # Fuera el libro que el lector puso como referencia. q4 pide "una lectura
     # que te dio una experiencia parecida a la que queres replicar", o sea que
@@ -1765,6 +1774,10 @@ def _filtrar_catalogo(libros: list[dict], respuestas: dict) -> tuple[list[dict],
 
 
 def _construir_texto_perfil(respuestas: dict) -> str:
+    # Despues de un rechazo el perfil lo reescribe el modelo (ver
+    # _reescribir_perfil) y reemplaza al armado con las opciones de q1 a q3.
+    if respuestas.get("_perfil_texto"):
+        return str(respuestas["_perfil_texto"])
     partes = []
     for clave, pregunta in PREGUNTAS.items():
         # Las preguntas que solo sirven para recortar el catalogo (q0) no
@@ -1810,9 +1823,8 @@ def _construir_texto_ajuste(profundas: list[dict], texto_leidos: str = "") -> st
     """Lo que la persona agrego DESPUES de las opciones fijas: lo que contesto en
     las 2 preguntas profundas y lo que opino de los libros que ya habia leido.
 
-    El motivo del rechazo YA NO entra aca: tiene su propio vector y su propio
-    peso (ver _PESO_CORRECCION). Metido en esta bolsa quedaba diluido a un
-    tercio de 0,25 y no movia el ranking.
+    El motivo del rechazo NO entra aca: corrige el perfil y el ancla del lector
+    (ver _reescribir_perfil), y de ahi en mas todo corre sobre ese perfil.
 
     De cada respuesta se usa su `consulta` -la misma eleccion escrita en el
     idioma del catalogo, que el LLM devuelve junto con la pregunta- y no el texto
@@ -1832,19 +1844,10 @@ def _construir_texto_ajuste(profundas: list[dict], texto_leidos: str = "") -> st
     return " ".join(partes)
 
 
-def _construir_texto_afinado(
-    respuestas: dict, profundas: list[dict], motivo_reformulado: str = ""
-) -> str:
+def _construir_texto_afinado(respuestas: dict, profundas: list[dict]) -> str:
     """El texto de consulta original mas las respuestas a las preguntas
     profundas: son las que terminan de decidir, entre los top-K candidatos,
-    cuales 3 se muestran y en que orden.
-
-    `motivo_reformulado` es la correccion del lector cuando pidio otra
-    recomendacion, ya reescrita en positivo por _reformular_rechazo (nunca el
-    texto crudo: ver el comentario de esa funcion). Solo se usa el motivo mas
-    reciente y no la suma de todos: dos correcciones sucesivas suelen apuntar a
-    lados opuestos ("muy denso", despues "muy liviano") y acumularlas deja un
-    vector que no pide nada en particular."""
+    cuales 3 se muestran y en que orden."""
     # Perfil y no consulta: este texto SI se embebe, y el ancla ya entra al
     # ranking por su propio vector. Meterla tambien aca la contaria dos veces.
     partes = [_construir_texto_perfil(respuestas)]
@@ -1852,8 +1855,6 @@ def _construir_texto_afinado(
         respuesta = str(p.get("respuesta") or "").strip()
         if respuesta:
             partes.append(respuesta)
-    if motivo_reformulado.strip():
-        partes.append(motivo_reformulado.strip())
     return " ".join(partes)
 
 
@@ -2099,23 +2100,21 @@ async def _ancla(respuestas: dict) -> dict | None:
     return ancla
 
 
-def _pesos(ancla, ajuste, correccion=None) -> tuple[float, float, float, float]:
-    """Como se reparte el puntaje entre las cuatro cosas que la persona dijo.
+def _pesos(ancla, ajuste) -> tuple[float, float, float]:
+    """Como se reparte el puntaje entre las tres cosas que la persona dijo.
 
-    Devuelve (perfil, ancla, ajuste, correccion). Lo que no se usa se le
-    devuelve al perfil, que es la unica parte que siempre existe: quien no
-    contesta q4 no tiene por que recibir una recomendacion peor armada, solo una
-    decidida por lo que si contesto.
+    Devuelve (perfil, ancla, ajuste). Lo que no se usa se le devuelve al perfil,
+    que es la unica parte que siempre existe: quien no contesta q4 no tiene por
+    que recibir una recomendacion peor armada, solo una decidida por lo que si
+    contesto.
 
-    Cuando estan las tres, los pesos fijos suman 1,10 y hay que escalarlos: se
-    reparten proporcionalmente el _MAX_SIN_PERFIL y el perfil se queda con el
-    resto. Escalar y no recortar una sola mantiene la proporcion que se calibro
-    entre ellas. Sin correccion el resultado es identico al de antes, porque
-    0,5 + 0,25 es exactamente _MAX_SIN_PERFIL."""
+    Cuando estan las dos, los pesos fijos pueden pasarse de _MAX_SIN_PERFIL y
+    hay que escalarlos: escalar y no recortar una sola mantiene la proporcion que
+    se calibro entre ellas. La correccion del lector ya no tiene peso propio:
+    reescribe el perfil y el ancla (ver _reescribir_perfil)."""
     pesos = [
         (_PESO_ANCLA_RICA if ancla.get("rica") else _PESO_ANCLA) if ancla else 0.0,
         _PESO_PROFUNDAS if ajuste else 0.0,
-        _PESO_CORRECCION if correccion else 0.0,
     ]
     total = sum(pesos)
     if total > _MAX_SIN_PERFIL:
@@ -2124,24 +2123,21 @@ def _pesos(ancla, ajuste, correccion=None) -> tuple[float, float, float, float]:
     return (1.0 - total, *pesos)
 
 
-def _puntaje(vector, norma: float, ancla, libro: dict, ajuste=None,
-             correccion=None) -> float:
-    """Que tanto le queda este libro a lo que la persona dijo, en cuatro partes:
+def _puntaje(vector, norma: float, ancla, libro: dict, ajuste=None) -> float:
+    """Que tanto le queda este libro a lo que la persona dijo, en tres partes:
 
-    - el perfil: las opciones que eligio en q1, q2 y q3;
+    - el perfil: las opciones que eligio en q1, q2 y q3 (o su version reescrita
+      si ya rechazo una recomendacion);
     - el ancla: la lectura que puso como referencia en q4;
     - el ajuste: lo que contesto en las 2 preguntas profundas y lo que opino de
-      lo que ya habia leido;
-    - la correccion: lo que escribio al rechazar la recomendacion anterior.
+      lo que ya habia leido.
 
-    Las tres van por vector separado y con peso explicito en vez de concatenarse
-    en un solo texto. Concatenadas, la parte corta desaparece: el ancla eran 9
-    palabras sobre 56 y era practicamente inerte (cuatro referencias de nichos
-    opuestos devolvian 6 de 8 libros iguales), y las respuestas profundas eran 3
-    palabras sobre 48 y no cambiaban el ganador en ninguno de los 24 casos del
-    banco."""
-    peso_perfil, peso_ancla, peso_ajuste, peso_correccion = _pesos(
-        ancla, ajuste, correccion)
+    Van por vector separado y con peso explicito en vez de concatenarse en un
+    solo texto. Concatenadas, la parte corta desaparece: el ancla eran 9 palabras
+    sobre 56 y era practicamente inerte (cuatro referencias de nichos opuestos
+    devolvian 6 de 8 libros iguales), y las respuestas profundas eran 3 palabras
+    sobre 48 y no cambiaban el ganador en ninguno de los 24 casos del banco."""
+    peso_perfil, peso_ancla, peso_ajuste = _pesos(ancla, ajuste)
     total = peso_perfil * _coseno_con_norma(vector, norma, libro, "experiencia")
     if peso_ancla:
         # El ancla va contra la sinopsis: la referencia que trae el lector es
@@ -2160,13 +2156,6 @@ def _puntaje(vector, norma: float, ancla, libro: dict, ajuste=None,
     if peso_ajuste:
         total += peso_ajuste * _coseno_con_norma(
             ajuste["vector"], ajuste["norma"], libro, "experiencia")
-    if peso_correccion:
-        # La correccion va contra la sinopsis y no contra la experiencia, por lo
-        # mismo que el ancla: cuando alguien dice que le erramos casi siempre
-        # habla de CONTENIDO ("queria algo sobre castas", "esperaba mas humor"),
-        # no de como se lee.
-        total += peso_correccion * _coseno_con_norma(
-            correccion["vector"], correccion["norma"], libro, "sinopsis")
     return total
 
 
@@ -2205,8 +2194,7 @@ def _castigo_repeticion(libro: dict, mostrados: list[dict], forzar: bool = False
     return peor
 
 
-def _puntaje_detalle(vector, norma: float, ancla, libro: dict, ajuste=None,
-                     correccion=None) -> dict:
+def _puntaje_detalle(vector, norma: float, ancla, libro: dict, ajuste=None) -> dict:
     """Cada parte del puntaje por separado, para la bitacora.
 
     Guardar solo la mezcla esconde justo lo que hay que poder revisar: si un
@@ -2221,19 +2209,12 @@ def _puntaje_detalle(vector, norma: float, ancla, libro: dict, ajuste=None,
         if ancla and ancla.get("rica") else None)
     propio = (_coseno_con_norma(ajuste["vector"], ajuste["norma"], libro, "experiencia")
               if ajuste else None)
-    # Desde que la re-busqueda compite contra todo el pool, la correccion puede
-    # traer un libro que la lista corta no tenia. Ese es justo el caso que hay
-    # que poder explicar despues, y sin esta columna el desglose mostraria tres
-    # cosenos que no alcanzan para justificar al ganador.
-    arreglo = (_coseno_con_norma(correccion["vector"], correccion["norma"], libro, "sinopsis")
-               if correccion else None)
     return {
         "perfil": round(perfil, 6),
         "ancla": round(suyo, 6) if suyo is not None else None,
         "ancla_experiencia": round(suyo_exp, 6) if suyo_exp is not None else None,
         "profundas": round(propio, 6) if propio is not None else None,
-        "correccion": round(arreglo, 6) if arreglo is not None else None,
-        "mezcla": round(_puntaje(vector, norma, ancla, libro, ajuste, correccion), 6),
+        "mezcla": round(_puntaje(vector, norma, ancla, libro, ajuste), 6),
     }
 
 
@@ -2415,41 +2396,6 @@ _SYSTEM_LEIDO = (
 )
 
 
-# Bug real de produccion (piloto de septiembre 2026, sesion 28c3beb9): el
-# lector rechazo una recomendacion escribiendo "Algun clasico o libro viejo"
-# -un PEDIDO, ya afirmativo- y esto lo reformulo como "Busca una lectura
-# fresca y actual" -el sentido CONTRARIO-. La causa era el unico ejemplo que
-# tenia el prompt de antes ("'muy denso y viejo' se convierte en 'busca algo
-# agil y contemporaneo'"): ensenaba que la palabra "viejo" siempre es una
-# queja para invertir, y el modelo aplico esa regla tambien cuando "viejo"
-# era lo que el lector queria, no lo que le sobraba. El texto que llega aca
-# puede ser cualquiera de las dos cosas y nada en el motivo_rechazo lo
-# distingue de antemano, asi que el prompt tiene que decidirlo el primero.
-_SYSTEM_REFORMULAR = (
-    "Convertis lo que un lector escribio al pedir otra recomendacion en una "
-    "sola oracion AFIRMATIVA que describe lo que esta buscando.\n\n"
-    "Primero fijate que tipo de texto es -son cosas distintas y pedimos cosas "
-    "distintas para cada una:\n"
-    "- Si YA es un pedido en positivo ('quiero fantasia', 'una autora mujer', "
-    "'algo mas romantico', 'un clasico o algo viejo'), el lector te esta "
-    "diciendo derecho lo que quiere: dejalo como esta, solo prolijizado en "
-    "una oracion ('busca fantasia', 'busca una autora mujer', 'busca un "
-    "clasico o un libro de otra epoca'). NO le des vuelta el sentido.\n"
-    "- Si es una QUEJA sobre el libro que le mostraron ('muy denso y "
-    "aburrido', 'no me gusto el tono', 'me parecio malisimo'), ahi si "
-    "convertila en el rasgo contrario que esta buscando ('busca algo agil y "
-    "ameno').\n\n"
-    "Reglas para los dos casos:\n"
-    "- Nunca nombres el libro ni el autor rechazado.\n"
-    "- Nunca uses negaciones ('no quiero', 'nada de', 'menos', 'sin').\n"
-    "- Una sola oracion corta, en espanol rioplatense, sin comillas.\n"
-    "- Si no estas seguro de si es pedido o queja, tratalo como pedido y "
-    "dejalo como esta: repetir lo que ya dijo es un error mas barato que "
-    "invertirlo al reves.\n"
-    "Devolve solo esa oracion, sin ningun texto adicional."
-)
-
-
 # Lo que el lector opino de un libro que ya leyo, ya convertido en texto de
 # busqueda. Se cachea por (libro, opinion) porque la misma persona puede pasar
 # varias veces por aca en una charla y el texto no cambia.
@@ -2502,30 +2448,244 @@ async def _texto_de_leidos(leidos: list[dict]) -> str:
     return ' '.join(partes)
 
 
-async def _reformular_rechazo(motivo: str) -> str:
-    """Reescribe en positivo el motivo por el que una recomendacion no convencio.
+# --- El perfil del lector, corregido por el propio lector ---------------------------
+#
+# Cuando alguien rechaza una recomendacion y explica por que, el modelo recibe el
+# perfil actual, la lectura de referencia (el ancla) y esa correccion, y devuelve
+# el perfil corregido. De ahi en mas TODO el proceso (vector del perfil, ancla,
+# filtros) corre de nuevo sobre ese perfil, igual que la primera vez.
+#
+# Esto reemplazo a un vector de correccion aparte, que se sumaba al perfil original
+# con un peso fijo. Sumar no resuelve las contradicciones: quien pedia "un clasico"
+# despues de haber dicho que queria algo contemporaneo seguia teniendo el perfil
+# viejo tirando para su lado. Reescribir si: lo que la correccion contradice se
+# reemplaza, lo que no toca se conserva.
+#
+# El perfil vigente viaja con el cliente (RespuestaChat.perfil_vigente) y vuelve en
+# cada respuesta: asi cada rechazo corrige el anterior en lugar de partir otra vez
+# del perfil original, y el servidor sigue sin guardar estado de sesion.
+_PERFIL_MAX = 600
+_REFERENCIA_MAX = 200
+_EXCLUIR_MAX = 6
+_EXCLUIR_LARGO = 40
+_GENEROS_EN_PROMPT = 40
+_RONDA_MAX = 20
 
-    Esto no es cosmetica: **los embeddings no tienen negacion**. Pegarle "muy
-    denso y aburrido" al texto de consulta empuja el vector HACIA lo denso y
-    aburrido, que es exactamente lo contrario de lo que pidio la persona, y el
-    bug seria invisible: la segunda recomendacion se pareceria a la primera y
-    nadie sabria por que.
+# Bug real de produccion (piloto de septiembre 2026, sesion 28c3beb9): el lector
+# rechazo una recomendacion escribiendo "Algun clasico o libro viejo" -un PEDIDO,
+# ya afirmativo- y el modelo lo reformulo como "Busca una lectura fresca y actual"
+# -el sentido CONTRARIO-. La causa era el unico ejemplo del prompt de antes, que
+# ensenaba que "viejo" es siempre una queja para invertir. Lo que escribe el lector
+# puede ser un pedido o una queja y nada lo distingue de antemano, asi que el
+# prompt tiene que decidirlo primero.
+_SYSTEM_PERFIL = (
+    "Corregis el perfil de un lector de Funes, un recomendador de libros, a partir "
+    "de lo que el lector escribio al rechazar una recomendacion.\n\n"
+    "Recibis un JSON con: el perfil actual (un texto que describe que experiencia "
+    "de lectura busca, escrito como se describe un libro), la lectura de referencia "
+    "que nombro (si la nombro) y lo que valora de ella, los generos que ya habia "
+    "excluido, la forma de libro que venia pidiendo, el libro que le mostramos y no "
+    "le sirvio, lo que el lector escribio, y la lista de generos del catalogo.\n\n"
+    "Primero fijate que tipo de texto escribio el lector -son cosas distintas:\n"
+    "- Un PEDIDO en positivo ('quiero un clasico', 'algo mas romantico', 'una "
+    "autora mujer', 'algo viejo'): aplicalo tal cual, sin darle vuelta el sentido.\n"
+    "- Una QUEJA sobre el libro ('muy denso y aburrido', 'no me gusto el tono'): "
+    "pasala al rasgo contrario que esta buscando ('busca algo agil y ameno').\n"
+    "- Si no estas seguro de cual es, tratalo como pedido: repetir lo que dijo es "
+    "un error mas barato que invertirlo.\n\n"
+    "Devolve un JSON con estos campos:\n"
+    "- \"perfil\": el perfil corregido. Conserva lo que la correccion no toca y "
+    "REEMPLAZA (no sumes al lado) lo que contradice. Mismo estilo y largo que el "
+    "actual: una a tres oraciones en espanol rioplatense, describiendo libros y "
+    "como se leen. Sin comillas.\n"
+    "- \"referencia_nombrado\": la lectura de referencia que el lector nombro. "
+    "Devolvela EXACTAMENTE igual (o vacia si no habia): es lo que mantiene la "
+    "busqueda cerca de lo que le gusta.\n"
+    "- \"referencia_valorado\": lo que el lector valora de esa lectura. Dejalo "
+    "igual salvo que la correccion lo contradiga o lo precise; si la correccion "
+    "choca con algo que valora, ajusta ESTO y no la referencia. Nunca inventes "
+    "titulos ni autores.\n"
+    "- \"quitar_referencia\": true SOLO si el lector pide de forma explicita dejar "
+    "de lado esa lectura o lo que se le parece ('nada parecido a X', 'X me aburrio'); "
+    "si no, false.\n"
+    "- \"forma\": la forma de libro que sigue buscando, una de clasicos, genero, "
+    "novela, breves, o vacia si no le importa. Por defecto la del libro rechazado "
+    "(te la doy como forma_del_libro_rechazado) o la que ya venia pidiendo. "
+    "Corregir un TEMA no cambia la forma: 'algo mas secular' es un tema, la novela "
+    "sigue siendo novela, no pases a un ensayo ni a una biografia. Solo cambiala si "
+    "el lector pide otra forma de manera explicita ('quiero cuentos', 'un ensayo'). "
+    "Si el libro no es de literatura, devolve vacio.\n"
+    "- \"excluir\": los generos que el lector rechazo de forma EXPLICITA ('no quiero "
+    "ciencia ficcion', 'nada de novela policial'), con el nombre mas parecido de la "
+    "lista de generos del catalogo. Incluye los que ya estaban excluidos salvo que "
+    "el lector pida volver a ellos. Un pedido en positivo NO es una exclusion. Es "
+    "una LISTA de textos; si no hay, lista vacia.\n\n"
+    "Reglas para los textos: nunca uses negaciones ('no', 'sin', 'nada de', "
+    "'menos'): la busqueda las lee al reves, asi que describi lo que SI quiere. "
+    "Nunca nombres el libro rechazado ni su autor.\n"
+    "Devolve solo el JSON, sin texto adicional."
+)
 
-    Si la reescritura falla se devuelve "" y el motivo se descarta. Es mejor
-    ignorar el pedido que aplicarlo al reves: sin motivo, la segunda
-    recomendacion es simplemente el siguiente candidato del ranking, que es un
-    comportamiento sano."""
-    motivo = motivo.strip()
+
+def _norm_motivo(motivo: str) -> str:
+    return " ".join(str(motivo or "").lower().split())[:500]
+
+
+def _perfil_inicial(respuestas: dict) -> dict:
+    """El perfil de partida: lo que el lector dijo en el cuestionario, antes de
+    cualquier correccion."""
+    nombrado, valorado = partes_del_ancla(respuestas)
+    forma = str(respuestas.get("q1b") or "").strip()
+    return {
+        "perfil": _construir_texto_perfil(respuestas),
+        "nombrado": nombrado,
+        "valorado": valorado,
+        "excluir": [],
+        "forma": forma if forma in _FORMAS_LITERATURA else "",
+        "motivo": "",
+        "ronda": 0,
+    }
+
+
+def _limpiar_perfil(crudo) -> dict | None:
+    """Un perfil vigente valido y acotado, o None. Se aplica tanto a lo que
+    devuelve el modelo como a lo que manda el cliente de vuelta: entra al
+    embedding, a los prompts y al filtro del catalogo, asi que no se confia en su
+    forma ni en su largo."""
+    if not isinstance(crudo, dict):
+        return None
+    perfil = str(crudo.get("perfil") or "").strip()[:_PERFIL_MAX]
+    if not perfil:
+        return None
+    # "excluir" tiene que ser una lista. Un string suelto NO se itera: son letras,
+    # y seis letras sueltas serian seis generos "excluidos" que no excluyen nada
+    # mientras la exclusion que el lector pidio se pierde. Un texto solo se toma
+    # como un unico genero; cualquier otra cosa, como ninguno.
+    bruto = crudo.get("excluir")
+    if isinstance(bruto, str):
+        bruto = [bruto]
+    elif not isinstance(bruto, (list, tuple)):
+        bruto = []
+    excluir: list[str] = []
+    for termino in list(bruto)[:_EXCLUIR_MAX]:
+        termino = str(termino).strip()[:_EXCLUIR_LARGO]
+        if termino and termino not in excluir:
+            excluir.append(termino)
+    forma = str(crudo.get("forma") or "").strip()
+    try:
+        ronda = max(0, min(int(crudo.get("ronda") or 0), _RONDA_MAX))
+    except (TypeError, ValueError):
+        ronda = 0
+    return {
+        "perfil": perfil,
+        "nombrado": str(crudo.get("nombrado") or "").strip()[:_REFERENCIA_MAX],
+        "valorado": str(crudo.get("valorado") or "").strip()[:_REFERENCIA_MAX],
+        "excluir": excluir,
+        "forma": forma if forma in _FORMAS_LITERATURA else "",
+        "motivo": _norm_motivo(crudo.get("motivo") or ""),
+        "ronda": ronda,
+    }
+
+
+def _aplicar_perfil(respuestas: dict, perfil: dict) -> dict:
+    """Las respuestas con el perfil corregido puesto. Todo lo que consume el
+    motor (vector del perfil, ancla, filtros) lee de aca, asi que no hay un
+    segundo camino de ranking para las correcciones."""
+    efectivas = {
+        **respuestas,
+        "_perfil_texto": perfil["perfil"],
+        "q4a": perfil["nombrado"],
+        "q4": perfil["nombrado"],
+        "q4b": perfil["valorado"],
+        "_excluir": perfil["excluir"],
+    }
+    # La forma (clasicos, novela, cuentos...) es la que ya filtra el catalogo para
+    # literatura a traves de q1b: la correccion la fija en vez de dejarla al
+    # arbitrio del texto del perfil, que es lo que dejo pasar de una novela a una
+    # biografia. Vacia quiere decir "no importa": se saca el filtro.
+    if str(respuestas.get("q0") or "").strip() == "literatura":
+        if perfil.get("forma"):
+            efectivas["q1b"] = perfil["forma"]
+        else:
+            efectivas.pop("q1b", None)
+    return efectivas
+
+
+def _resumen_perfil(perfil: dict) -> str:
+    """El perfil corregido en una linea, para la bitacora (columna
+    motivo_reformulado)."""
+    partes = [perfil["perfil"]]
+    if perfil.get("nombrado") or perfil.get("valorado"):
+        partes.append(f"[referencia: {perfil.get('nombrado', '')} / {perfil.get('valorado', '')}]")
+    if perfil.get("forma"):
+        partes.append(f"[forma: {perfil['forma']}]")
+    if perfil.get("excluir"):
+        partes.append("[excluye: " + ", ".join(perfil["excluir"]) + "]")
+    return " ".join(partes)
+
+
+# La lista de generos que se le da al modelo es la misma mientras no se recargue el
+# catalogo: se arma una vez por carga y no en cada rechazo.
+_GENEROS_CACHE: tuple[float, list[str]] | None = None
+
+
+async def _generos_del_catalogo() -> list[str]:
+    """Los generos y subgeneros mas comunes del catalogo, para que el modelo
+    nombre las exclusiones como las nombra el catalogo."""
+    global _GENEROS_CACHE
+    libros = await _libros()
+    if _GENEROS_CACHE is not None and _GENEROS_CACHE[0] == _libros_cache_en:
+        return _GENEROS_CACHE[1]
+    cuenta: dict[str, int] = {}
+    for libro in libros:
+        for campo in ("genero", "subgenero"):
+            valor = str(libro.get(campo) or "").strip()
+            if valor and _normalizar_texto(valor) not in ("en general", "general"):
+                cuenta[valor] = cuenta.get(valor, 0) + 1
+    generos = [g for g, _ in sorted(cuenta.items(), key=lambda kv: -kv[1])[:_GENEROS_EN_PROMPT]]
+    _GENEROS_CACHE = (_libros_cache_en, generos)
+    return generos
+
+
+async def _reescribir_perfil(actual: dict, motivo: str, rechazado: dict | None,
+                             generos: list[str], ronda: int = 0) -> dict | None:
+    """El perfil del lector corregido con lo que escribio al rechazar un libro, o
+    None si no se pudo.
+
+    Si falla se devuelve None y la correccion se descarta: es mejor ignorar el
+    pedido que aplicarlo mal, y sin correccion la recomendacion siguiente es
+    simplemente el proximo candidato del ranking, que es un comportamiento sano."""
+    motivo = str(motivo or "").strip()
     if not motivo or not OPENROUTER_API_KEY:
-        return ""
+        return None
 
+    forma_rechazado = _forma_del_libro(rechazado) if rechazado else None
+    entrada = {
+        "perfil_actual": actual["perfil"],
+        "referencia_nombrada": actual.get("nombrado", ""),
+        "referencia_valorada": actual.get("valorado", ""),
+        "generos_ya_excluidos": actual.get("excluir", []),
+        "forma_que_venia_pidiendo": actual.get("forma", ""),
+        "libro_rechazado": {
+            "titulo": (rechazado or {}).get("titulo", ""),
+            "autor": (rechazado or {}).get("autor", ""),
+            "sinopsis": str((rechazado or {}).get("sinopsis") or "")[:400],
+            "genero": str((rechazado or {}).get("genero") or ""),
+            "subgenero": str((rechazado or {}).get("subgenero") or ""),
+            "macro": str((rechazado or {}).get("macro") or ""),
+        },
+        "forma_del_libro_rechazado": forma_rechazado or "",
+        "formas_posibles": list(_FORMAS_LITERATURA),
+        "lo_que_escribio_el_lector": motivo,
+        "generos_del_catalogo": generos,
+    }
     body = {
         "model": _MODELO_VOZ,
         # Igual que la expansion del ancla: esto se embebe, no se muestra.
         "temperature": 0,
         "messages": [
-            {"role": "system", "content": _SYSTEM_REFORMULAR},
-            {"role": "user", "content": motivo},
+            {"role": "system", "content": _SYSTEM_PERFIL},
+            {"role": "user", "content": json.dumps(entrada, ensure_ascii=False)},
         ],
     }
     for intento in (1, 2):
@@ -2541,20 +2701,42 @@ async def _reformular_rechazo(motivo: str) -> str:
                     json=body,
                 )
             resp.raise_for_status()
-            texto = resp.json()["choices"][0]["message"]["content"].strip()
-            if not texto:
-                raise ValueError("Reformulacion vacia.")
+            datos = _parsear_json_llm(resp.json()["choices"][0]["message"]["content"])
+            perfil = _limpiar_perfil({
+                "perfil": datos.get("perfil"),
+                "nombrado": actual.get("nombrado", ""),
+                "valorado": datos.get("referencia_valorado"),
+                "excluir": datos.get("excluir"),
+                # Sin el campo, la forma que venia se conserva. Con el campo, vacia
+                # es una respuesta: "no importa".
+                "forma": datos["forma"] if "forma" in datos else (
+                    actual.get("forma") or forma_rechazado or ""),
+                "motivo": motivo,
+                "ronda": ronda,
+            })
+            if perfil is None:
+                raise ValueError("Perfil vacio.")
+            # La lectura que el lector nombro mantiene la busqueda cerca de lo que le
+            # gusta, y quitarla sin que lo pida dejo una vez al ranking sin ancla: la
+            # recomendacion se fue de una novela a una biografia. Solo sale cuando el
+            # modelo lo declara con quitar_referencia, que el prompt reserva para un
+            # pedido explicito ("nada parecido a X"). Si no, queda como estaba y lo
+            # unico que se ajusta es lo que valora de ella.
+            if datos.get("quitar_referencia") is True and actual.get("nombrado"):
+                perfil["nombrado"] = ""
+                perfil["valorado"] = ""
             logger.info(
-                "funes_chat_reformular_ok intento=%s modelo=%s latencia_ms=%s",
-                intento, _MODELO_VOZ, round((time.monotonic() - inicio) * 1000),
+                "funes_chat_perfil_reescrito_ok intento=%s modelo=%s latencia_ms=%s excluir=%s forma=%s ancla=%s",
+                intento, _MODELO_VOZ, round((time.monotonic() - inicio) * 1000), perfil["excluir"],
+                perfil["forma"], bool(perfil["nombrado"]),
             )
-            return texto
+            return perfil
         except Exception as exc:  # noqa: BLE001
             logger.warning(
-                "funes_chat_reformular_fallo intento=%s modelo=%s latencia_ms=%s error=%s",
+                "funes_chat_perfil_reescrito_fallo intento=%s modelo=%s latencia_ms=%s error=%s",
                 intento, _MODELO_VOZ, round((time.monotonic() - inicio) * 1000), exc,
             )
-    return ""
+    return None
 
 
 def _dicho_por_el_lector(respuestas: dict) -> str:
@@ -2773,6 +2955,7 @@ async def elegir_libro(
     motivo_rechazo: str = "",
     leidos: list[dict] | None = None,
     libro_fijado: str = "",
+    perfil_vigente: dict | None = None,
 ) -> dict:
     """El ranking solo: elige el libro y devuelve todo lo que hizo falta para
     elegirlo, sin escribir la voz ni tocar la bitacora.
@@ -2787,24 +2970,41 @@ async def elegir_libro(
     el ancla ya calculada y los dos textos que entraron al vector."""
     # Los libros que la persona ya leyo se sacan del catalogo antes de rankear,
     # y lo que opino de ellos entra al vector de ajuste mas abajo.
+    respuestas_originales = respuestas
     if leidos:
         respuestas = {**respuestas, "_leidos": leidos}
 
-    # La correccion se calcula ANTES de pedir los candidatos, porque es la que
-    # decide contra que se compite: sin correccion, la lista corta de siempre;
-    # con correccion, todo el pool. Si la reescritura en positivo falla, esto da
-    # "" y la re-busqueda vuelve sola al comportamiento viejo.
-    motivo_reformulado = await _reformular_rechazo(motivo_rechazo)
-    hay_correccion = _PESO_CORRECCION > 0 and bool(motivo_reformulado.strip())
-    correccion = None
-    if hay_correccion:
-        crudo_correccion = await _embeber_cacheado(motivo_reformulado.strip())
-        vec_c, norma_c = _preparar_consulta(crudo_correccion, respuestas.get("q0"))
-        correccion = {"vector": vec_c, "norma": norma_c,
-                      "texto": motivo_reformulado.strip()}
+    # Si el lector rechazo el libro anterior y explico por que, el modelo corrige
+    # su perfil y su ancla (ver _reescribir_perfil) ANTES de pedir los candidatos:
+    # es lo que decide contra que se compite. Sin correccion, la lista corta de
+    # siempre; con ella, todo el pool, porque la lista corta se armo con lo que el
+    # lector dijo ANTES de ver un libro y no podria traer ninguno nuevo. Si la
+    # reescritura falla se sigue con el perfil que haya, sin correccion.
+    #
+    # El mismo motivo llega a /funes/candidato y despues a /funes/recomendar: el
+    # perfil vigente guarda el motivo que ya aplico, y si coincide no se vuelve a
+    # pagar la reescritura.
+    perfil = _limpiar_perfil(perfil_vigente)
+    motivo_norm = _norm_motivo(motivo_rechazo)
+    # La ronda es cuantos libros ya se mostraron: el mismo pedido de dos rechazos
+    # distintos ("algo mas clasico" dicho dos veces porque el primer intento
+    # tampoco lo era) tiene rondas distintas y vuelve a corregir; el mismo
+    # rechazo que llega a candidato y despues a recomendar, no.
+    ronda = len(ya_mostrados)
+    if motivo_norm and not (perfil and perfil["motivo"] == motivo_norm
+                            and perfil["ronda"] == ronda):
+        rechazado = await buscar_libro(ya_mostrados[-1]) if ya_mostrados else None
+        nuevo = await _reescribir_perfil(
+            perfil or _perfil_inicial(respuestas_originales), motivo_rechazo,
+            rechazado, await _generos_del_catalogo(), ronda)
+        if nuevo is not None:
+            perfil = nuevo
+    if perfil is not None:
+        respuestas = _aplicar_perfil(respuestas, perfil)
+        respuestas_originales = _aplicar_perfil(respuestas_originales, perfil)
 
     candidatos, puntajes, pool, filtro_aflojado, ancla = await _candidatos(
-        respuestas, todos=hay_correccion)
+        respuestas, todos=perfil is not None)
     # Los ya mostrados, como objetos del catalogo, para poder medir contra ellos.
     mostrados = [l for l in candidatos if l["id"] in ya_mostrados]
     # Ademas del id, se descarta la misma OBRA con otro id. El catalogo tiene
@@ -2830,12 +3030,8 @@ async def elegir_libro(
     else:
         # Sin peso (o sin nada que agregar) vuelve el comportamiento viejo: todo
         # concatenado en un solo texto.
-        texto_afinado = _construir_texto_afinado(respuestas, profundas, motivo_reformulado)
+        texto_afinado = _construir_texto_afinado(respuestas, profundas)
         ajuste = None
-        # Sin el mecanismo de vectores aparte, la correccion vuelve adentro del
-        # texto concatenado (_construir_texto_afinado ya la incluye) y no puede
-        # ademas tener vector propio.
-        correccion = None
     vector_afinado, norma_afinado = _preparar_consulta(
         await _embeber_cacheado(texto_afinado), respuestas.get("q0"))
 
@@ -2843,8 +3039,7 @@ async def elegir_libro(
     # al elegir los 8 candidatos, la referencia del lector decidiria quienes
     # compiten pero no quien gana.
     def puntaje_final(libro: dict) -> float:
-        return (_puntaje(vector_afinado, norma_afinado, ancla, libro, ajuste,
-                         correccion)
+        return (_puntaje(vector_afinado, norma_afinado, ancla, libro, ajuste)
                 - _PESO_DIVERSIDAD * _castigo_repeticion(libro, mostrados))
 
     # Se puntua UNA vez por libro y se reusa. Con la correccion puesta
@@ -2872,8 +3067,7 @@ async def elegir_libro(
     # bitacora tiene que contener siempre al que se mostro.
     if all(l["id"] != mejor["id"] for l in finalistas):
         finalistas = [mejor] + finalistas[:-1]
-    puntajes = {l["id"]: _puntaje_detalle(vector_afinado, norma_afinado, ancla, l,
-                                          ajuste, correccion)
+    puntajes = {l["id"]: _puntaje_detalle(vector_afinado, norma_afinado, ancla, l, ajuste)
                 for l in finalistas}
     return {
         "libro": mejor,
@@ -2889,7 +3083,15 @@ async def elegir_libro(
         "texto_afinado": texto_afinado,
         "texto_ajuste": texto_ajuste,
         "texto_leidos": texto_leidos,
-        "motivo_reformulado": motivo_reformulado,
+        # El perfil corregido (en una linea), siempre que esta recomendacion venga de
+        # un rechazo: va a la columna motivo_reformulado de la bitacora. Se escribe
+        # tambien en la llamada que NO reescribe (recomendar, tras candidato), que es
+        # la que guarda la fila.
+        "motivo_reformulado": _resumen_perfil(perfil) if perfil and motivo_norm else "",
+        # El perfil vigente, para devolverselo al cliente, y las respuestas ya con
+        # el perfil aplicado (sin las claves internas de esta llamada), para la voz.
+        "perfil_vigente": perfil,
+        "respuestas_efectivas": respuestas_originales,
         # El orden en que quedaron los disponibles tras el re-rank. Lo consume el
         # banco de pruebas; la bitacora hoy solo guarda al ganador.
         "orden_afinado": finalistas,
@@ -2904,6 +3106,7 @@ async def recomendar(
     motivo_rechazo: str = "",
     leidos: list[dict] | None = None,
     libro_fijado: str = "",
+    perfil_vigente: dict | None = None,
 ) -> dict:
     """Elige el mejor libro no mostrado, entre los top-K candidatos de las
     respuestas fijas (Q1-Q4), rankeados con el texto afinado por las 2
@@ -2918,16 +3121,17 @@ async def recomendar(
     sin estado, y la sesion existe solo para escribir la bitacora (que es lo que
     despues se mide). Si falla o viene vacio, la recomendacion sale igual.
 
-    `motivo_rechazo` es lo que el lector contesto cuando pidio otra: se reescribe
-    en positivo antes de entrar al vector (ver _reformular_rechazo)."""
+    `motivo_rechazo` es lo que el lector contesto cuando pidio otra: corrige su
+    perfil antes de rankear (ver _reescribir_perfil). `perfil_vigente` es el que
+    salio de la correccion anterior, y se devuelve actualizado."""
     eleccion = await elegir_libro(respuestas, profundas, ya_mostrados,
-                                  motivo_rechazo, leidos, libro_fijado)
+                                  motivo_rechazo, leidos, libro_fijado, perfil_vigente)
     mejor = eleccion["libro"]
     candidatos = eleccion["candidatos"]
     # La portada se busca mientras el modelo escribe la voz: asi la espera de
     # una no se suma a la de la otra.
     tarea_portada = portadas.iniciar(mejor.get("isbn"), mejor["titulo"], mejor["autor"])
-    voz, empujon = await _generar_voz(respuestas, profundas, mejor)
+    voz, empujon = await _generar_voz(eleccion["respuestas_efectivas"], profundas, mejor)
 
     mostrados_tras_este = len(ya_mostrados) + 1
     agotado = (
@@ -2960,6 +3164,8 @@ async def recomendar(
         "titulo": mejor["titulo"],
         "autor": mejor["autor"],
         "portada": portada,
+        # El perfil corregido, para que el cliente lo mande en el proximo pedido.
+        "perfil_vigente": eleccion["perfil_vigente"],
         "voz": voz,
         # Se manda con la recomendacion y el cliente lo guarda sin mostrarlo.
         # Viaja igual aunque la persona termine diciendo que estuvo floja:

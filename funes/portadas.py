@@ -26,6 +26,7 @@ una a pedido de su dueño.
 """
 
 import asyncio
+import difflib
 import hashlib
 import io
 import logging
@@ -97,6 +98,14 @@ class _Intento:
         self.fallo = False
 
 
+def _se_parecen(a: str, b: str) -> bool:
+    """Dos palabras iguales o casi: los autores cambian de nombre segun el idioma
+    de la fuente (Thomas Moro / Thomas More, Tolstoi / Tolstoy), y buscar el
+    nombre en castellano en Open Library no encuentra al mismo autor en ingles.
+    El titulo tiene que coincidir aparte, asi que la tolerancia es chica."""
+    return a == b or difflib.SequenceMatcher(None, a, b).ratio() >= 0.75
+
+
 def _coincide(titulo: str, autor: str, nombre: str, autores: str = "") -> bool:
     """El resultado de la fuente corresponde al libro pedido.
 
@@ -112,7 +121,7 @@ def _coincide(titulo: str, autor: str, nombre: str, autores: str = "") -> bool:
     palabras = [p for p in _normalizar(autor).split() if len(p) > 3]
     if palabras:
         presentes = set(texto.split())
-        return any(p in presentes for p in palabras)
+        return any(_se_parecen(p, t) for p in palabras for t in presentes)
     return len(t.split()) >= 3 or t == _normalizar(nombre)
 
 
@@ -203,22 +212,35 @@ async def _url_ol_isbn(isbn: str, prioritario: bool = False) -> str:
 
 async def _url_ol_texto(client: httpx.AsyncClient, titulo: str, autor: str, intento: _Intento,
                         prioritario: bool = False) -> str | None:
-    await _esperar_turno_ol(prioritario)
-    try:
-        resp = await client.get(
-            f"{_API_OL}/search.json",
-            params={"title": titulo, "author": autor, "limit": 5,
-                    "fields": "title,author_name,cover_i"},
-        )
-        if resp.status_code != 200:
-            intento.fallo = intento.fallo or _es_fallo_de_fuente(resp.status_code)
-            return None
-        for doc in resp.json().get("docs", []):
-            if doc.get("cover_i") and _coincide(
-                    titulo, autor, doc.get("title", ""), " ".join(doc.get("author_name") or [])):
-                return f"{_COVERS_OL}/b/id/{doc['cover_i']}-L.jpg?default=false"
-    except (httpx.HTTPError, ValueError):
-        intento.fallo = True
+    # Con el autor y, si no hay nada con portada, solo por titulo: Open Library
+    # guarda al autor con su nombre en ingles, asi que filtrar por "Thomas Moro"
+    # devuelve una edicion sin tapa y esconde la que si la tiene (Thomas More).
+    # La validacion del autor la hace _coincide, con tolerancia.
+    consultas = [{"title": titulo, "author": autor}] if autor.strip() else []
+    consultas.append({"title": titulo})
+    for i, params in enumerate(consultas):
+        await _esperar_turno_ol(prioritario)
+        try:
+            resp = await client.get(
+                f"{_API_OL}/search.json",
+                params={**params, "limit": 10, "fields": "title,author_name,cover_i"},
+            )
+            if resp.status_code != 200:
+                intento.fallo = intento.fallo or _es_fallo_de_fuente(resp.status_code)
+                continue
+            docs = resp.json().get("docs", [])
+            for doc in docs:
+                if doc.get("cover_i") and _coincide(
+                        titulo, autor, doc.get("title", ""), " ".join(doc.get("author_name") or [])):
+                    return f"{_COVERS_OL}/b/id/{doc['cover_i']}-L.jpg?default=false"
+            # La busqueda solo por titulo es para cuando la del autor no trajo
+            # NINGUNA edicion con tapa (el autor figura con otro nombre). Si traia
+            # tapas y ninguna coincidio, repetir la busqueda sin autor solo suma
+            # un pedido a un servicio gratuito.
+            if i == 0 and len(consultas) > 1 and any(d.get("cover_i") for d in docs):
+                break
+        except (httpx.HTTPError, ValueError):
+            intento.fallo = True
     return None
 
 
