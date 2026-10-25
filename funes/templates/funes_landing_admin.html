@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block titulo %}Funes — Landing{% endblock %}
+{% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
+
+{#
+  El tablero de la landing: lo que hacen los libreros que llegan a la demo
+  (origen 'landing'), aparte del piloto de lectores. Es una pantalla de
+  escritorio, como funes_piloto.html, y pisa la columna de 480px con <header>.
+
+  Muestra CONTEOS y no porcentajes decisivos: con decenas de sesiones, un
+  porcentaje suelto es ruido. Las visitas a la landing y los clics al
+  WhatsApp/mail de la pagina estan en PostHog (eventos landing_*): esta pantalla
+  empieza donde la persona toca "probalo vos".
+#}
+
+{% macro chip(etiqueta, href, activo) -%}
+  <a href="{{ href }}" class="px-2.5 py-1 rounded-lg text-xs whitespace-nowrap
+     {{ 'bg-tinta/20 font-semibold' if activo else 'hover:bg-tinta/10' }}"
+     style="color: rgb(var(--tinta))">{{ etiqueta }}</a>
+{%- endmacro %}
+
+{% macro atajo(etiqueta, desde, hasta) -%}
+  {{ chip(etiqueta,
+          '?' ~ ('desde=' ~ desde ~ '&' if desde else '') ~ ('hasta=' ~ hasta if hasta else ''),
+          d.rango.desde == desde and d.rango.hasta == hasta) }}
+{%- endmacro %}
+
+{% block contenido %}
+<header class="bg-celeste">
+  <div class="max-w-6xl mx-auto px-6 py-5 flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+    <div>
+      <h1 class="text-3xl font-bold text-tinta leading-tight" style="font-family: var(--font-display);">Funes · Landing</h1>
+      <p class="text-xs text-tinta/80 mt-1 tabular-nums">
+        {{ d.generado.strftime('%d/%m/%Y %H:%M') }} hs · {{ d.sesiones }} demo{{ 's' if d.sesiones != 1 else '' }}
+        {%- if d.rango.desde or d.rango.hasta %}
+          entre {{ d.rango.desde.strftime('%d/%m') if d.rango.desde else 'el principio' }}
+          y {{ d.rango.hasta.strftime('%d/%m') if d.rango.hasta else 'hoy' }}
+        {%- endif %}
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-1 justify-end">
+      <span class="text-xs text-tinta/70 mr-1">Cuándo</span>
+      {{ atajo('Todo', none, none) }}
+      {{ atajo('Hoy', d.rango.hoy, d.rango.hoy) }}
+      {{ atajo('7 días', d.rango.hace_7, d.rango.hoy) }}
+      {{ atajo('30 días', d.rango.hace_30, d.rango.hoy) }}
+    </div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-6 py-6 space-y-8">
+
+  <section>
+    <h2 class="text-base font-semibold mb-3">Embudo de la demo</h2>
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+      {% for etiqueta, n, ayuda in [
+        ('Abrieron la demo', d.sesiones, 'Sesiones con origen landing.'),
+        ('Empezaron a charlar', d.empezaron, 'Contestaron la primera pregunta.'),
+        ('Vieron un libro', d.con_recomendacion, 'Recibieron al menos una recomendación.'),
+        ('Aceptaron un libro', d.aceptaron, 'Tocaron «Precisa».'),
+        ('Tocaron «Quiero Funes»', d.contactaron, 'El botón que abre el WhatsApp de contacto.')] %}
+        <div class="bg-papel border border-borde rounded-xl2 p-4">
+          <p class="text-3xl font-bold tabular-nums">{{ n }}</p>
+          <p class="text-sm font-semibold mt-1 leading-tight">{{ etiqueta }}</p>
+          <p class="text-xs text-gris mt-1 leading-snug">{{ ayuda }}</p>
+          {% if d.sesiones and loop.index > 1 %}
+            <p class="text-xs text-gris mt-1 tabular-nums">{{ (n / d.sesiones * 100)|round|int }}% de las que abrieron</p>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    <p class="text-xs text-gris mt-3 max-w-prose">
+      Las visitas a la landing y los clics al WhatsApp o al mail de la página no pasan por la base:
+      están en PostHog, con los eventos <code>landing_*</code>. Con estas cantidades, mirá los
+      conteos y no los porcentajes.
+    </p>
+  </section>
+
+  <section class="grid md:grid-cols-2 gap-8">
+    <div>
+      <h2 class="text-base font-semibold mb-3">Dónde se van</h2>
+      <table class="w-full text-sm tabular-nums">
+        <thead><tr class="text-left text-xs text-gris">
+          <th class="py-1 font-medium">Paso</th><th class="py-1 font-medium text-right">Llegaron</th>
+          <th class="py-1 font-medium text-right">%</th><th class="py-1 font-medium text-right">Se fueron</th>
+        </tr></thead>
+        <tbody>
+        {% for p in d.escalera %}
+          <tr class="border-t border-borde">
+            <td class="py-1.5">{{ p.etiqueta }}</td>
+            <td class="py-1.5 text-right">{{ p.n }}</td>
+            <td class="py-1.5 text-right">{{ p.pct|round|int if p.pct is not none else '—' }}</td>
+            <td class="py-1.5 text-right">{{ p.caida or '' }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div>
+      <h2 class="text-base font-semibold mb-3">Por día</h2>
+      {% if d.por_dia %}
+      <table class="w-full text-sm tabular-nums">
+        <thead><tr class="text-left text-xs text-gris">
+          <th class="py-1 font-medium">Día</th><th class="py-1 font-medium text-right">Demos</th>
+          <th class="py-1 font-medium text-right">Con libro</th><th class="py-1 font-medium text-right">Contactaron</th>
+        </tr></thead>
+        <tbody>
+        {% for f in d.por_dia %}
+          <tr class="border-t border-borde">
+            <td class="py-1.5">{{ f.dia.strftime('%d/%m') }}</td>
+            <td class="py-1.5 text-right">{{ f.sesiones }}</td>
+            <td class="py-1.5 text-right">{{ f.con_recomendacion }}</td>
+            <td class="py-1.5 text-right">{{ f.contactaron }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <p class="text-sm text-gris">Todavía no hay demos con origen <code>landing</code>.</p>
+      {% endif %}
+    </div>
+  </section>
+
+</main>
+{% endblock %}

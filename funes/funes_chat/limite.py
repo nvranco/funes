@@ -33,6 +33,13 @@ _LIMITE_GLOBAL = (400, 3600)
 # es justamente lo que no queremos perder.
 _LIMITE_IP_BARATO = (120, 600)
 
+# La demo para libreros es publica, la comparte gente que no conocemos y cada
+# conversacion gasta LLM de verdad. Dos topes propios, ademas de los de arriba:
+# por IP (una persona probando dos o tres veces entra de sobra) y uno global por
+# dia, para que un link que se viraliza no vacie la cuenta.
+_LIMITE_DEMO_IP = (12, 3600)
+_LIMITE_DEMO_GLOBAL = (200, 86400)
+
 _ventanas: dict[str, list[float]] = {}
 
 
@@ -68,6 +75,19 @@ def _permitido(clave: str, maximo: int, ventana: int) -> bool:
     return True
 
 
+def _cabe(clave: str, maximo: int, ventana: int) -> bool:
+    """Como _permitido, pero sin anotar la marca: sirve para chequear varios
+    topes y anotarlos recien cuando el pedido pasa todos."""
+    ahora = time.monotonic()
+    marcas = [t for t in _ventanas.get(clave, []) if ahora - t < ventana]
+    _ventanas[clave] = marcas
+    return len(marcas) < maximo
+
+
+def _anotar(clave: str) -> None:
+    _ventanas.setdefault(clave, []).append(time.monotonic())
+
+
 def _limpiar() -> None:
     """Saca del dict las claves que ya no tienen marcas vivas, para que no crezca
     indefinidamente con las IPs que pasaron una sola vez."""
@@ -78,9 +98,10 @@ def _limpiar() -> None:
         _ventanas.pop(clave, None)
 
 
-def controlar(request: Request, caro: bool = True) -> None:
+def controlar(request: Request, caro: bool = True, demo: bool = False) -> None:
     """Levanta 429 si se paso del limite. `caro=True` para los endpoints que
-    gastan LLM."""
+    gastan LLM. `demo=True` para los de la libreria de demostracion: suma los
+    topes de _LIMITE_DEMO_*."""
     _limpiar()
     ip = _ip(request)
     maximo, ventana = _LIMITE_IP if caro else _LIMITE_IP_BARATO
@@ -88,6 +109,25 @@ def controlar(request: Request, caro: bool = True) -> None:
         logger.warning("funes_chat_limite_ip ip=%s caro=%s", ip, caro)
         raise HTTPException(status_code=429, detail="Demasiados pedidos. Probá en un rato.")
 
-    if caro and not _permitido("global", *_LIMITE_GLOBAL):
-        logger.error("funes_chat_limite_global alcanzado")
-        raise HTTPException(status_code=429, detail="Funes está saturado. Probá más tarde.")
+    if not caro:
+        return
+
+    # Los topes de la demo y el global se chequean todos antes de anotar
+    # ninguno: un pedido rechazado por uno no descuenta cupo de los otros.
+    topes = []
+    if demo:
+        topes.append((f"demo-ip:{ip}", _LIMITE_DEMO_IP, logging.WARNING,
+                      "funes_chat_limite_demo_ip ip=%s", (ip,),
+                      "Ya probaste varias veces la demo. Escribinos y lo hablamos."))
+        topes.append(("demo-global", _LIMITE_DEMO_GLOBAL, logging.ERROR,
+                      "funes_chat_limite_demo_global alcanzado", (),
+                      "La demo llegó al tope de hoy. Probá mañana o escribinos."))
+    topes.append(("global", _LIMITE_GLOBAL, logging.ERROR,
+                  "funes_chat_limite_global alcanzado", (),
+                  "Funes está saturado. Probá más tarde."))
+    for clave, (maximo, ventana), nivel, mensaje_log, args_log, detalle in topes:
+        if not _cabe(clave, maximo, ventana):
+            logger.log(nivel, mensaje_log, *args_log)
+            raise HTTPException(status_code=429, detail=detalle)
+    for clave, *_ in topes:
+        _anotar(clave)

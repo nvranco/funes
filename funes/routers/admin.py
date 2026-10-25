@@ -186,7 +186,7 @@ async def _listar_librerias():
     filas = await db.pool().fetch(
         """
         SELECT l.id, l.slug, l.nombre, l.token_panel, l.tipo_catalogo, l.funes_habilitado,
-               l.funes_catalogo_completo, l.funes_cierre, l.funes_sedes,
+               l.funes_catalogo_completo, l.funes_cierre, l.funes_sedes, l.funes_saludo,
                COUNT(li.id) FILTER (
                    WHERE li.estado = 'publicado' AND li.archivado_en IS NULL
                ) AS cant_libros
@@ -405,6 +405,7 @@ async def admin_toggle_catalogo_completo(token: str, libreria_id: int):
 
 class CierreFunes(BaseModel):
     cierre: str = Field("", max_length=1500)
+    saludo: str = Field("", max_length=600)
     sedes: str = Field("", max_length=6000)   # JSON crudo, ver schema.sql:funes_sedes
 
 
@@ -466,14 +467,16 @@ async def admin_cierre_funes(token: str, libreria_id: int, cuerpo: CierreFunes):
     cierre = cuerpo.cierre.strip() or None
     sedes = _validar_sedes(cuerpo.sedes)
     fila = await db.pool().fetchrow(
-        "UPDATE librerias SET funes_cierre = $2, funes_sedes = $3::jsonb "
+        "UPDATE librerias SET funes_cierre = $2, funes_sedes = $3::jsonb, "
+        "funes_saludo = $4 "
         "WHERE id = $1 AND tipo_catalogo = 'libros' "
-        "RETURNING funes_cierre, funes_sedes",
-        libreria_id, cierre, sedes,
+        "RETURNING funes_cierre, funes_sedes, funes_saludo",
+        libreria_id, cierre, sedes, cuerpo.saludo.strip() or None,
     )
     if fila is None:
         raise HTTPException(status_code=404, detail="No existe esa librería.")
-    return {"funes_cierre": fila["funes_cierre"], "funes_sedes": fila["funes_sedes"]}
+    return {"funes_cierre": fila["funes_cierre"], "funes_sedes": fila["funes_sedes"],
+            "funes_saludo": fila["funes_saludo"]}
 
 
 @router.post("/admin/{token}/librerias/{libreria_id}/borrar")

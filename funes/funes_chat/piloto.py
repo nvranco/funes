@@ -19,6 +19,7 @@ son justamente las que se olvidan cuando uno mira un tablero:
    le gusto". Un porcentaje sin su margen al lado invita justo a lo segundo.
 """
 
+import asyncio
 import datetime
 import math
 
@@ -174,7 +175,7 @@ ESCALERA = [
 # contrato.
 _RANGO = (f"($1::date IS NULL OR (s.creado_en AT TIME ZONE '{ZONA}')::date >= $1) "
           f"AND ($2::date IS NULL OR (s.creado_en AT TIME ZONE '{ZONA}')::date <= $2) "
-          f"AND ($3::text[] IS NULL OR {ORIGEN} = ANY($3))")
+          f"AND (($3::text[] IS NULL AND {ORIGEN} <> 'landing') OR {ORIGEN} = ANY($3))")
 
 
 def margen(exitos: int, n: int) -> float | None:
@@ -272,6 +273,62 @@ async def calcular(desde: datetime.date | None = None,
     }
 
 
+async def calcular_landing(desde: datetime.date | None = None,
+                           hasta: datetime.date | None = None) -> dict:
+    """El tablero de la landing: lo que hicieron los libreros que llegaron a la
+    demo (origen 'landing'), separado del piloto de lectores.
+
+    Ojo con lo que NO mide: las visitas a la landing y los clics al WhatsApp o al
+    mail de contacto de la pagina viven en PostHog (eventos landing_*), porque la
+    pagina no escribe en la base. Esto es lo que pasa DESPUES de tocar "probalo
+    vos": cuantos arrancan, cuantos llegan a una recomendacion, cuantos la
+    aceptan y cuantos tocan "Quiero Funes en mi libreria". Con n de decenas, los
+    margenes de error son enormes: se muestran los conteos, no porcentajes
+    decisivos."""
+    cohorte = ["landing"]
+    embudo, desenlace, por_dia, escalera = await asyncio.gather(
+        _embudo_por_origen(desde, hasta, cohorte),
+        _fila(
+            f"""
+            SELECT count(DISTINCT s.id) FILTER (WHERE r.veredicto = 'me_la_llevo') AS aceptaron,
+                   count(DISTINCT s.id) FILTER (WHERE r.clic_conseguir_en IS NOT NULL) AS contactaron
+            FROM funes_sesiones s
+            LEFT JOIN funes_recomendaciones r ON r.sesion_id = s.id
+            WHERE {_RANGO}
+            """, desde, hasta, cohorte),
+        _filas(
+            f"""
+            SELECT (s.creado_en AT TIME ZONE '{ZONA}')::date AS dia,
+                   count(DISTINCT s.id) AS sesiones,
+                   count(DISTINCT r.sesion_id) AS con_recomendacion,
+                   count(DISTINCT s.id) FILTER (WHERE r.clic_conseguir_en IS NOT NULL) AS contactaron
+            FROM funes_sesiones s
+            LEFT JOIN funes_recomendaciones r ON r.sesion_id = s.id
+            WHERE {_RANGO}
+            GROUP BY 1 ORDER BY 1 DESC
+            """, desde, hasta, cohorte),
+        _abandono_por_paso(desde, hasta, cohorte),
+    )
+    fila = dict(embudo[0]) if embudo else {}
+    hoy = ahora().date()
+    return {
+        "sesiones": fila.get("sesiones", 0),
+        "empezaron": fila.get("empezaron", 0),
+        "llegaron_al_final": fila.get("llegaron_al_final", 0),
+        "con_recomendacion": fila.get("con_recomendacion", 0),
+        "aceptaron": desenlace["aceptaron"] or 0,
+        "contactaron": desenlace["contactaron"] or 0,
+        "escalera": escalera,
+        "por_dia": [dict(f) for f in por_dia],
+        "rango": {
+            "desde": desde, "hasta": hasta, "hoy": hoy,
+            "hace_7": hoy - datetime.timedelta(days=6),
+            "hace_30": hoy - datetime.timedelta(days=29),
+        },
+        "generado": ahora(),
+    }
+
+
 async def _rango_disponible():
     """El primer y el ultimo dia con datos, en hora local. Sirve para que el
     calendario no ofrezca dias vacios a los costados."""
@@ -280,6 +337,7 @@ async def _rango_disponible():
         SELECT min((creado_en AT TIME ZONE '{ZONA}')::date) AS primer_dia,
                max((creado_en AT TIME ZONE '{ZONA}')::date) AS ultimo_dia
         FROM funes_sesiones
+        WHERE origen <> 'landing'
         """
     )
 

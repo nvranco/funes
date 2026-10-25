@@ -23,7 +23,9 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
 from funes import db
-from funes.config import ADMIN_TOKEN, DOMINIO_FUNES, FUNES_CONTACTO, POSTHOG_HOST, POSTHOG_KEY
+from funes.config import (
+    ADMIN_TOKEN, DOMINIO_FUNES, FUNES_CONTACTO, FUNES_SLUG_DEMO, POSTHOG_HOST, POSTHOG_KEY,
+)
 from funes.funes_chat import bitacora, limite, nucleo, piloto, precios, qr
 from funes.funes_chat.nucleo import ErrorFunesChat
 
@@ -321,6 +323,16 @@ class PedidoClic(BaseModel):
     recomendacion_id: int
 
 
+def _es_demo(cuerpo: RespuestasFijas) -> bool:
+    """Si el pedido es de la libreria de demostracion para libreros (ver
+    config.FUNES_SLUG_DEMO). Lo dice el cuerpo y no la URL: el cliente manda el
+    slug en cada pedido, asi que NO es un control de seguridad. Quien omita o
+    cambie el campo se libra de los topes de la demo, pero sigue sujeto a
+    _LIMITE_IP y _LIMITE_GLOBAL de limite.py, que son los que protegen el gasto.
+    Se normaliza (espacios y mayusculas) para que 'Demo-Libreros' cuente."""
+    return bool(FUNES_SLUG_DEMO) and cuerpo.libreria.strip().lower() == FUNES_SLUG_DEMO
+
+
 def _respuestas(cuerpo: RespuestasFijas) -> dict:
     """Las respuestas fijas como dict, para pasarselas al motor.
 
@@ -377,6 +389,8 @@ async def pagina_landing(request: Request):
         "posthog_host": POSTHOG_HOST,
         "base_url": _base_absoluta(request),
         "og_version": _version_og(),
+        # El boton "Probalo vos" de la landing lleva a /funes/{slug_demo}.
+        "slug_demo": FUNES_SLUG_DEMO,
     })
 
 
@@ -450,7 +464,8 @@ async def pagina_libreria(request: Request, slug: str):
     no tiene Funes habilitado -mismo criterio 404-no-401 que el resto del
     panel, no confirmamos que la ruta existe."""
     libreria = await db.pool().fetchrow(
-        "SELECT nombre, whatsapp, mensaje_wa_template, funes_cierre, funes_sedes "
+        "SELECT nombre, whatsapp, mensaje_wa_template, funes_cierre, funes_sedes, "
+        "funes_saludo "
         "FROM librerias "
         "WHERE slug = $1 AND activa AND funes_habilitado AND tipo_catalogo = 'libros'",
         slug,
@@ -474,6 +489,10 @@ async def pagina_libreria(request: Request, slug: str):
         # template reciba el objeto y no un string con JSON adentro.
         "cierre_libreria_js": _js((libreria["funes_cierre"] or "").strip() or None),
         "sedes_js": _js(_sedes(libreria["funes_sedes"])),
+        # Reemplaza la primera burbuja del chat (ver schema.sql:funes_saludo).
+        "saludo_libreria_js": _js((libreria["funes_saludo"] or "").strip() or None),
+        # La demo para libreros: otro rotulo en el boton final y otro tope por IP.
+        "es_demo_js": _js(slug == FUNES_SLUG_DEMO),
     })
     return templates.TemplateResponse(request, "funes_chat.html", contexto)
 
@@ -622,7 +641,7 @@ async def ml_callback(request: Request, code: str = "", state: str = ""):
 
 @router.post("/funes/pregunta-profunda")
 async def pregunta_profunda(request: Request, cuerpo: PedidoPregunta):
-    limite.controlar(request)
+    limite.controlar(request, demo=_es_demo(cuerpo))
     profundas = [p.model_dump() for p in cuerpo.profundas]
     try:
         return await nucleo.generar_pregunta(_respuestas(cuerpo), profundas)
@@ -633,7 +652,7 @@ async def pregunta_profunda(request: Request, cuerpo: PedidoPregunta):
 
 @router.post("/funes/recomendar")
 async def recomendar(request: Request, cuerpo: RespuestaChat):
-    limite.controlar(request)
+    limite.controlar(request, demo=_es_demo(cuerpo))
     profundas = [p.model_dump() for p in cuerpo.profundas]
     try:
         return await nucleo.recomendar(
@@ -716,6 +735,30 @@ async def admin_piloto(request: Request, token: str, desde: str = "", hasta: str
         "funes_piloto.html",
         {"request": request, "token": token, "d": await piloto.calcular(d, h, cohortes)},
     )
+
+
+@router.get("/funes/admin/{token}/landing", response_class=HTMLResponse)
+async def admin_landing(request: Request, token: str, desde: str = "", hasta: str = ""):
+    """El tablero de la landing: lo que hacen los libreros en la demo (origen
+    'landing'), aparte del piloto de lectores. Ver piloto.calcular_landing."""
+    _validar_admin(token)
+    d, h = _fecha(desde), _fecha(hasta)
+    if d and h and d > h:
+        d, h = h, d
+    return templates.TemplateResponse(
+        "funes_landing_admin.html",
+        {"request": request, "token": token, "d": await piloto.calcular_landing(d, h)},
+    )
+
+
+@router.get("/funes/admin/{token}/landing.json")
+async def admin_landing_json(token: str, desde: str = "", hasta: str = ""):
+    """Lo mismo que /landing, como JSON."""
+    _validar_admin(token)
+    d, h = _fecha(desde), _fecha(hasta)
+    if d and h and d > h:
+        d, h = h, d
+    return await piloto.calcular_landing(d, h)
 
 
 @router.get("/funes/admin/{token}/piloto.json")
@@ -927,7 +970,7 @@ async def admin_borrar_conversacion(token: str, sesion_id: str):
 
 @router.post("/funes/mas-info")
 async def mas_info(request: Request, cuerpo: PedidoInfoExtra):
-    limite.controlar(request)
+    limite.controlar(request, demo=_es_demo(cuerpo))
     profundas = [p.model_dump() for p in cuerpo.profundas]
     try:
         return await nucleo.info_extra(_respuestas(cuerpo), profundas, cuerpo.libro_id)

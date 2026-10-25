@@ -75,6 +75,12 @@ OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-flash")
 # Si esta vacia, la pagina de privacidad lo dice en vez de inventar un contacto.
 FUNES_CONTACTO = os.environ.get("FUNES_CONTACTO", "")
 
+# El slug de la libreria de demostracion para libreros (la que abre el boton de
+# la landing). Es la unica a la que se le aplica el limite estricto por IP y la
+# unica cuyo boton final dice "Quiero Funes en mi libreria" en vez de
+# "Consultar por WhatsApp".
+FUNES_SLUG_DEMO = os.environ.get("FUNES_SLUG_DEMO", "demo-libreros").strip().lower()
+
 ML_CLIENT_ID = os.environ.get("ML_CLIENT_ID", "")
 ML_CLIENT_SECRET = os.environ.get("ML_CLIENT_SECRET", "")
 ML_REDIRECT_URI = os.environ.get("ML_REDIRECT_URI", "")

@@ -319,6 +319,12 @@ const MENSAJE_TEMPLATE = {{ mensaje_wa_template_js | default('null', true) | saf
 // escriba.
 const CIERRE_LIBRERIA = {{ cierre_libreria_js | default('null', true) | safe }};
 const SEDES = {{ sedes_js | default('null', true) | safe }};
+// El saludo propio de la libreria (schema.sql:funes_saludo): reemplaza la primera
+// burbuja de iniciar() entera, o null para el saludo de siempre. Es lo que usa
+// la demo para libreros, donde Funes le habla a quien compra y no al lector.
+const SALUDO_LIBRERIA = {{ saludo_libreria_js | default('null', true) | safe }};
+// Verdadero solo en la libreria de demostracion (config.FUNES_SLUG_DEMO).
+const ES_DEMO = {{ es_demo_js | default('false', true) | safe }};
 // El orden lo manda el servidor (routers/funes_chat.py inyecta PREGUNTAS
 // entero). Antes estaba hardcodeado aca, y eso hacia que agregar una pregunta
 // en nucleo.py y olvidarse de tocar este archivo la dejara sin preguntar,
@@ -1577,7 +1583,9 @@ async function mostrarBotonesRecomendacion() {
     } else if (LIBRERIA_SLUG) {
       const mensaje = armarMensajeLibro(tituloActual, autorActual);
       btnConseguir.href = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(mensaje)}`;
-      btnConseguir.textContent = "Consultar por WhatsApp";
+      // En la demo el que toca el boton es un librero, no un lector: no
+      // consulta por el libro, quiere Funes en su local.
+      btnConseguir.textContent = ES_DEMO ? "Quiero Funes en mi librería" : "Consultar por WhatsApp";
     } else {
       btnConseguir.href = urlDeBusqueda(tituloActual, autorActual);
       btnConseguir.textContent = "¿Dónde lo consigo?";
@@ -2467,7 +2475,9 @@ async function iniciar() {
   // feliz con el cuento, y las tres lineas la aprovechan en orden: quien es,
   // que tiene (que es el chiste borgeano y la explicacion de que hace, todo
   // junto), y para que le sirve eso a quien esta del otro lado.
-  await mostrarRespuestaFunes(
+  // Con saludo propio (la demo para libreros), el texto lo escribio la libreria
+  // y reemplaza a las tres lineas de abajo. Mismo tope: tres lineas.
+  await mostrarRespuestaFunes(SALUDO_LIBRERIA ? SALUDO_LIBRERIA.split("\n").slice(0, 3).join("\n") :
     // Tres lineas y ni una mas EN ESTA burbuja: el tipeo es caracter por
     // caracter (ver MS_ENTRE_LETRAS, mas DELAY_TIPEO_MIN de "pensando" por
     // burbuja), asi que cada linea extra son segundos en los que la persona

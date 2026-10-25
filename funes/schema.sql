@@ -501,6 +501,14 @@ ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_catalogo_completo BOOLEAN N
 -- librero: el texto lo escribimos con la libreria, no lo carga ella sola.
 ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_cierre TEXT;
 
+-- El saludo de Funes por libreria. NULL o vacio = el saludo generico ("Hola, mi
+-- nombre es Ireneo Funes. Tengo a mi disposicion una seleccion de ... ofrecidos
+-- por la libreria X"). Con texto, REEMPLAZA a esa primera burbuja entera: cada
+-- linea (\n) es una linea de la burbuja, maximo tres (MAX_MENSAJES_POR_RESPUESTA
+-- del chat). Existe para la demo de libreros, donde Funes le habla al librero y
+-- no al lector.
+ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_saludo TEXT;
+
 -- Las sedes de la libreria con horario, para que el cierre diga cual esta
 -- abierta AHORA y el boton "¿Como llego?" apunte a esa (o a la proxima en
 -- abrir). NULL = sin sedes: el boton sigue siendo "Consultar por WhatsApp".
