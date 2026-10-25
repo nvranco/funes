@@ -76,19 +76,16 @@
      anchas se estiran hasta el cuadrado, asi ninguna tarjeta se dispara en altura. */
   .cat .lib-tapa { position: relative; container-type: inline-size; background: rgb(var(--fondo)); }
   .cat .lib-tapa img { display: block; width: 100%; height: auto; min-height: 100cqw; max-height: 150cqw; object-fit: cover; }
-  .cat .lib-sin { aspect-ratio: 4 / 5; display: flex; align-items: center; justify-content: center;
-    background: rgb(var(--celeste-claro)); color: rgb(var(--verde-texto)); }
-  .cat .lib-sin span { font-family: "Inter Tight", Inter, sans-serif; font-weight: 700; font-size: 22cqw; line-height: 1; opacity: .55; }
 
   /* Boton "Consultar": el de la landing, de ancho completo bajo el titulo y el autor. Contorno y texto
      cambian de verde como los botones "lava" de la landing, cada uno con su ritmo (--dur, --del). */
   .cat .lib-wa { display: flex; align-items: center; justify-content: center; gap: .45rem; width: 100%; min-height: 44px; margin-top: .7rem;
-    border-radius: 10px; color: #2F5539; border: 1.5px solid currentColor; background: transparent;
+    border-radius: 10px; color: #44744F; border: 1.5px solid currentColor; background: transparent;
     font-size: .88rem; font-weight: 600; transition: transform .15s ease, background-color .15s ease; }
   @media (prefers-reduced-motion: no-preference) {
     .cat .lib-wa { animation: lava-wa var(--dur, 2.4s) ease-in-out var(--del, 0s) infinite alternate; }
   }
-  @keyframes lava-wa { 0% { color: #2F5539; } 100% { color: #4C8250; } }
+  @keyframes lava-wa { 0% { color: #44744F; } 100% { color: #67995C; } }
   .cat .lib-wa:hover { animation: none; color: rgb(var(--tinta)); background: rgba(46,33,22,.05); }
   .cat .lib-wa:active { transform: scale(.97); }
   .cat .lib-wa svg { width: 18px; height: 18px; flex: none; }
@@ -473,6 +470,8 @@
 
   function renderResultados(lista) {
     if (!catalogoListo) return;
+    // Los libros sin imagen van al fondo del catalogo, en el mismo orden relativo.
+    lista = [...lista.filter((l) => l.imagen_url), ...lista.filter((l) => !l.imagen_url)];
     if (lista.length === 0) {
       resultados.innerHTML = '';
       ultimaLista = null;
@@ -506,16 +505,12 @@
     columnasActuales = cantidadColumnas();
     const cols = Array.from({ length: columnasActuales }, () => []), alturas = new Array(columnasActuales).fill(0);
     lista.forEach((libro, i) => {
-      const est = 1.25 + Math.min(3, Math.ceil((libro.titulo || '').length / 17)) * 0.2 + 0.6;
+      const est = (libro.imagen_url ? 1.25 : 0) + Math.min(3, Math.ceil((libro.titulo || '').length / 17)) * 0.2 + 0.6;
       const k = alturas.indexOf(Math.min(...alturas));
       alturas[k] += est;
       cols[k].push(`
         <article class="lib" data-idx="${i}" style="--i:${Math.min(i, 8)};--dur:${(2.2 + (i % 4) * 0.5).toFixed(1)}s;--del:-${((i * 0.8) % 3).toFixed(1)}s">
-          <div class="lib-tapa">
-            ${libro.imagen_url
-              ? `<img src="${libro.imagen_url}" loading="lazy" alt="">`
-              : `<div class="lib-sin" aria-hidden="true"><span>${escaparHtml((libro.titulo || '?').trim().charAt(0).toUpperCase())}</span></div>`}
-          </div>
+          ${libro.imagen_url ? `<div class="lib-tapa"><img src="${libro.imagen_url}" loading="lazy" alt=""></div>` : ''}
           <div class="lib-txt">
             <p class="lib-titulo">${escaparHtml(libro.titulo)}</p>
             <p class="lib-autor">${escaparHtml(libro.autor || `${ET_AUTOR_CAP} no disponible`)}</p>
