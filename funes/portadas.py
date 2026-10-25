@@ -84,6 +84,20 @@ def clave_de(isbn: str | None, titulo: str, autor: str) -> str:
     return "ta:" + " ".join(_normalizar(f"{titulo} {autor}").split())[:200]
 
 
+_AUTOR_VACIO = {"autor no disponible", "sin autor", "desconocido", "anonimo", "n a", "s a"}
+
+
+def _sin_autor(autor: str | None) -> bool:
+    return _normalizar(autor or "") in _AUTOR_VACIO | {""}
+
+
+def _buscable(isbn: str | None, titulo: str, autor: str | None) -> bool:
+    """Una busqueda por titulo solo, sin autor, trae la tapa de cualquier libro
+    que se llame igual ("Apocalipsis", "Albert Einstein"): no se hace. Con ISBN
+    si, porque identifica la edicion."""
+    return bool((titulo or "").strip()) and bool(_isbn(isbn) or not _sin_autor(autor))
+
+
 def url_de(sha: str) -> str:
     return f"/portadas/{sha}.jpg"
 
@@ -281,7 +295,7 @@ async def _resolver(isbn: str | None, titulo: str, autor: str, intento: _Intento
                 pasos.append(("ml-isbn", lambda: _url_ml(
                     client, token, {"product_identifier": isbn}, intento)))
             pasos.append(("ol-isbn", lambda: _url_ol_isbn(isbn, prioritario)))
-        if titulo:
+        if titulo and not _sin_autor(autor):
             consulta = f"{titulo} {autor}".strip()
             if token:
                 pasos.append(("ml-texto", lambda: _url_ml(
@@ -326,6 +340,8 @@ async def obtener(isbn: str | None, titulo: str, autor: str = "",
 
     `buscar_en_red=False` solo consulta lo ya guardado: para las vistas donde
     no se puede esperar ~1 s a las APIs externas."""
+    if not _buscable(isbn, titulo, autor):
+        return None
     isbn_limpio = _isbn(isbn)
     clave = clave_de(isbn_limpio, titulo, autor)
     fila = await db.pool().fetchrow(
@@ -435,7 +451,8 @@ async def consultar(libros: list[dict]) -> tuple[dict, set]:
     """Para una lista de libros (dict con id, isbn?, titulo, autor) devuelve
     ({id: url} de los que ya tienen portada guardada, {id} de los que se buscaron
     hace poco y no la tienen). No sale a la red."""
-    claves = {l["id"]: clave_de(l.get("isbn"), l["titulo"], l.get("autor", "")) for l in libros}
+    claves = {l["id"]: clave_de(l.get("isbn"), l["titulo"], l.get("autor", "")) for l in libros
+              if _buscable(l.get("isbn"), l["titulo"], l.get("autor"))}
     if not claves:
         return {}, set()
     filas = await db.pool().fetch(
@@ -462,7 +479,8 @@ def buscar_en_segundo_plano(libros: list[dict]) -> None:
             return
         isbn, titulo, autor = libro.get("isbn"), libro["titulo"], libro.get("autor", "")
         clave = clave_de(isbn, titulo, autor)
-        if titulo.strip() and clave not in _en_curso and not _fallo_reciente(clave):
+        if (_buscable(isbn, titulo, autor) and clave not in _en_curso
+                and not _fallo_reciente(clave)):
             _tarea_de(isbn, titulo, autor, prioritario=False)
 
 
