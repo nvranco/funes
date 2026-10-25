@@ -1,4 +1,4 @@
-"""Corre el pipeline de vision actual (app/vision.py, sin modificar) contra el
+"""Corre el pipeline de vision actual (funes/vision.py, sin modificar) contra el
 dataset de evaluacion en data/, para el estudio de que tan bien se comporta el
 modelo con fotos variadas (angulo, luz, cantidad de libros, stock vs. reales).
 
@@ -32,7 +32,7 @@ SALIDA_DIR.mkdir(exist_ok=True)
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault("DATABASE_URL", "postgresql://u:p@localhost/db")
 os.environ.setdefault("ADMIN_TOKEN", "x")
-from app.vision import _PROMPT, redimensionar, sanear_libro  # noqa: E402
+from funes.vision import _PROMPT, redimensionar, sanear_libro  # noqa: E402
 
 API_KEY = os.environ["OPENROUTER_API_KEY"]
 MODELO = "google/gemini-2.5-flash"  # el mismo que corre en produccion

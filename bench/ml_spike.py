@@ -6,7 +6,7 @@ Sin autorizar, `/sites/MLA/search` devuelve 403 y `/sites/MLA` devuelve
 suponer que con token va a andar: hay que probarlo.
 
 Esto es el go/no-go de la Fase de precios. Si aun autorizados devuelve 403,
-`app/funes_chat/precios.py` ya degrada solo (muestra el link de busqueda
+`funes/funes_chat/precios.py` ya degrada solo (muestra el link de busqueda
 sin precio) y no hay nada mas que construir de ese lado.
 
 Requiere haber autorizado la app una vez (abrir
@@ -30,8 +30,8 @@ os.environ.setdefault("ADMIN_TOKEN", "x")
 
 import httpx  # noqa: E402
 
-from app import db  # noqa: E402
-from app.funes_chat import precios  # noqa: E402
+from funes import db  # noqa: E402
+from funes.funes_chat import precios  # noqa: E402
 
 CONSULTAS = [
     ("titulo+autor", "Rayuela Julio Cortazar"),

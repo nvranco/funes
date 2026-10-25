@@ -54,9 +54,9 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 import httpx  # noqa: E402
 
-from app import db  # noqa: E402
-from app.config import OPENROUTER_API_KEY  # noqa: E402
-from app.funes_chat import nucleo  # noqa: E402
+from funes import db  # noqa: E402
+from funes.config import OPENROUTER_API_KEY  # noqa: E402
+from funes.funes_chat import nucleo  # noqa: E402
 
 PERFILES = RAIZ / "bench" / "perfiles.json"
 CACHE = Path(os.environ.get("TEMP", ".")) / "funes_bench_cache.json"
@@ -88,10 +88,6 @@ VARIANTES = {
     # sin_filtro_forma mueve los 8 de literatura; sin_filtro_tema, los 8 de
     # divulgacion. La vara de este ultimo es div-psicoanalisis-no.
     "sin_filtro_forma": {"_FILTRO_FORMA": False},
-    # La correccion (el motivo del rechazo) sin vector propio: vuelve a viajar
-    # diluida adentro del texto de ajuste, que es como estaba cuando en
-    # produccion dos recomendaciones seguidas devolvieron la misma lista.
-    "sin_correccion": {"_PESO_CORRECCION": 0.0},
     "sin_filtro_tema": {"_FILTRO_TEMA": False},
     "sin_filtros_tema": {"_FILTRO_FORMA": False, "_FILTRO_TEMA": False,
                          "_FILTRO_SUBGENERO": False},

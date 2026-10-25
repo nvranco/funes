@@ -1,0 +1,342 @@
+"""Bitacora de "Funes Chat": persistencia de las conversaciones.
+
+Vive aparte de nucleo.py a proposito: el nucleo es matching por embeddings y
+llamadas al LLM, y no tiene por que saber SQL. Aca esta todo lo que escribe en
+funes_sesiones / funes_recomendaciones (ver funes/schema.sql).
+
+Regla que atraviesa el modulo: **ninguna falla de bitacora puede tumbar una
+recomendacion**. La conversacion es el producto, el registro es el instrumento
+que usamos para medirla. Por eso cada funcion atrapa todo y loguea un warning
+en vez de propagar; el peor caso es una sesion que se pierde, no un lector
+mirando un error.
+"""
+
+import json
+import logging
+import uuid
+
+from funes import db
+
+logger = logging.getLogger("librero.funes_chat")
+
+# Los que el QR y los links de la campana pueden setear via ?src=. Cualquier
+# otra cosa cae a 'link': el parametro viene de afuera y no queremos que un
+# valor arbitrario ensucie las cohortes con las que se leen las hipotesis.
+#
+# Cada valor nombra una DISTANCIA SOCIAL, no un canal. Es la unica particion que
+# le importa al piloto: el conocido infla el veredicto por cortesia y el
+# desconocido no, y esa diferencia es lo unico que hace legible a HF-2. Un tag
+# de canal ("whatsapp") juntaria en el mismo balde a un amigo y a un estudiante
+# de un grupo de materia -los dos extremos exactos del sesgo- y la exclusion de
+# los amigos en piloto.COHORTES_VALIDAS dejaria de funcionar sin que nada avise.
+#
+#   directo   conocido del que manda el link. Se llama asi y no "amigo" porque
+#             el parametro queda a la vista en la barra del navegador, y
+#             etiquetar a alguien de amigo en la URL que le mandas es raro. Lo
+#             que nombra sigue siendo la distancia social, no el canal. Si lo
+#             reenvia a los suyos siguen contando como directo: se los trata
+#             como mas sesgados de lo que son, y eso solo descarta datos, nunca
+#             contamina el numero.
+#   whatsapp  los grupos de materias de la facultad. Es un nombre de canal, y
+#             se banca serlo por una razon concreta: en este piloto NADIE MAS
+#             recibe el link por ahi -los conocidos van por 'directo'-, asi que
+#             el tag mapea uno a uno con una poblacion de desconocidos. El dia
+#             que se mande un whatsapp a un conocido, este tag deja de
+#             significar lo que dice y hay que partirlo.
+#   qr        cualquier codigo o volante impreso. Absorbe a 'flyer': el poster
+#             en el pasillo y el papelito en la calle terminaron siendo la
+#             misma cosa.
+#   flyer     legado. Ya no se reparte, pero hay filas guardadas con este valor
+#             y el tablero las tiene que poder mostrar.
+#   link      lo que llega sin ?src=. Es un cajon de sastre -visitas directas,
+#             crawlers, la URL compartida sin parametros-, asi que NO se le
+#             puede atribuir ninguna distancia social. Por eso los conocidos
+#             tienen que ir con su tag y no con el link pelado: mezclarlos aca
+#             deja a HF-2 sin forma de sacarlos.
+#   landing   libreros que llegan desde la landing de Funes y prueban la demo
+#             (/funes/{FUNES_SLUG_DEMO}). NO son lectores: son el comprador, y su
+#             opinion sobre un libro no dice nada del piloto. Por eso piloto.py
+#             los deja afuera de la vista "todas" y de cada hipotesis, y tienen
+#             su propio tablero en /funes/admin/{token}/landing.
+ORIGENES_VALIDOS = {"qr", "directo", "whatsapp", "flyer", "link", "landing"}
+
+
+def normalizar_origen(src: str | None) -> str:
+    src = (src or "").strip().lower()
+    return src if src in ORIGENES_VALIDOS else "link"
+
+
+async def crear_sesion(origen: str, libreria_id: int | None = None) -> str | None:
+    """Crea la fila de la conversacion y devuelve su id (uuid4 del servidor).
+
+    El id lo genera el servidor y nunca el cliente: oficia de capacidad, igual
+    que librerias.token_panel. Quien lo tiene puede escribir esa sesion, y no
+    se puede adivinar la de otro."""
+    sesion_id = str(uuid.uuid4())
+    try:
+        await db.pool().execute(
+            "INSERT INTO funes_sesiones (id, origen, libreria_id) VALUES ($1, $2, $3)",
+            sesion_id, normalizar_origen(origen), libreria_id,
+        )
+        return sesion_id
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("funes_bitacora_crear_sesion_fallo error=%s", exc)
+        return None
+
+
+async def guardar_estado(
+    sesion_id: str,
+    respuestas: dict,
+    profundas: list[dict],
+    pool: int | None = None,
+    filtro_aflojado: str | None = None,
+    ciclo: int = 1,
+    libreria_id: int | None = None,
+) -> None:
+    """Actualiza las respuestas de una sesion ya creada.
+
+    Se llama en cada paso, no solo al final: asi el abandono queda registrado
+    con el detalle de hasta donde llego la persona, que es exactamente lo que
+    mide la hipotesis del embudo. Una conversacion que se corta en q2 tiene que
+    dejar rastro de que se corto en q2."""
+    if not sesion_id:
+        return
+    try:
+        await db.pool().execute(
+            """
+            UPDATE funes_sesiones
+            SET macro = COALESCE($2, macro),
+                -- NULLIF y no asignacion directa: esta funcion corre en CADA
+                -- paso, y en el reinicio desde q1 el cliente manda todo vacio.
+                -- Asignando de una, ese POST borraba las respuestas y las
+                -- preguntas del ciclo anterior. Un valor nuevo si pisa al viejo;
+                -- lo unico que se ignora es el vacio.
+                q1 = COALESCE(NULLIF($3, ''), q1),
+                q1b = COALESCE(NULLIF($11, ''), q1b),
+                q2 = COALESCE(NULLIF($4, ''), q2),
+                q3 = COALESCE(NULLIF($5, ''), q3),
+                q4 = COALESCE(NULLIF($6, ''), q4),
+                q4a = COALESCE(NULLIF($12, ''), q4a),
+                q4b = COALESCE(NULLIF($13, ''), q4b),
+                profundas = CASE WHEN $7::jsonb = '[]'::jsonb THEN profundas ELSE $7::jsonb END,
+                -- GREATEST y no ciclos+1: el cliente dice en que vuelta va, asi
+                -- que un POST repetido (reintento, doble toque) escribe el mismo
+                -- numero en vez de inventar una vuelta que nunca existio.
+                ciclos = GREATEST(ciclos, $10),
+                pool_inicial = COALESCE($8, pool_inicial),
+                filtro_aflojado = COALESCE($9, filtro_aflojado),
+                -- COALESCE y no asignacion directa: si esta llamada puntual
+                -- no trajo el id (resolucion fallo, o el cliente todavia no
+                -- mando `libreria`), no se pisa lo que ya quedo grabado en
+                -- la creacion de la sesion.
+                libreria_id = COALESCE($14, libreria_id),
+                ultima_act = now()
+            WHERE id = $1
+            """,
+            sesion_id,
+            str(respuestas.get("q0") or "") or None,
+            str(respuestas.get("q1") or ""),
+            str(respuestas.get("q2") or ""),
+            str(respuestas.get("q3") or ""),
+            str(respuestas.get("q4") or ""),
+            json.dumps(profundas, ensure_ascii=False),
+            pool,
+            filtro_aflojado,
+            max(1, int(ciclo or 1)),
+            str(respuestas.get("q1b") or ""),
+            # q4a puede quedar vacia legitimamente -es "no se me ocurre
+            # ninguno"-, asi que aca el NULLIF no distingue "no contesto" de
+            # "contesto que no". Da igual para lo que se mide: en las dos la
+            # sesion no tiene referencia, y q4b dice si llego al final.
+            str(respuestas.get("q4a") or ""),
+            str(respuestas.get("q4b") or ""),
+            libreria_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("funes_bitacora_guardar_estado_fallo sesion=%s error=%s", sesion_id, exc)
+
+
+async def guardar_leido(sesion_id: str, libro_id: str, titulo: str,
+                        autor: str = "", opinion: str = "") -> bool:
+    """Registra un libro que la persona ya habia leido cuando se lo ibamos a ofrecer.
+
+    Va en su propia tabla y no como un veredicto de funes_recomendaciones, porque
+    no es lo mismo: esa recomendacion nunca se mostro. Guardarla ahi la contaria
+    en el embudo y ensuciaria el analisis pareado de la 1ra contra la 2da.
+
+    Y es un dato por derecho propio: acertar un libro que la persona YA leyo no es
+    errarle, es lo contrario, y hasta ahora las dos cosas se veian iguales desde
+    afuera."""
+    if not sesion_id or not libro_id:
+        return False
+    try:
+        await db.pool().execute(
+            """
+            INSERT INTO funes_leidos (sesion_id, libro_id, titulo, autor, opinion)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (sesion_id, libro_id) DO UPDATE
+                SET opinion = COALESCE(EXCLUDED.opinion, funes_leidos.opinion)
+            """,
+            sesion_id, libro_id, titulo, autor or None, opinion or None,
+        )
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("funes_bitacora_guardar_leido_fallo sesion=%s error=%s", sesion_id, exc)
+        return False
+
+
+async def guardar_recomendacion(
+    sesion_id: str,
+    orden: int,
+    libro: dict,
+    voz: str,
+    candidatos: list[dict],
+    puntajes: dict[str, float],
+    texto_consulta: str,
+    texto_afinado: str,
+    motivo_rechazo: str | None = None,
+    motivo_reformulado: str | None = None,
+    texto_perfil: str = "",
+    ancla: dict | None = None,
+    peso_ancla: float | None = None,
+    profundas: list[dict] | None = None,
+) -> int | None:
+    """Guarda una recomendacion mostrada y devuelve su id.
+
+    Se guarda `voz` (el texto que genero el LLM) porque sin el no se puede
+    reconstruir que leyo la persona cuando dio su veredicto: un "no me interesa"
+    sobre un libro bien elegido pero mal presentado es un problema distinto de
+    un "no me interesa" sobre un libro mal elegido, y desde el veredicto solo no
+    se distinguen.
+
+    `candidatos` guarda el top-K entero con su coseno PARTIDO EN DOS: cuanto se
+    parecio al perfil que la persona describio y cuanto a la lectura que puso de
+    referencia. Es lo que despues permite ver si el motor esta degenerado (si
+    siempre gana el mismo punado de libros), si el segundo candidato estaba
+    pegado o lejos del primero, y sobre todo por que lado entro cada uno.
+
+    `ancla` trae el parrafo que el LLM escribio sobre la referencia. Se guarda
+    porque es la mitad del vector que eligio a estos candidatos: sin el, la
+    recomendacion no se puede explicar despues, ni siquiera con todo lo demas
+    delante."""
+    if not sesion_id:
+        return None
+    resumen = []
+    for c in candidatos:
+        p = puntajes.get(c["id"]) or {}
+        resumen.append({
+            "id": c["id"],
+            "titulo": c["titulo"],
+            "autor": c.get("autor", ""),
+            "coseno": p.get("mezcla"),
+            "coseno_perfil": p.get("perfil"),
+            "coseno_ancla": p.get("ancla"),
+            "coseno_profundas": p.get("profundas"),
+            # None cuando la persona no corrigio, que es la primera
+            # recomendacion de toda conversacion.
+            "coseno_correccion": p.get("correccion"),
+        })
+    try:
+        return await db.pool().fetchval(
+            """
+            INSERT INTO funes_recomendaciones
+                (sesion_id, orden, libro_id, titulo, autor, voz, candidatos,
+                 texto_consulta, texto_afinado, motivo_rechazo, motivo_reformulado,
+                 texto_perfil, ancla_texto, ancla_expandida, ancla_conocida, peso_ancla,
+                 profundas)
+            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11,
+                    $12, $13, $14, $15, $16, $17::jsonb)
+            ON CONFLICT (sesion_id, orden) DO UPDATE
+                SET libro_id = EXCLUDED.libro_id, titulo = EXCLUDED.titulo,
+                    autor = EXCLUDED.autor, voz = EXCLUDED.voz,
+                    candidatos = EXCLUDED.candidatos,
+                    texto_consulta = EXCLUDED.texto_consulta,
+                    texto_afinado = EXCLUDED.texto_afinado,
+                    motivo_rechazo = EXCLUDED.motivo_rechazo,
+                    motivo_reformulado = EXCLUDED.motivo_reformulado,
+                    texto_perfil = EXCLUDED.texto_perfil,
+                    ancla_texto = EXCLUDED.ancla_texto,
+                    ancla_expandida = EXCLUDED.ancla_expandida,
+                    ancla_conocida = EXCLUDED.ancla_conocida,
+                    peso_ancla = EXCLUDED.peso_ancla,
+                    profundas = EXCLUDED.profundas,
+                    -- Si el (sesion_id, orden) se reusa para OTRO libro, lo que
+                    -- la persona opino del anterior deja de aplicar. Sin esto,
+                    -- un reintento por red cortada o un doble toque dejaba el
+                    -- veredicto viejo pegado al libro nuevo, y ese par mentiroso
+                    -- entraba despues al analisis pareado como si fuera real.
+                    veredicto = CASE WHEN funes_recomendaciones.libro_id = EXCLUDED.libro_id
+                                     THEN funes_recomendaciones.veredicto END,
+                    justificacion = CASE WHEN funes_recomendaciones.libro_id = EXCLUDED.libro_id
+                                         THEN funes_recomendaciones.justificacion END,
+                    clic_conseguir_en = CASE WHEN funes_recomendaciones.libro_id = EXCLUDED.libro_id
+                                             THEN funes_recomendaciones.clic_conseguir_en END
+            RETURNING id
+            """,
+            sesion_id, orden, libro["id"], libro["titulo"], libro["autor"], voz,
+            json.dumps(resumen, ensure_ascii=False),
+            texto_consulta, texto_afinado, motivo_rechazo or None, motivo_reformulado or None,
+            texto_perfil or None,
+            (ancla or {}).get("texto") or None,
+            (ancla or {}).get("expandida") or None,
+            (ancla or {}).get("conocida") if ancla else None,
+            peso_ancla if ancla else None,
+            json.dumps(profundas or [], ensure_ascii=False),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "funes_bitacora_guardar_recomendacion_fallo sesion=%s orden=%s error=%s",
+            sesion_id, orden, exc,
+        )
+        return None
+
+
+async def guardar_clic_conseguir(sesion_id: str, recomendacion_id: int) -> bool:
+    """Registra que el lector toco "¿donde lo consigo?".
+
+    Es la metrica mas importante del piloto: un veredicto alto es una opinion y
+    sale gratis, esto es un movimiento real hacia conseguir el libro. Se escribe
+    solo la primera vez (el COALESCE evita que un doble tap pise la hora
+    original y arruine el calculo de cuanto tardo en decidirse)."""
+    try:
+        resultado = await db.pool().execute(
+            """
+            UPDATE funes_recomendaciones
+            SET clic_conseguir_en = COALESCE(clic_conseguir_en, now())
+            WHERE id = $2 AND sesion_id = $1
+            """,
+            sesion_id, recomendacion_id,
+        )
+        return resultado == "UPDATE 1"
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "funes_bitacora_clic_fallo sesion=%s rec=%s error=%s", sesion_id, recomendacion_id, exc
+        )
+        return False
+
+
+async def guardar_veredicto(
+    sesion_id: str, recomendacion_id: int, veredicto: str, justificacion: str
+) -> bool:
+    """Guarda el veredicto del lector sobre una recomendacion puntual.
+
+    Pide el sesion_id ademas del id de la recomendacion: sin eso, cualquiera
+    podria calificar recomendaciones ajenas mandando ids consecutivos, porque
+    funes_recomendaciones.id es un BIGSERIAL adivinable. El sesion_id es el
+    uuid4 impredecible que hace de capacidad."""
+    try:
+        resultado = await db.pool().execute(
+            """
+            UPDATE funes_recomendaciones
+            SET veredicto = $3, justificacion = $4
+            WHERE id = $2 AND sesion_id = $1
+            """,
+            sesion_id, recomendacion_id, veredicto, justificacion.strip() or None,
+        )
+        return resultado == "UPDATE 1"
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "funes_bitacora_guardar_veredicto_fallo sesion=%s rec=%s error=%s",
+            sesion_id, recomendacion_id, exc,
+        )
+        return False

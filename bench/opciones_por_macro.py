@@ -13,8 +13,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.stdout.reconfigure(encoding="utf-8")
 
-from app import db
-from app.funes_chat import nucleo
+from funes import db
+from funes.funes_chat import nucleo
 
 CLAVE = sys.argv[1] if len(sys.argv) > 1 else "q1"
 # Al analizar q3 se deja q1 vacia a proposito: es la unica forma de aislar lo

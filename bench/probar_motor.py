@@ -26,9 +26,9 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 import httpx  # noqa: E402
 
-from app import db  # noqa: E402
-from app.funes_chat import nucleo  # noqa: E402
-from app.routers import funes_chat as router  # noqa: E402
+from funes import db  # noqa: E402
+from funes.funes_chat import nucleo  # noqa: E402
+from funes.routers import funes_chat as router  # noqa: E402
 
 PERFILES = RAIZ / "bench" / "perfiles.json"
 # El server local para el smoke HTTP. Configurable porque hay mas de una
@@ -119,7 +119,7 @@ def probar_resolver() -> None:
 
 def probar_filtros() -> None:
     print("\n_filtrar_catalogo(): macro, banda de paginas y aflojado")
-    catalogo = ([libro(f"l{i}", f"Novela {i}", "literatura", 200) for i in range(100)]
+    catalogo = ([libro(f"l{i}", f"Novela {i}", "literatura", 140) for i in range(100)]
                 + [libro(f"h{i}", f"Historia {i}", "historia", 500) for i in range(100)]
                 + [libro("sin", "Sin paginas", "literatura", None)])
 
@@ -454,7 +454,8 @@ def probar_filtro_tema() -> None:
 
 def _q1b_en_el_router() -> None:
     print("\nq1b en el router: obligatoria donde se pregunta, prohibida donde no")
-    lit = {"q0": "literatura", "q1": "narrativa", "q2": "corto", "q3": "trama"}
+    lit = {"q0": "literatura", "q1": "narrativa", "q2": "corto", "q3": "trama",
+           "q4b": "algo que me atrape"}
     hist = {"q0": "historia", "q1": "argentina", "q2": "corto", "q3": "trama"}
     ok(_valida(router.RespuestasCompletas, {**lit, "q1b": "novela"}),
        "literatura con q1b pasa")
@@ -599,7 +600,7 @@ def probar_dominio() -> None:
     pestaña de alguien. Las dos cosas se descubren tarde y no se pueden
     reconstruir, asi que se prueban antes.
     """
-    from app import main
+    from funes import main
 
     print()
     print("el dominio propio de Funes")
@@ -660,7 +661,7 @@ def probar_rutas() -> None:
     """
     from starlette.routing import Match
 
-    from app.main import app
+    from funes.main import app
 
     print()
     print("el orden de las rutas de Funes")
@@ -714,31 +715,43 @@ def probar_textos() -> None:
     ok("El detalle" not in ajuste, "y no el texto del boton")
     ok("Sí" in ajuste, "si no hay consulta (respuesta escrita a mano) usa lo que escribio la persona")
 
-    perfil_solo, ancla_solo, ajuste_solo, correccion_solo = nucleo._pesos(None, None)
+    perfil_solo, ancla_solo, ajuste_solo = nucleo._pesos(None, None)
     ok(perfil_solo == 1.0, "sin ancla ni profundas, todo el peso es del perfil")
-    p_pa, a_pa, j_pa, c_pa = nucleo._pesos({"x": 1}, None)
+    p_pa, a_pa, _ = nucleo._pesos({"x": 1}, None)
     ok(abs(p_pa + a_pa - 1.0) < 1e-9 and a_pa == nucleo._PESO_ANCLA,
        "con ancla sola, los pesos suman 1")
-    p3, a3, j3, c3 = nucleo._pesos({"x": 1}, {"x": 1})
+    p3, a3, j3 = nucleo._pesos({"x": 1}, {"x": 1})
     ok(abs(p3 + a3 + j3 - 1.0) < 1e-9 and j3 == nucleo._PESO_PROFUNDAS,
        "con las tres partes, los pesos suman 1", f"{p3}+{a3}+{j3}")
     ok(p3 > 0, "y al perfil siempre le queda algo", f"perfil={p3}")
 
-    # La correccion es el cuarto componente. Antes viajaba adentro del texto de
-    # ajuste, compartiendo un solo vector con las dos profundas y con los libros
-    # leidos: le tocaba un tercio de 0,25 y en produccion no movia el ranking
-    # (dos recomendaciones seguidas, la misma lista, delta maximo 0,005).
-    p4, a4, j4, c4 = nucleo._pesos({"x": 1}, {"x": 1}, {"x": 1})
-    ok(abs(p4 + a4 + j4 + c4 - 1.0) < 1e-9, "con las cuatro partes, los pesos suman 1")
-    ok(c4 > nucleo._PESO_PROFUNDAS / 3,
-       "la correccion pesa mas que el tercio de las profundas que tenia antes",
-       f"antes ~{nucleo._PESO_PROFUNDAS / 3:.3f}, ahora {c4:.3f}")
-    ok(p4 >= 0.24, "y al perfil le sigue quedando su parte", f"le quedo {p4:.3f}")
-    ok(abs(a4 / j4 - nucleo._PESO_ANCLA / nucleo._PESO_PROFUNDAS) < 1e-9,
+    # La correccion del lector ya no es un componente del puntaje: reescribe el
+    # perfil y el ancla (nucleo._reescribir_perfil), y de ahi en mas todo corre
+    # sobre ese perfil. Lo que se verifica aca es lo que NO depende del modelo.
+    ok(abs(a3 / j3 - nucleo._PESO_ANCLA / nucleo._PESO_PROFUNDAS) < 1e-9,
        "escalar mantiene la proporcion entre ancla y profundas")
-    sin_c = nucleo._pesos({"x": 1}, {"x": 1})
-    ok(sin_c[:3] == nucleo._pesos({"x": 1}, {"x": 1}, None)[:3],
-       "sin correccion, el reparto es identico al de antes")
+    base = {"q0": "literatura", "q2": "corto", "q4a": "Sheldrake", "q4b": "que me abra la cabeza"}
+    corregido = nucleo._limpiar_perfil({
+        "perfil": "Un clasico de otra epoca, de lectura pausada.",
+        "nombrado": "Sheldrake", "valorado": "ideas que abren la cabeza",
+        "excluir": ["ciencia ficcion", "ciencia ficcion", " "], "motivo": "  Algo mas   CLASICO "})
+    ok(corregido is not None and corregido["excluir"] == ["ciencia ficcion"],
+       "el perfil vigente se limpia: sin vacios ni repetidos")
+    ok(corregido["motivo"] == "algo mas clasico",
+       "el motivo se guarda normalizado, que es lo que evita pagar la reescritura dos veces")
+    ok(nucleo._limpiar_perfil({"perfil": "  "}) is None and nucleo._limpiar_perfil("x") is None
+       and nucleo._limpiar_perfil(None) is None,
+       "un perfil vacio o con forma rara se descarta (el cliente lo manda de vuelta)")
+    largo = nucleo._limpiar_perfil({"perfil": "a" * 5000, "excluir": ["x"] * 50})
+    ok(len(largo["perfil"]) == nucleo._PERFIL_MAX and len(largo["excluir"]) == 1,
+       "y se acota: entra a un embedding y a un prompt")
+    efectivas = nucleo._aplicar_perfil(base, corregido)
+    ok(nucleo._construir_texto_perfil(efectivas) == corregido["perfil"],
+       "el perfil corregido reemplaza al armado con q1 a q3")
+    ok(nucleo.partes_del_ancla(efectivas) == ("Sheldrake", "ideas que abren la cabeza"),
+       "y el ancla corregida reemplaza a la original")
+    ok(nucleo._construir_texto_perfil(base) != corregido["perfil"],
+       "sin perfil corregido todo sigue igual que antes")
     ok(nucleo._construir_texto_ajuste([{"pregunta": "p", "respuesta": "r"}]) == "r"
        and "erramos" not in nucleo._construir_texto_ajuste([{"pregunta": "p", "respuesta": "r"}]),
        "el motivo del rechazo ya no se cuela en el texto de ajuste")
@@ -799,7 +812,8 @@ def _validadores() -> None:
 
     # Literatura completa incluye q1b: desde el filtro por forma, un pedido de
     # literatura sin la forma es un pedido incompleto.
-    base = {"q0": "literatura", "q1": "ideas", "q1b": "novela", "q2": "corto", "q3": "ideas"}
+    base = {"q0": "literatura", "q1": "ideas", "q1b": "novela", "q2": "corto", "q3": "ideas",
+            "q4b": "algo que me atrape"}
     ok(not acepta_chat({**base, "ya_mostrados": [f"id{i}" for i in range(7)]}),
        "ya_mostrados mas largo que _MAX_TOTAL_RECOMENDACIONES se rechaza")
     ok(acepta_chat({**base, "ya_mostrados": [f"id{i}" for i in range(6)]}),
@@ -833,25 +847,26 @@ def _validadores() -> None:
 
 # ------------------------------------------------- perfiles.json vs catalogo
 
+_PISO_CHICO = 85
+
+
 async def probar_rebusqueda() -> None:
-    """La correccion tiene que poder traer un libro que la lista corta no tenia.
+    """Un perfil corregido tiene que poder traer un libro que la lista corta no tenia.
 
-    Es la propiedad que justifica todo el cambio, y es la que no se ve mirando
-    un resultado suelto: con el top-8 congelado antes de que la persona hablara,
-    el libro que pide al corregir puede ser inalcanzable por CONSTRUCCION y no
-    por puntaje. Aca se prueba justo eso, con el catalogo real y sin llamar a
-    ninguna API: el vector de la correccion se fabrica copiando el embedding de
-    un libro que quedo afuera del top-8, que es el caso extremo -"quiero
-    exactamente esto"- y el que antes no podia ganar nunca.
+    Es la propiedad que justifica rankear el pool entero despues de un rechazo, y
+    la que no se ve mirando un resultado suelto: con el top-8 congelado antes de
+    que la persona hablara, el libro que pide al corregir puede ser inalcanzable
+    por CONSTRUCCION y no por puntaje. Aca se prueba justo eso, con el catalogo
+    real y sin llamar al modelo: el vector del perfil corregido se fabrica
+    copiando el embedding de un libro que quedo afuera del top-8, que es el caso
+    extremo -"quiero exactamente esto"- y el que antes no podia ganar nunca.
 
-    _DOS_VECTORES se apaga durante esta prueba: lo que se verifica es que la
-    correccion (peso 0,35, coseno perfecto fabricado) alcanza para ganarle a
-    TODO el pool, y con dos_vectores prendido el termino de perfil compite en
-    otro eje (contra `embedding_experiencia`) que puede darle a otro libro un
+    _DOS_VECTORES se apaga durante esta prueba: con dos_vectores prendido el
+    perfil compite contra `embedding_experiencia`, y puede darle a otro libro un
     puntaje mas alto ahi, un efecto real pero que no tiene nada que ver con lo
     que esta prueba quiere demostrar."""
     print()
-    print("re-busqueda: la correccion compite contra todo el pool")
+    print("re-busqueda: el perfil corregido compite contra todo el pool")
     previo_dos_vectores = nucleo._DOS_VECTORES
     nucleo._DOS_VECTORES = False
     perfil = {"q0": "literatura", "q1": "narrativa", "q1b": "novela",
@@ -873,28 +888,199 @@ async def probar_rebusqueda() -> None:
     objetivo = afuera[len(afuera) // 2]
 
     vec = array.array("f", objetivo["embedding_abstracto"])
-    correccion = {"vector": vec, "norma": sum(x * x for x in vec) ** 0.5,
-                  "texto": "(fabricada)"}
-    vector, norma = nucleo._preparar_consulta(
-        await nucleo._embeber_cacheado(nucleo._construir_texto_perfil(perfil)),
-        perfil["q0"])
+    vector, norma = vec, sum(x * x for x in vec) ** 0.5
 
     def gana(libros):
-        return max(libros, key=lambda l: nucleo._puntaje(
-            vector, norma, ancla, l, None, correccion))
+        return max(libros, key=lambda l: nucleo._puntaje(vector, norma, ancla, l))
 
     ok(gana(todos)["id"] == objetivo["id"],
-       "sobre el pool entero gana el libro que el lector pidio al corregir",
+       "sobre el pool entero gana el libro que el perfil corregido describe",
        gana(todos)["titulo"][:50])
     ok(gana(corto)["id"] != objetivo["id"],
        "y sobre la lista corta era inalcanzable, que es el bug que esto arregla")
 
-    detalle = nucleo._puntaje_detalle(vector, norma, ancla, objetivo, None, correccion)
-    ok(detalle.get("correccion") is not None,
-       "el desglose de la bitacora trae el coseno de la correccion")
-    ok(nucleo._puntaje_detalle(vector, norma, ancla, objetivo)["correccion"] is None,
-       "y es None cuando no hubo correccion, que es toda primera recomendacion")
+    detalle = nucleo._puntaje_detalle(vector, norma, ancla, objetivo)
+    ok("correccion" not in detalle and detalle["mezcla"] is not None,
+       "el desglose de la bitacora ya no trae columna de correccion: la correccion es el perfil")
+
+    # La exclusion dura por genero, sobre el catalogo real (macro literatura).
+    base_lit = {"q0": "literatura"}
+    pool_lit, n_lit, _ = nucleo._filtrar_catalogo(await nucleo._libros(), base_lit)
+    ficcion = [l for l in pool_lit if nucleo._es_de_genero(l, ["ciencia ficcion"])]
+    ok(bool(ficcion), "la macro literatura tiene libros de ciencia ficcion para excluir",
+       f"{len(ficcion)} de {n_lit}")
+    sin, n_sin, _ = nucleo._filtrar_catalogo(
+        await nucleo._libros(), {**base_lit, "_excluir": ["Ciencia Ficción"]})
+    ok(not any(nucleo._es_de_genero(l, ["ciencia ficcion"]) for l in sin),
+       "con _excluir, ningun libro del genero queda en el pool (sin importar tildes ni mayusculas)")
+    ok(n_sin == n_lit - len(ficcion), "y el pool achica exactamente por esos libros",
+       f"{n_lit} - {len(ficcion)} = {n_sin}")
+    igual, n_igual, _ = nucleo._filtrar_catalogo(
+        await nucleo._libros(), {**base_lit, "_excluir": ["genero que no existe"]})
+    ok(n_igual == n_lit, "un termino que no matchea nada no saca a nadie")
+    # Con un pool chico, excluir no puede dejarlo bajo el piso: se omite.
+    chico = pool_lit[:_PISO_CHICO]
+    ids_chico = {l["id"] for l in chico}
+    generos: dict[str, int] = {}
+    for l in chico:
+        g = nucleo._normalizar_texto(str(l.get("genero") or ""))
+        if g:
+            generos[g] = generos.get(g, 0) + 1
+    comun, cuantos = max(generos.items(), key=lambda kv: kv[1])
+    ok(len(chico) - cuantos < nucleo._PISO_POOL, "(el genero mas comun del pool chico lo dejaria bajo el piso)",
+       f"{comun}: {cuantos} de {len(chico)}")
+    _, n_chico, _ = nucleo._filtrar_catalogo(
+        await nucleo._libros(), {**base_lit, "_solo_ids": ids_chico, "_excluir": [comun]})
+    ok(n_chico == len(chico), "si excluir dejaria el pool por debajo del piso, no se aplica",
+       f"{n_chico} vs {len(chico)}")
     nucleo._DOS_VECTORES = previo_dos_vectores
+
+
+class _RespModelo:
+    def __init__(self, contenido: dict):
+        self._c = contenido
+
+    def raise_for_status(self) -> None:
+        pass
+
+    def json(self) -> dict:
+        return {"choices": [{"message": {"content": json.dumps(self._c)}}]}
+
+
+async def probar_perfil_corregido() -> None:
+    """elegir_libro con el perfil que corrige el modelo tras un rechazo.
+
+    El modelo, los embeddings y el ancla se reemplazan por dobles: lo que se
+    verifica es el CABLEADO (que se llama una vez por rechazo, que el perfil viaja
+    y se acumula, que la referencia y la forma se tratan como se espera, que un
+    modelo caido no rompe nada), no la calidad de lo que escribe el modelo."""
+    print()
+    print("perfil corregido por el modelo tras un rechazo")
+    llamadas: list[dict] = []
+    salida = {"perfil": "Una novela clasica de otra epoca, de lectura pausada.",
+              "referencia_valorado": "ideas que abren la cabeza", "forma": "novela",
+              "quitar_referencia": False, "excluir": ["Ciencia Ficción"]}
+
+    class ClienteFalso:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, headers=None, json=None):
+            llamadas.append(json_loads(json["messages"][1]["content"]))
+            if salida is None:
+                raise RuntimeError("modelo caido")
+            return _RespModelo(salida)
+
+    json_loads = json.loads
+    originales = (nucleo.httpx.AsyncClient, nucleo.OPENROUTER_API_KEY,
+                  nucleo._embeber_cacheado, nucleo._ancla)
+    catalogo = await nucleo._libros()
+
+    async def embeber_falso(texto):
+        return list(catalogo[hash(texto) % len(catalogo)]["embedding_abstracto"])
+
+    async def sin_ancla(respuestas):
+        return None
+
+    nucleo.httpx.AsyncClient = ClienteFalso
+    nucleo.OPENROUTER_API_KEY = "falsa"
+    nucleo._embeber_cacheado = embeber_falso
+    nucleo._ancla = sin_ancla
+    nucleo._GENEROS_CACHE = None
+    resp = {"q0": "literatura", "q2": "intermedio", "q3": "trama",
+            "q4a": "Hermann Hesse", "q4b": "que me abra la cabeza"}
+    try:
+        e0 = await nucleo.elegir_libro(dict(resp), [], [], "", [], "")
+        ok(e0["perfil_vigente"] is None and e0["motivo_reformulado"] == "",
+           "sin rechazo no hay perfil corregido y el ranking sigue como antes")
+        ok(len(e0["candidatos"]) == nucleo._TOP_K_CANDIDATOS, "con la lista corta de siempre")
+
+        motivo = "algo mas clasico, no quiero ciencia ficcion"
+        e1 = await nucleo.elegir_libro(dict(resp), [], [e0["libro"]["id"]], motivo, [], "")
+        pv = e1["perfil_vigente"]
+        ok(len(llamadas) == 1 and pv is not None, "un rechazo con motivo llama al modelo una vez")
+        ok(llamadas[0]["libro_rechazado"]["titulo"] == e0["libro"]["titulo"],
+           "y le pasa el libro rechazado")
+        ok(pv["excluir"] == ["Ciencia Ficción"] and pv["forma"] == "novela" and pv["ronda"] == 1,
+           "el perfil trae la exclusion, la forma y la ronda", str(pv))
+        ok(pv["nombrado"] == "Hermann Hesse",
+           "la referencia nombrada queda como estaba si el modelo no pide quitarla")
+        ok(e1["pool"] == len(e1["candidatos"]) or e1["restantes"] > nucleo._TOP_K_CANDIDATOS,
+           "con correccion compite el pool entero")
+        genero = str(e1["libro"].get("genero") or "").lower()
+        ok("ciencia" not in genero, "el libro elegido no es del genero excluido", genero)
+        ok(e1["respuestas_efectivas"]["_perfil_texto"] == pv["perfil"]
+           and e1["respuestas_efectivas"]["q1b"] == "novela"
+           and "_leidos" not in e1["respuestas_efectivas"],
+           "las respuestas efectivas llevan el perfil y la forma, sin claves internas de la llamada")
+        ok(e1["motivo_reformulado"].startswith("Una novela clasica"),
+           "la bitacora recibe el perfil corregido")
+
+        e2 = await nucleo.elegir_libro(dict(resp), [], [e0["libro"]["id"]], motivo, [],
+                                       e1["libro"]["id"], pv)
+        ok(len(llamadas) == 1, "el mismo rechazo (candidato y despues recomendar) no repite la llamada")
+        ok(e2["libro"]["id"] == e1["libro"]["id"]
+           and e2["motivo_reformulado"].startswith("Una novela clasica"),
+           "pero la bitacora lo registra igual")
+
+        e2b = await nucleo.elegir_libro(dict(resp), [], [e0["libro"]["id"], e1["libro"]["id"]],
+                                        motivo, [], "", pv)
+        ok(len(llamadas) == 2 and e2b["perfil_vigente"]["ronda"] == 2,
+           "el mismo texto en OTRO rechazo vuelve a corregir (otra ronda)")
+        ok(llamadas[1]["perfil_actual"] == pv["perfil"]
+           and llamadas[1]["generos_ya_excluidos"] == ["Ciencia Ficción"],
+           "y parte del perfil vigente, no del original")
+
+        salida.update({"perfil": "Una novela breve y agil.", "excluir": "Policial",
+                       "quitar_referencia": True, "forma": ""})
+        e3 = await nucleo.elegir_libro(dict(resp), [], [e0["libro"]["id"]], "nada parecido a Hesse", [], "", pv)
+        pv3 = e3["perfil_vigente"]
+        ok(pv3["nombrado"] == "" and pv3["valorado"] == "",
+           "'nada parecido a X' puede quitar la referencia (quitar_referencia)")
+        ok(pv3["excluir"] == ["Policial"], "un 'excluir' que viene como texto es UN genero, no letras sueltas")
+        ok(pv3["forma"] == "" and "q1b" not in e3["respuestas_efectivas"],
+           "forma vacia quiere decir 'no importa': se saca el filtro")
+        ok(nucleo.partes_del_ancla(e3["respuestas_efectivas"]) == ("", ""), "y el ancla queda vacia")
+
+        salida.update({"quitar_referencia": False, "referencia_nombrado": "Otro Autor"})
+        e4 = await nucleo.elegir_libro(dict(resp), [], [e0["libro"]["id"]], "otro motivo", [], "")
+        ok(e4["perfil_vigente"]["nombrado"] == "Hermann Hesse",
+           "el modelo no puede cambiar la referencia que el lector nombro")
+
+        n = len(llamadas)
+        salida = None
+        e5 = await nucleo.elegir_libro(dict(resp), [], [e0["libro"]["id"]], "un motivo mas", [], "")
+        ok(e5["perfil_vigente"] is None and e5["libro"]["id"] != e0["libro"]["id"],
+           "con el modelo caido la correccion se descarta y igual elige otro libro")
+        ok(len(llamadas) - n == 2, "tras dos intentos")
+
+        e6 = await nucleo.elegir_libro(dict(resp), [], [], "", [], "",
+                                       {"perfil": "x" * 9999, "excluir": [f"g{i}" for i in range(99)], "nombrado": "y" * 999})
+        ok(len(e6["perfil_vigente"]["perfil"]) == nucleo._PERFIL_MAX
+           and len(e6["perfil_vigente"]["excluir"]) == nucleo._EXCLUIR_MAX,
+           "un perfil vigente adulterado se acota")
+        ok((await nucleo.elegir_libro(dict(resp), [], [], "", [], "", {"basura": 1}))["perfil_vigente"] is None,
+           "y uno sin perfil se descarta")
+    finally:
+        (nucleo.httpx.AsyncClient, nucleo.OPENROUTER_API_KEY,
+         nucleo._embeber_cacheado, nucleo._ancla) = originales
+        nucleo._GENEROS_CACHE = None
+
+    pv_ok = router.PerfilVigente(perfil="x", excluir=["a"])
+    ok(pv_ok.model_dump()["excluir"] == ["a"], "el borde HTTP acepta un perfil vigente valido")
+    for malo in ({"perfil": "x" * 9999}, {"excluir": ["a"] * 99}, {"ronda": 999}):
+        try:
+            router.PerfilVigente(**malo)
+            rechazado = False
+        except Exception:  # noqa: BLE001
+            rechazado = True
+        ok(rechazado, f"y rechaza uno fuera de rango: {list(malo)[0]}")
 
 
 async def probar_perfiles() -> None:
@@ -998,6 +1184,61 @@ async def probar_http() -> None:
         ok(r.status_code == 200 and r.json().get("sesion_id"), "POST /sesion devuelve un id")
 
 
+def probar_caminos() -> None:
+    """El flujo de dos caminos: que exige el servidor en cada uno y como pesa
+    el ancla cuando reemplaza al perfil."""
+    print("\nflujo de dos caminos (q2, ancla, desvio)")
+    nucleo_previa = nucleo.MACRO_UNICA
+    nucleo.MACRO_UNICA = "literatura"
+    try:
+        publicas = nucleo.preguntas_publicas()
+        ok(list(publicas) == ["q4a", "q4c", "q1", "q1b", "q2", "q3", "q4b"],
+           "el cliente recorre q4a, q4c, q1, q1b, q2, q3, q4b en ese orden", str(list(publicas)))
+    finally:
+        nucleo.MACRO_UNICA = nucleo_previa
+
+    def acepta(datos: dict) -> bool:
+        try:
+            router.RespuestasCompletas(**{"q0": "literatura", **datos})
+            return True
+        except Exception:
+            return False
+
+    ok(acepta({"q2": "corto", "q4a": "Borges"}),
+       "camino A: q2 y una lectura nombrada alcanzan")
+    ok(acepta({"q2": "corto", "q4c": "decir", "q4b": "algo triste"}),
+       "camino B: q2 y lo que quiere, en texto libre")
+    ok(not acepta({"q2": "corto", "q4c": "decir"}),
+       "camino B sin texto se rechaza")
+    ok(acepta({"q2": "corto", "q4c": "preguntas", "q1": "ideas", "q1b": "novela",
+               "q3": "trama", "q4b": "x"}),
+       "camino C: q1, q1b, q3 y q4b")
+    ok(not acepta({"q2": "corto", "q4c": "preguntas", "q1": "ideas"}),
+       "camino C a medias se rechaza")
+    ok(not acepta({"q2": "corto", "q4c": "inventada", "q4a": "x"}),
+       "un desvio inventado se rechaza")
+    sin = nucleo._pesos({"rica": True}, None)
+    ok(abs(sum(sin) - 1.0) < 1e-9 and abs(sin[1] - nucleo._MAX_SIN_PERFIL) < 1e-9,
+       "ancla rica: pesa lo que el tope sin perfil y el perfil (q2) se queda con el resto", str(sin))
+    comun = nucleo._pesos({"rica": False}, None)
+    ok(abs(comun[1] - nucleo._PESO_ANCLA) < 1e-9, "ancla comun: el peso de siempre", str(comun))
+    ok(nucleo._pesos(None, None) == (1.0, 0.0, 0.0), "sin ancla todo es perfil")
+    texto = nucleo._construir_texto_perfil({"q0": "literatura", "q2": "corto"})
+    ok(bool(texto), "el perfil con solo q2 no queda vacio (la API de embeddings lo rechazaria)")
+
+    def nombrado(titulo, autor, q4):
+        return nucleo._menciono_el_libro(titulo, f" {nucleo._normalizar_texto(q4)} ", autor)
+
+    ok(nombrado("2001: Una odisea del espacio", "Arthur C. Clarke", "odisea en el espacio de clarke"),
+       "el libro escrito a medias y con su autor cuenta como nombrado")
+    ok(not nombrado("2001: Una odisea del espacio", "Arthur C. Clarke", "odisea en el espacio"),
+       "a medias y sin autor no alcanza: compartir un par de palabras no dice nada")
+    ok(not nombrado("Canticos de la lejana Tierra", "Arthur C. Clarke", "clarke"),
+       "nombrar solo al autor no saca sus libros (pide mas de el)")
+    ok(not nombrado("Historia de la eternidad", "Jorge Luis Borges", "borges ficciones"),
+       "otro libro del mismo autor no cuenta como nombrado")
+
+
 def probar_macro_unica() -> None:
     """El parche que expone una sola rama, probado por los dos lados.
 
@@ -1014,8 +1255,8 @@ def probar_macro_unica() -> None:
 
         ok("q0" not in publicas, "la pregunta del territorio no viaja al HTML")
         ok("q4" not in publicas, "el ancla vieja (historia/divulgacion) tampoco")
-        ok(set(publicas) == {"q1", "q1b", "q2", "q3", "q4a", "q4b"},
-           "viajan las 6 preguntas de literatura y ninguna mas", str(sorted(publicas)))
+        ok(set(publicas) == {"q1", "q1b", "q2", "q3", "q4a", "q4b", "q4c"},
+           "viajan las 7 preguntas de literatura y ninguna mas", str(sorted(publicas)))
         ok("variantes" not in publicas["q1"], "la q1 viaja ya resuelta, sin variantes")
         # El merge al reves dejaria la q1 base, que NO tiene "opciones": el
         # cliente moriria con un KeyError en la primera pregunta.
@@ -1090,6 +1331,7 @@ async def main() -> None:
     probar_empujon()
     probar_validadores()
     probar_macro_unica()
+    probar_caminos()
     probar_dominio()
     probar_rutas()
 
@@ -1097,6 +1339,7 @@ async def main() -> None:
     try:
         await probar_perfiles()
         await probar_rebusqueda()
+        await probar_perfil_corregido()
     finally:
         await db.cerrar()
 

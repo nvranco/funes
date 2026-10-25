@@ -34,7 +34,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 import httpx
 
-from app import db
+from funes import db
 
 CUANTOS = int(sys.argv[1]) if len(sys.argv) > 1 else 20
 

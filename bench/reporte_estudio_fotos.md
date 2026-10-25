@@ -1,7 +1,7 @@
 # Estudio: pipeline de visión contra un dataset variado de fotos de estante
 
 **Fecha:** 2026-08-09
-**Modelo evaluado:** `google/gemini-2.5-flash` (el mismo que corre en producción), prompt y guardrail de `app/vision.py` sin modificar.
+**Modelo evaluado:** `google/gemini-2.5-flash` (el mismo que corre en producción), prompt y guardrail de `funes/vision.py` sin modificar.
 **Dataset:** 39 imágenes en `data/`, curadas para simular fotos reales de un librero (ángulos, luz, cantidad de libros y duplicados variados). 4 son duplicados exactos por hash MD5 (`images (20)=(12)`, `(21)=(10)`, `(23)=(7)`, `(25)=(1)`), así que el modelo se corrió contra **32 imágenes de contenido único** (36 archivos totales en `data/` menos esos 4). Script: [`bench/estudio_dataset.py`](estudio_dataset.py). Resultados crudos: [`bench/resultados_estudio/resultados.json`](resultados_estudio/resultados.json). Costo total del estudio: **$0.12**.
 
 De las 32, 6 son fotos reales sacadas por el usuario con el celular (las que importan más, porque son las que se parecen a lo que va a subir un librero real); el resto son fotos de stock bajadas de buscadores, que sirven para estresar casos que las 6 reales no cubrían (alta resolución, apilados horizontales, idioma inglés, estantes muy densos).
@@ -18,7 +18,7 @@ De las 32, 6 son fotos reales sacadas por el usuario con el celular (las que imp
 
 **`WhatsApp Image...AMfadfa.jpeg`** — estante recto, bien iluminado, novelas juveniles/romance (Julia Quinn, Marissa Meyer). 13 libros, confianza **0.98**, guardrail x0. El mejor resultado de todo el dataset. Es la foto de referencia para la guía (§4).
 
-**`dffd.jpeg`** — la foto que originalmente generó el bug de subtítulo documentado en `app/tokens.py` (contiene "Four Thousand Weeks" de Oliver Burkeman). 7 libros, confianza 0.93, guardrail x0. Confirmado: el modelo lee bien título y autor acá; el problema histórico era de dedupe (ya resuelto), no de visión.
+**`dffd.jpeg`** — la foto que originalmente generó el bug de subtítulo documentado en `funes/tokens.py` (contiene "Four Thousand Weeks" de Oliver Burkeman). 7 libros, confianza 0.93, guardrail x0. Confirmado: el modelo lee bien título y autor acá; el problema histórico era de dedupe (ya resuelto), no de visión.
 
 **`dfs.jpeg`** — estante angulado (~30°), dos niveles, con objetos no-libro en cuadro (cables, cargador). 16 libros, confianza 0.87, guardrail x0. El clutter no confundió al modelo — no intentó "leer" el cargador como libro.
 

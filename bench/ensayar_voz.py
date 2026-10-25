@@ -14,9 +14,9 @@ import asyncio, sys, json, os, httpx
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.stdout.reconfigure(encoding="utf-8")
-from app.config import OPENROUTER_API_KEY
-from app import db
-from app.funes_chat import nucleo
+from funes.config import OPENROUTER_API_KEY
+from funes import db
+from funes.funes_chat import nucleo
 
 NL = chr(10)
 CACHE = Path(os.environ.get("TEMP", ".")) / "funes_rasgos.json"

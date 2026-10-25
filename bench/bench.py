@@ -20,7 +20,7 @@ FOTOS = ["6", "7", "8", "9", "10", "11", "12"]
 sys.path.insert(0, str(Path(__file__).parent.parent))
 os.environ.setdefault("DATABASE_URL", "postgresql://u:p@localhost/db")
 os.environ.setdefault("ADMIN_TOKEN", "x")
-from app.vision import _PROMPT, redimensionar, sanear_libro  # noqa: E402
+from funes.vision import _PROMPT, redimensionar, sanear_libro  # noqa: E402
 
 MODELOS = [
     "google/gemini-2.5-flash",

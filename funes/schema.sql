@@ -1,0 +1,644 @@
+-- LIBRERO — esquema MVP-0
+-- Migraciones a mano: este archivo se corre entero (con IF NOT EXISTS) al
+-- arrancar la app. No hay Alembic (ver stack, requisitos §8).
+
+CREATE TABLE IF NOT EXISTS librerias (
+    id              SERIAL PRIMARY KEY,
+    slug            TEXT NOT NULL UNIQUE,
+    nombre          TEXT NOT NULL,
+    whatsapp        TEXT NOT NULL,              -- formato internacional 54911...
+    token_panel     TEXT NOT NULL UNIQUE,
+    mensaje_wa_template TEXT NOT NULL DEFAULT
+        'Hola, vi en el catalogo que tenes {titulo} de {autor}. Sigue disponible?',
+    creado_en       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    activa          BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS lotes (
+    id              SERIAL PRIMARY KEY,
+    libreria_id     INTEGER NOT NULL REFERENCES librerias(id) ON DELETE CASCADE,
+    estado          TEXT NOT NULL DEFAULT 'procesando'
+                    CHECK (estado IN ('procesando', 'revision', 'publicado', 'descartado')),
+    cant_fotos      INTEGER NOT NULL DEFAULT 0,
+    creado_en       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    publicado_en    TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS fotos (
+    id              SERIAL PRIMARY KEY,
+    lote_id         INTEGER NOT NULL REFERENCES lotes(id) ON DELETE CASCADE,
+    path            TEXT NOT NULL,
+    orden           INTEGER NOT NULL DEFAULT 0,
+    creado_en       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS libros (
+    id              SERIAL PRIMARY KEY,
+    libreria_id     INTEGER NOT NULL REFERENCES librerias(id) ON DELETE CASCADE,
+    lote_id         INTEGER REFERENCES lotes(id) ON DELETE SET NULL,
+    foto_id         INTEGER REFERENCES fotos(id) ON DELETE SET NULL,
+    titulo_raw      TEXT NOT NULL,              -- lo que leyo el modelo, nunca se pisa
+    autor_raw       TEXT NOT NULL DEFAULT '',
+    titulo          TEXT NOT NULL,              -- version editada por el librero
+    autor           TEXT NOT NULL DEFAULT '',
+    confianza       REAL NOT NULL DEFAULT 0,    -- 0..1 declarada por el modelo
+    estado          TEXT NOT NULL DEFAULT 'pendiente'
+                    CHECK (estado IN ('pendiente', 'publicado', 'descartado', 'vendido')),
+    creado_en       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    publicado_en    TIMESTAMPTZ,
+    vendido_en      TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS eventos (
+    id              BIGSERIAL PRIMARY KEY,
+    libreria_id     INTEGER NOT NULL REFERENCES librerias(id) ON DELETE CASCADE,
+    tipo            TEXT NOT NULL,              -- vista|busqueda|clic_whatsapp|scan_qr|lote_publicado|libro_editado|inventario_reiniciado|ventas_confirmadas|catalogo_creado|catalogo_editado|catalogo_borrado|catalogo_movido|lote_catalogo_asignado
+    payload         JSONB NOT NULL DEFAULT '{}'::jsonb,
+    session_id      TEXT,
+    creado_en       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Migraciones incrementales. Se corren enteras en cada arranque, por eso todo
+-- lo de aca abajo tiene que ser idempotente (IF NOT EXISTS).
+
+-- Dedupe entre lotes: fotografiar el mismo estante dos veces es lo esperable,
+-- no un error del librero. El libro repetido se guarda igual (trazabilidad de
+-- que la foto lo vio) pero apunta al original y nace descartado, asi nunca
+-- llega duplicado al catalogo publico.
+ALTER TABLE libros ADD COLUMN IF NOT EXISTS duplicado_de INTEGER REFERENCES libros(id) ON DELETE SET NULL;
+
+-- Reinicio de inventario: borrado logico, nunca fisico. Para el librero es un
+-- ciclo nuevo con el catalogo en cero; para nosotros el historial completo
+-- sigue ahi, que es el dato con el que se mide HV-5 (¿vuelve a cargar?).
+ALTER TABLE libros ADD COLUMN IF NOT EXISTS archivado_en TIMESTAMPTZ;
+ALTER TABLE lotes  ADD COLUMN IF NOT EXISTS archivado_en TIMESTAMPTZ;
+
+-- Catalogos segmentados: recortes curados del catalogo general (psicologia,
+-- juveniles, liquidacion puntual, etc). Un libro pertenece a lo sumo a un
+-- catalogo (FK simple, no hace falta tabla intermedia). Borrar un catalogo
+-- no borra sus libros: quedan sin catalogo (ON DELETE SET NULL), visibles
+-- de nuevo solo en el catalogo general.
+CREATE TABLE IF NOT EXISTS catalogos (
+    id              SERIAL PRIMARY KEY,
+    libreria_id     INTEGER NOT NULL REFERENCES librerias(id) ON DELETE CASCADE,
+    slug            TEXT NOT NULL,
+    nombre          TEXT NOT NULL,
+    descripcion     TEXT NOT NULL DEFAULT '',
+    creado_en       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (libreria_id, slug)
+);
+ALTER TABLE libros ADD COLUMN IF NOT EXISTS catalogo_id INTEGER REFERENCES catalogos(id) ON DELETE SET NULL;
+-- Color elegido por el librero (clave de PALETA_CATALOGOS en app/colores.py).
+-- NULL en los catalogos creados antes de esta columna: color_catalogo() cae
+-- al color derivado del id, asi ninguno queda sin color.
+ALTER TABLE catalogos ADD COLUMN IF NOT EXISTS color TEXT;
+
+-- Foto de tapa por libro: cuando una foto cargada resulta tener un solo
+-- libro (en vez de una estanteria con varios lomos), esa misma foto sirve
+-- como tapa exhibible en el catalogo publico. mostrar_foto es la decision
+-- del librero en la revision (por defecto se muestra); se ignora si
+-- foto_portada_id es NULL.
+ALTER TABLE libros ADD COLUMN IF NOT EXISTS foto_portada_id INTEGER REFERENCES fotos(id) ON DELETE SET NULL;
+ALTER TABLE libros ADD COLUMN IF NOT EXISTS mostrar_foto BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- Desacopla la propiedad de una foto de pertenecer a un lote: hace falta
+-- para poder agregarle una foto de tapa suelta a un libro ya cargado (sin
+-- pasar por /lotes). libreria_id reemplaza al JOIN via lotes para saber de
+-- quien es una foto; el backfill corre en cada arranque pero es barato.
+ALTER TABLE fotos ADD COLUMN IF NOT EXISTS libreria_id INTEGER REFERENCES librerias(id) ON DELETE CASCADE;
+UPDATE fotos SET libreria_id = (SELECT l.libreria_id FROM lotes l WHERE l.id = fotos.lote_id)
+    WHERE libreria_id IS NULL;
+ALTER TABLE fotos ALTER COLUMN lote_id DROP NOT NULL;
+
+-- Portadas de referencia traidas de fuentes externas (MercadoLibre, Open
+-- Library) para libros sin foto propia. La clave es el ISBN normalizado o, sin
+-- ISBN, titulo+autor normalizados; el archivo vive en DATA_DIR/portadas/ con
+-- nombre por sha256 (ver funes/portadas.py). 'sin_portada' se guarda para no
+-- repetir la busqueda en cada vista; se reintenta pasado un tiempo.
+CREATE TABLE IF NOT EXISTS portadas (
+    clave        TEXT PRIMARY KEY,
+    estado       TEXT NOT NULL,            -- 'ok' | 'sin_portada'
+    sha256       CHAR(64),
+    fuente       TEXT,                     -- 'ml-isbn' | 'ol-isbn' | 'ml-texto' | 'ol-texto'
+    origen_url   TEXT,
+    ancho        INTEGER,
+    alto         INTEGER,
+    bytes        INTEGER,
+    revisada_en  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Catalogo del recomendador "Funes Chat": independiente del catalogo de
+-- donaciones (tabla `libros`), no pertenece a ninguna libreria. isbn/
+-- fecha_publicacion/categoria/genero/subgenero/nro_paginas quedan NULL para
+-- los libros que no vinieron de una fuente con esos datos (se completan
+-- despues, via investigacion, en otra tanda de trabajo). No hay columna
+-- editorial: un libro tiene multiples ediciones/editoriales, no es un dato
+-- estable "del libro".
+CREATE TABLE IF NOT EXISTS funes_libros (
+    id                  TEXT PRIMARY KEY,   -- slugify(titulo), con sufijo de autor si colisiona
+    titulo              TEXT NOT NULL,
+    autor               TEXT NOT NULL DEFAULT '',
+    abstracto           TEXT NOT NULL DEFAULT '',
+    embedding_abstracto REAL[],              -- 1536 dims; NULL hasta vectorizar
+    isbn                TEXT,
+    fecha_publicacion   TEXT,                -- tal cual la trae la fuente ("MM/YYYY"); no inventamos dia
+    categoria           TEXT,
+    genero              TEXT,
+    subgenero           TEXT,
+    nro_paginas         INTEGER,
+    confianza_abstracto TEXT,                -- 'alta' | 'baja'
+    nota                TEXT,                -- notas de investigacion (confianza baja, dato no verificado, etc)
+    fuente              TEXT NOT NULL DEFAULT 'manual',  -- 'manual' | 'ateneo-kaggle' | futuras fuentes
+    creado_en           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- editorial no es un dato estable del libro (cada edicion tiene la suya):
+-- se descarta de funes_libros, no se vuelve a completar.
+ALTER TABLE funes_libros DROP COLUMN IF EXISTS editorial;
+
+-- Macro-categoria para el filtro duro de Funes: 'literatura' | 'historia' |
+-- 'divulgacion'. Es la primera pregunta de la conversacion y recorta el
+-- catalogo ANTES del coseno: con 503 libros de historia y divulgacion
+-- mezclados entre literatura, el vector solo puede devolverle un manual de
+-- cosmologia a quien pidio una novela, y un absurdo mata la sesion.
+--
+-- Se deriva de categoria/genero, que cubren 1377 de las 1381 filas. El reparto
+-- verificado es historia=368, divulgacion=187, literatura=826.
+--
+-- macro_manual es la valvula de escape para corregir un libro puntual por SQL
+-- sin que el proximo arranque lo pise.
+ALTER TABLE funes_libros ADD COLUMN IF NOT EXISTS macro_manual TEXT;
+ALTER TABLE funes_libros ADD COLUMN IF NOT EXISTS macro TEXT;
+
+-- Se recalcula en cada arranque para que la regla de mapeo viva en un solo
+-- lugar (este archivo). El IS DISTINCT FROM lo vuelve un no-op desde la segunda
+-- corrida: no ensucia 1381 filas en cada deploy.
+WITH derivado AS (
+    SELECT id, COALESCE(macro_manual, CASE
+        WHEN genero    LIKE 'HISTORIA%'             THEN 'historia'
+        WHEN categoria LIKE 'CIENCIAS DE LA SALUD%' THEN 'divulgacion'
+        -- Filosofia va a divulgacion y no a literatura, que es donde caia por
+        -- el ELSE. La macro de divulgacion se presenta como "ciencias,
+        -- naturaleza, ideas" y su primera pregunta tiene una opcion para las
+        -- ideas; en literatura, en cambio, un libro de filosofia solo era
+        -- alcanzable pidiendo "ensayo", que es la forma y no el tema.
+        -- Critica literaria NO se mueve: habla de literatura, no de ideas.
+        WHEN genero    LIKE 'FILOSOF%'              THEN 'divulgacion'
+        ELSE 'literatura'
+    END) AS macro_nuevo
+    FROM funes_libros
+)
+UPDATE funes_libros f SET macro = d.macro_nuevo
+FROM derivado d
+WHERE d.id = f.id AND f.macro IS DISTINCT FROM d.macro_nuevo;
+
+-- El `tema` de esos libros de filosofia viene del vocabulario de LITERATURA
+-- ('ensayo'), y en divulgacion ese valor no lo descarta ninguna opcion: el libro
+-- sobreviviria a las cinco y le aparaceria por igual a quien pregunta por
+-- plantas y a quien pregunta por el universo, que es como se fabrica un hub. Se
+-- reetiqueta al valor que si existe en divulgacion.
+UPDATE funes_libros
+SET rasgos = jsonb_set(COALESCE(rasgos, '{}'::jsonb), '{tema}', '"ideas"')
+WHERE genero LIKE 'FILOSOF%' AND rasgos->>'tema' IS DISTINCT FROM 'ideas';
+
+-- Bitacora de "Funes Chat": una fila por conversacion. No reusa `eventos`
+-- porque esa tabla cuelga de una libreria (libreria_id NOT NULL con FK) y Funes
+-- no pertenece a ninguna: es un recomendador propio, con su propio catalogo.
+--
+-- Se guarda la conversacion entera, incluida la voz que genero el LLM: sin ese
+-- texto no se puede reconstruir que leyo la persona cuando dio su veredicto, y
+-- el veredicto queda sin contexto. El id lo genera el servidor (uuid4) y oficia
+-- de capacidad, igual que librerias.token_panel: quien lo tiene puede escribir
+-- esa sesion, y nadie la puede adivinar.
+CREATE TABLE IF NOT EXISTS funes_sesiones (
+    id              TEXT PRIMARY KEY,              -- uuid4 del servidor, nunca el que manda el cliente
+    origen          TEXT NOT NULL DEFAULT 'link',  -- qr|amigo|flyer|link, del ?src= de GET /funes
+    macro           TEXT,                          -- q0: literatura|historia|divulgacion (filtro duro)
+    q1              TEXT NOT NULL DEFAULT '',
+    q1b             TEXT NOT NULL DEFAULT '',  -- la forma; solo se pregunta en literatura
+    q2              TEXT NOT NULL DEFAULT '',      -- corto|intermedio|largo; define la banda de paginas
+    q3              TEXT NOT NULL DEFAULT '',
+    q4              TEXT NOT NULL DEFAULT '',      -- texto libre del lector
+    profundas       JSONB NOT NULL DEFAULT '[]'::jsonb,  -- [{pregunta, respuesta}] generadas por el LLM
+    pool_inicial    INTEGER,                       -- libros que sobrevivieron los filtros duros
+    -- Que filtro duro hubo que soltar porque el pool caia bajo el piso:
+    -- 'paginas', o el filtro por tema de esa macro ('subgenero' en historia,
+    -- 'tema' en divulgacion, 'forma' en literatura). NULL si no se aflojo nada.
+    filtro_aflojado TEXT,
+    creado_en       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ultima_act      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Una fila por recomendacion mostrada (hasta 3 por sesion). `orden` habilita el
+-- test pareado 1ra vs 2da: la 2da nace de motivo_rechazo, el texto libre con el
+-- que el lector explico por que la 1ra no le cerro.
+--
+-- libro_id va sin FK a funes_libros a proposito: si un libro sale del catalogo,
+-- la bitacora de lo que efectivamente se recomendo tiene que sobrevivir. Por
+-- eso tambien se copian titulo y autor.
+CREATE TABLE IF NOT EXISTS funes_recomendaciones (
+    id                 BIGSERIAL PRIMARY KEY,
+    sesion_id          TEXT NOT NULL REFERENCES funes_sesiones(id) ON DELETE CASCADE,
+    orden              INTEGER NOT NULL,           -- 1, 2, 3
+    libro_id           TEXT NOT NULL,
+    titulo             TEXT NOT NULL DEFAULT '',
+    autor              TEXT NOT NULL DEFAULT '',
+    voz                TEXT NOT NULL DEFAULT '',   -- la burbuja tal cual la leyo el lector
+    candidatos         JSONB NOT NULL DEFAULT '[]'::jsonb,  -- [{id, titulo, coseno}], el top-K entero
+    texto_consulta     TEXT NOT NULL DEFAULT '',   -- lo que se embebio para sacar el top-K
+    texto_afinado      TEXT NOT NULL DEFAULT '',   -- lo que se embebio para elegir dentro del top-K
+    motivo_rechazo     TEXT,                       -- por que NO convencio la anterior; NULL en la 1ra
+    motivo_reformulado TEXT,                       -- el rechazo reescrito en positivo, que es lo que se embebe
+    veredicto          TEXT CHECK (veredicto IN ('no_me_interesa', 'puede_ser', 'me_la_llevo')),
+    justificacion      TEXT,                       -- por que ese veredicto, texto libre
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (sesion_id, orden)
+);
+
+-- Credenciales de MercadoLibre. Una sola fila (CHECK id = 1): la app usa la
+-- cuenta ML del proyecto, no la de cada lector.
+--
+-- El refresh_token NO puede vivir en una variable de entorno: ML lo rota en
+-- cada refresco y es de un solo uso, asi que el valor cambia cada 6 horas y el
+-- anterior queda muerto. Guardarlo aca es lo que permite que el server se
+-- auto-refresque sin intervencion. client_id/client_secret siguen viniendo del
+-- entorno (ver funes/config.py): son secretos estables.
+CREATE TABLE IF NOT EXISTS funes_ml_credenciales (
+    id             INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    access_token   TEXT NOT NULL,
+    refresh_token  TEXT NOT NULL,
+    expira_en      TIMESTAMPTZ NOT NULL,           -- now() + expires_in (21600s = 6h)
+    user_id        TEXT,                           -- la cuenta ML que autorizo
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Cache del precio de referencia por libro. Tabla propia y no columnas en
+-- funes_libros porque es dato de afuera, con TTL y con fallas propias: mezclarlo
+-- con el catalogo obligaria a distinguir "no lo consultamos nunca" de "lo
+-- consultamos y no habia nada".
+--
+-- Se llamaba funes_precios_ml cuando el precio salia de la API de MercadoLibre.
+-- ML cerro /sites/MLA/search para aplicaciones de terceros (403 con token
+-- valido, verificado), asi que ahora el precio es una referencia del mercado
+-- argentino y el nombre con _ml quedaba mintiendo. Se renombra en vez de
+-- recrear para no perder lo cacheado.
+DO $$ BEGIN
+    IF to_regclass('public.funes_precios_ml') IS NOT NULL
+       AND to_regclass('public.funes_precios') IS NULL THEN
+        ALTER TABLE funes_precios_ml RENAME TO funes_precios;
+    END IF;
+END $$;
+
+-- El TTL evita salir a buscar en cada recomendacion. url_busqueda se guarda
+-- siempre, aunque no haya precio: el link no depende de nadie y es lo que el
+-- lector ve igual.
+CREATE TABLE IF NOT EXISTS funes_precios (
+    libro_id        TEXT PRIMARY KEY,              -- sin FK: la cache sobrevive a un libro borrado
+    precio          INTEGER,                       -- pesos enteros; NULL = consultado y sin dato confiable
+    moneda          TEXT NOT NULL DEFAULT 'ARS',
+    condicion       TEXT,                          -- 'nuevo' | 'usado' | NULL
+    cant_resultados INTEGER NOT NULL DEFAULT 0,
+    url_busqueda    TEXT NOT NULL DEFAULT '',
+    consultado_en   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    error           TEXT                           -- ultimo motivo de fallo; NULL si salio bien
+);
+
+-- De donde salio el precio. Se muestra al lector: un precio sin fuente es una
+-- afirmacion nuestra, uno con fuente es una referencia que puede verificar.
+ALTER TABLE funes_precios ADD COLUMN IF NOT EXISTS fuente TEXT;
+-- Link directo a la publicacion con ese precio. Se guarda aparte de `fuente`
+-- (que es solo el dominio) porque el link puede faltar o no validar y el
+-- dominio igual sirve para afinar la busqueda.
+ALTER TABLE funes_precios ADD COLUMN IF NOT EXISTS url_oferta TEXT;
+
+-- Excepcion por-libreria: alguna libreria cataloga CDs de musica, no libros,
+-- pero reusa el mismo pipeline (foto -> vision -> revision -> catalogo
+-- publico). tipo_catalogo decide que prompt usa vision.py y que palabras
+-- ("libro"/"CD", "autor"/"artista") se muestran en panel/revision/catalogo
+-- publico (ver app/etiquetas.py). TEXT en vez de BOOLEAN: si aparece un
+-- tercer tipo de catalogo el dia de mañana, no hace falta tocar el schema.
+-- Sin UI de edicion todavia (como con mensaje_wa_template): se setea a mano
+-- por SQL para la libreria puntual que lo necesita.
+ALTER TABLE librerias ADD COLUMN IF NOT EXISTS tipo_catalogo TEXT NOT NULL DEFAULT 'libros'
+    CHECK (tipo_catalogo IN ('libros', 'cds'));
+
+-- Subcatalogos: exactamente 2 niveles (catalogo -> subcatalogo). padre_id NULL
+-- = catalogo de primer nivel. La pertenencia al padre NO se materializa: un
+-- libro sigue apuntando al catalogo mas especifico (libros.catalogo_id) y la
+-- expansion padre->hijos se resuelve en cada query, asi mover un subcatalogo
+-- de padre es un UPDATE de una fila y nunca hay que migrar libros.
+-- ON DELETE SET NULL: borrar un padre sube sus hijos a primer nivel (no los
+-- borra) conservandoles slug y color, asi los QR ya impresos siguen andando.
+-- La regla de los 2 niveles se valida en la app (un CHECK no puede llevar
+-- subquery); la autoreferencia es imposible por construccion (en el INSERT el
+-- id todavia no existe, y el UPDATE que mueve de padre la excluye en su WHERE).
+ALTER TABLE catalogos ADD COLUMN IF NOT EXISTS padre_id INTEGER REFERENCES catalogos(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_librerias_slug ON librerias(slug);
+CREATE INDEX IF NOT EXISTS idx_libros_activos ON libros(libreria_id, estado) WHERE archivado_en IS NULL;
+CREATE INDEX IF NOT EXISTS idx_libros_libreria_estado ON libros(libreria_id, estado);
+CREATE INDEX IF NOT EXISTS idx_libros_lote ON libros(lote_id);
+CREATE INDEX IF NOT EXISTS idx_eventos_libreria_fecha ON eventos(libreria_id, creado_en);
+CREATE INDEX IF NOT EXISTS idx_lotes_libreria ON lotes(libreria_id);
+CREATE INDEX IF NOT EXISTS idx_catalogos_libreria ON catalogos(libreria_id);
+CREATE INDEX IF NOT EXISTS idx_catalogos_padre ON catalogos(padre_id);
+CREATE INDEX IF NOT EXISTS idx_libros_catalogo ON libros(catalogo_id);
+-- El clic en "¿donde lo consigo?" es la metrica que decide si el negocio
+-- existe: un veredicto alto es una opinion, esto es un movimiento hacia
+-- conseguir el libro. Va como timestamp y no como boolean para saber cuanto
+-- tardo en decidirse desde que vio la recomendacion.
+ALTER TABLE funes_recomendaciones ADD COLUMN IF NOT EXISTS clic_conseguir_en TIMESTAMPTZ;
+
+-- Trazabilidad del ancla de similitud (q4). Sin esto una recomendacion no se
+-- puede auditar despues: el parrafo que el LLM escribe sobre la referencia del
+-- lector es literalmente la mitad del vector que elige los candidatos, y hasta
+-- ahora se calculaba, se usaba y se tiraba. `texto_consulta` guarda lo que
+-- escribio la persona, no lo que el modelo entendio que era.
+ALTER TABLE funes_recomendaciones ADD COLUMN IF NOT EXISTS ancla_texto TEXT;
+ALTER TABLE funes_recomendaciones ADD COLUMN IF NOT EXISTS ancla_expandida TEXT;
+-- false = el modelo no reconocio la referencia con lo que ya sabia. En ese caso
+-- se fue a buscarla a la web (40 veces mas caro) y, si eso tambien fallo, se
+-- embebio el texto crudo del lector: ese ultimo caso se distingue porque
+-- ancla_expandida queda en NULL. Es la senal que dice si el catalogo de
+-- referencias que trae la gente le queda grande al modelo.
+ALTER TABLE funes_recomendaciones ADD COLUMN IF NOT EXISTS ancla_conocida BOOLEAN;
+-- El peso con el que se mezclo. Va guardado para que las filas viejas sigan
+-- siendo interpretables el dia que lo cambiemos.
+ALTER TABLE funes_recomendaciones ADD COLUMN IF NOT EXISTS peso_ancla REAL;
+-- Lo que REALMENTE se embebio como perfil: texto_consulta incluye la linea de
+-- la referencia, que desde que el ancla tiene vector propio ya no entra al
+-- vector del perfil. Sin esta columna los dos textos se confunden.
+ALTER TABLE funes_recomendaciones ADD COLUMN IF NOT EXISTS texto_perfil TEXT;
+
+-- Las 2 preguntas profundas que el LLM genero para ESTA recomendacion, con lo
+-- que la persona contesto. Vivian solo en funes_sesiones, y cuando alguien
+-- agota las 3 opciones y arranca de nuevo desde q1 la fila se reescribe con las
+-- del ciclo nuevo: las del primer ciclo se perdian para siempre. Son la mitad
+-- interesante de la conversacion (las unicas preguntas que no escribimos
+-- nosotros), asi que ahora quedan pegadas a la recomendacion que produjeron.
+ALTER TABLE funes_recomendaciones ADD COLUMN IF NOT EXISTS profundas JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+-- Cuantas veces esta persona agoto las recomendaciones y volvio a empezar desde
+-- q1. Sin este contador, una sesion de dos vueltas es indistinguible de una de
+-- una sola vuelta con respuestas raras.
+ALTER TABLE funes_sesiones ADD COLUMN IF NOT EXISTS ciclos INTEGER NOT NULL DEFAULT 1;
+
+-- q1b: la forma del libro. Se pregunta SOLO en literatura, asi que en las otras
+-- dos macros queda en '' para siempre, que es lo correcto y no un dato faltante.
+-- Se llama q1b y no q5 para que quede al lado de la pregunta de la que cuelga.
+ALTER TABLE funes_sesiones ADD COLUMN IF NOT EXISTS q1b TEXT NOT NULL DEFAULT '';
+
+-- El ancla partida en dos, tambien solo en literatura: q4a es lo que el lector
+-- nombro (vacia si contesto que no se le ocurre ninguno) y q4b que de eso
+-- quiere repetir. En historia y divulgacion las dos quedan en '' y el ancla
+-- sigue viniendo entera en q4, hasta que esas macros tengan su propia version.
+-- No se renumera ni se reusa q4: hay sesiones guardadas con la pregunta vieja y
+-- mezclarlas en la misma columna haria que "lo que escribio el lector" quisiera
+-- decir dos cosas distintas segun la fecha.
+ALTER TABLE funes_sesiones ADD COLUMN IF NOT EXISTS q4a TEXT NOT NULL DEFAULT '';
+ALTER TABLE funes_sesiones ADD COLUMN IF NOT EXISTS q4b TEXT NOT NULL DEFAULT '';
+
+-- El texto que se vectoriza, partido en dos. Hasta ahora el vector de cada libro
+-- salia de `abstracto`, un parrafo unico que mezclaba de que trata el libro con
+-- que es leerlo, y que ademas fue escrito calcando el cuestionario ("novela
+-- corta... densa... el valor central es la psicologia del personaje"). Eso tiene
+-- dos costos medidos: 694 de los 1.381 empiezan con la misma formula, y los
+-- libros que nombran todos los ejes a la vez le quedan cerca a cualquier
+-- consulta -el mas repetido entraba en el top-8 de 20 de cada 300 busquedas-.
+--
+-- `sinopsis` dice SOLO de que trata: tema, epoca, lugar, quien. Es contra lo que
+-- se compara la referencia que trae el lector en q4, que tambien es contenido.
+-- `experiencia` dice SOLO que es leerlo: ritmo, densidad, tono, para que momento.
+-- Es contra lo que se comparan las opciones que el lector elige, que estan
+-- escritas en ese mismo idioma. Comparar cada cosa con su semejante es el punto:
+-- hoy una y otra compiten dentro del mismo parrafo y se diluyen.
+--
+-- `abstracto` NO se toca ni se reemplaza: lo sigue leyendo la voz de Funes y el
+-- panel, y es el respaldo si esto sale peor.
+ALTER TABLE funes_libros ADD COLUMN IF NOT EXISTS sinopsis TEXT;
+ALTER TABLE funes_libros ADD COLUMN IF NOT EXISTS experiencia TEXT;
+ALTER TABLE funes_libros ADD COLUMN IF NOT EXISTS embedding_experiencia REAL[];
+
+-- Los tres textos de un libro pasan a tener cada uno su vector, con el mismo
+-- nombre que el texto del que sale. `embedding` se llamaba asi cuando era el
+-- unico que habia (salia de `abstracto`, ver importar_ateneo_bbdd); con tres
+-- en juego, un nombre generico obliga a recordar cual era. El rename es
+-- condicional para que corra una sola vez: schema.sql se ejecuta en cada
+-- arranque.
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_name = 'funes_libros' AND column_name = 'embedding')
+       AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name = 'funes_libros' AND column_name = 'embedding_abstracto') THEN
+        ALTER TABLE funes_libros RENAME COLUMN embedding TO embedding_abstracto;
+    END IF;
+END $$;
+
+-- El vector de la sinopsis, que hasta ahora no existia: la reescritura v3
+-- escribio el TEXTO de 1.102 libros y nunca se vectorizo, asi que el ancla
+-- siguio comparandose contra el abstracto. Va en columna propia y no pisando
+-- a `embedding_abstracto` para que el cambio sea un flag y no una migracion:
+-- con los dos guardados se puede medir el ancla contra uno y contra el otro
+-- sobre el mismo catalogo desplegado, y volver atras sin re-vectorizar nada.
+-- Mismo criterio que _calcular_centrados, que guarda el crudo y el centrado.
+ALTER TABLE funes_libros ADD COLUMN IF NOT EXISTS embedding_sinopsis REAL[];
+-- Vocabulario cerrado (tema, tono, exigencia, ritmo...) para poder filtrar por
+-- algo que el catalogo hoy no tiene: en divulgacion, 87 de 187 libros tienen
+-- subgenero "EN GENERAL", asi que no hay con que separar un libro de hongos de
+-- uno de psicoanalisis salvo el vector.
+ALTER TABLE funes_libros ADD COLUMN IF NOT EXISTS rasgos JSONB;
+-- Que version del prompt escribio esas tres columnas. Sin esto no se sabe si una
+-- fila quedo vieja cuando el prompt cambia, y habria que reprocesar el catalogo
+-- entero por las dudas.
+ALTER TABLE funes_libros ADD COLUMN IF NOT EXISTS version_reescritura TEXT;
+
+-- Los libros que el lector nos dijo que ya habia leido, con lo que opino de
+-- ellos. No son recomendaciones: nunca se mostraron. Guardarlos en
+-- funes_recomendaciones los contaria en el embudo y ensuciaria el analisis
+-- pareado de la 1ra contra la 2da.
+--
+-- Y son un dato por derecho propio. Sobre 24 lectores simulados, 5 de cada 25
+-- recomendaciones reprobadas eran libros que la persona ya habia leido: pasaba
+-- siempre que nombraba un autor como referencia y le devolviamos su obra mas
+-- famosa. Eso no es errarle, es acertarle tarde, y desde afuera se veia igual
+-- que un fracaso.
+CREATE TABLE IF NOT EXISTS funes_leidos (
+    sesion_id  TEXT NOT NULL REFERENCES funes_sesiones(id) ON DELETE CASCADE,
+    libro_id   TEXT NOT NULL,
+    titulo     TEXT NOT NULL,
+    autor      TEXT,
+    opinion    TEXT,
+    creado_en  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (sesion_id, libro_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_funes_libros_macro ON funes_libros(macro) WHERE embedding_abstracto IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_funes_sesiones_fecha ON funes_sesiones(creado_en);
+
+-- Funes por libreria: /funes/{slug} ofrece el mismo recomendador pero acotado
+-- a los libros que esa libreria tiene publicados (cruce por titulo/autor
+-- contra funes_libros, resuelto en memoria — ver nucleo.ids_por_libreria, no
+-- hay tabla de matches ni denormalizacion). funes_habilitado es manual (se
+-- prende desde /admin, como tipo_catalogo) y solo tiene sentido con
+-- tipo_catalogo='libros': Funes hoy no sabe nada de CDs.
+ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_habilitado BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Excepcion de demo: con esto prendido, Funes por libreria (ver
+-- nucleo.ids_por_libreria) NO recorta el pool a lo que esa libreria tiene
+-- publicado -recomienda de Babilonia entera, como el Funes generico, pero
+-- con el saludo y el cierre en nombre de esta libreria puntual-. Pensado
+-- para una libreria de demostracion sin catalogo propio cargado todavia (o
+-- chico a proposito). Apagado por default: el recorte real es el
+-- comportamiento normal de Funes por libreria, esto es la excepcion.
+ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_catalogo_completo BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- El cierre de Funes por libreria, despues de que el lector acepta el libro.
+-- NULL o vacio = las dos burbujas genericas del template ("si estas en X ahora
+-- mismo..." + "si no, por WhatsApp"). Con texto, cada linea (\n) es una burbuja
+-- propia, en el mismo markdown-lite del chat (*cursiva*, **negrita**). Es
+-- donde una libreria dice lo que solo ella sabe: un descuento para la
+-- comunidad, una condicion. Se edita desde /admin, no hay UI en el panel del
+-- librero: el texto lo escribimos con la libreria, no lo carga ella sola.
+ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_cierre TEXT;
+
+-- El saludo de Funes por libreria. NULL o vacio = el saludo generico ("Hola, mi
+-- nombre es Ireneo Funes. Tengo a mi disposicion una seleccion de ... ofrecidos
+-- por la libreria X"). Con texto, REEMPLAZA a esa primera burbuja entera: cada
+-- linea (\n) es una linea de la burbuja, maximo tres (MAX_MENSAJES_POR_RESPUESTA
+-- del chat). Existe para la demo de libreros, donde Funes le habla al librero y
+-- no al lector.
+ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_saludo TEXT;
+
+-- Las sedes de la libreria con horario, para que el cierre diga cual esta
+-- abierta AHORA y el boton "¿Como llego?" apunte a esa (o a la proxima en
+-- abrir). NULL = sin sedes: el boton sigue siendo "Consultar por WhatsApp".
+-- Forma:
+--   {"intro": "*Festina Lente* tiene dos sedes en el campus.",
+--    "tz": "America/Argentina/Buenos_Aires",
+--    "sedes": [{"nombre": "del edificio Tornavias",
+--               "referencia": "en el primer piso, al lado de la Biblioteca Central",
+--               "dias": [1,2,3,4,5], "desde": "10:00", "hasta": "16:00",
+--               "maps": "https://..."}]}
+-- `nombre` lleva la preposicion ("del edificio X", "de la Torre Y") porque
+-- el chat lo pega despues de "la": "abierta la del edificio X". dias: 1=lunes
+-- ... 7=domingo. Se guarda como JSON y no en tablas propias: son dos filas por
+-- libreria que se cargan una vez, y el chat las lee enteras de un saque.
+ALTER TABLE librerias ADD COLUMN IF NOT EXISTS funes_sedes JSONB;
+
+-- Para que el dashboard de Funes por libreria (funes/funes_chat/panel_funes.py,
+-- nucleo.cobertura_libreria) pueda filtrar/agrupar conversaciones por
+-- libreria. El scoping real de la RECOMENDACION no pasa por aca (funes_chat.py
+-- nunca lee funes_sesiones para armar el pool, ver nucleo.ids_por_libreria):
+-- esto es solo bitacora, poblada por routers/funes_chat.py:sesion() resolviendo
+-- el slug que manda el cliente (nucleo.id_libreria_activa).
+ALTER TABLE funes_sesiones ADD COLUMN IF NOT EXISTS libreria_id INTEGER
+    REFERENCES librerias(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_funes_sesiones_libreria ON funes_sesiones(libreria_id, creado_en);
+CREATE INDEX IF NOT EXISTS idx_funes_recomendaciones_sesion ON funes_recomendaciones(sesion_id, orden);
+
+-- Analizando el piloto de septiembre 2026 aparecio "Los extraños de M..." como
+-- la recomendacion mas repetida en cuanto se probaba _DOS_VECTORES contra las
+-- conversaciones reales: su abstracto es una ADIVINANZA ("no fue posible
+-- identificar con certeza la novela... se mantiene la hipotesis mas plausible
+-- segun su ubicacion fisica en el estante"), y un texto que no compromete nada
+-- cae cerca del centro del espacio de embeddings -exactamente lo que vuelve
+-- hub a un libro-. Un barrido sobre el catalogo entero (3.600 libros, las 3
+-- macros) encontro otros 3 con el mismo problema: el propio abstracto admite
+-- que no se sabe que libro es.
+--
+-- Se excluyen del recomendador poniendo sus vectores en NULL -el mismo filtro
+-- que _libros() ya usa para "todavia no vectorizado", WHERE embedding_abstracto
+-- IS NOT NULL-, no se borran: si algun dia se identifica el libro real, alcanza con
+-- corregir titulo/autor y volver a correr catalog/reescribir_abstractos.py
+-- sobre ese id. El WHERE de abajo deja de matchear en cuanto corre una vez,
+-- asi que las corridas siguientes son no-op.
+UPDATE funes_libros
+SET embedding_abstracto = NULL, embedding_experiencia = NULL,
+    confianza_abstracto = 'baja',
+    nota = 'Excluido del recomendador (piloto sept. 2026): el titulo no se '
+           'pudo identificar con certeza y el abstracto es una hipotesis, no '
+           'una descripcion real del libro.'
+WHERE id IN ('los-extranos-de-m', 'la-gilada', 'educacion-fisica-infantil',
+             'ciencia-ficcion-espacio')
+  AND embedding_abstracto IS NOT NULL;
+
+-- Migracion v5a de literatura (sept. 2026, ver catalog/instructivo_reescritura_v5.md):
+-- de los agentes que reescribieron sinopsis/experiencia libro por libro, 22
+-- terminaron en cuarentena porque no se pudo confirmar con una fuente que
+-- edicion es exactamente cada uno -ISBN cruzado con otro producto, homonimo
+-- real sin forma de desambiguar, o ficha generica sin autor/ISBN-. Mismo
+-- criterio que la exclusion anterior de 4 libros: los embeddings van a NULL,
+-- la fila no se borra.
+UPDATE funes_libros
+SET embedding_abstracto = NULL, embedding_experiencia = NULL,
+    confianza_abstracto = 'baja',
+    nota = CASE id
+        WHEN 'aves' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a un numero de la revista Litoral (antologia de varios autores), no a ''Los pajaros'' de Aristofanes que describe la ficha.'
+        WHEN 'cuentos-perversos' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El titulo lo usan al menos dos obras distintas en espanol (Javier Tomeo/Anagrama, y una compilacion de Gonzalo Marquez Cristo), sin ISBN ni autor en la ficha para desambiguar.'
+        WHEN 'desierto' THEN 'Excluido del recomendador (migracion v5a, cuarentena): La ficha describe ''Desert'' de Le Clezio, pero el ISBN corresponde a un ensayo/manifiesto postecologista anonimo sin relacion.'
+        WHEN 'diccionario-multilingue-ilustrado' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Diccionario visual generico sin autor, editorial ni ISBN: no hay edicion identificable.'
+        WHEN 'educacion-sexual-integral-para-la-inclusion' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Titulo generico de material pedagogico sobre ESI e inclusion, sin ISBN ni autor: hay multiples materiales similares, ninguno identificable con certeza.'
+        WHEN 'el-buscon' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a una adaptacion abreviada para lectores juveniles (Susaeta), no al texto original de Quevedo que describe la ficha.'
+        WHEN 'el-dinero' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a ''El dinero'' de Carl Menger (ensayo economico), no a la novela de Zola que describe la ficha.'
+        WHEN 'el-viy-y-otros-relatos' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a una edicion que solo trae el relato ''El Viy'' de Gogol, no la seleccion de varios relatos que describe la ficha.'
+        WHEN 'electra-edipo-en-colono-ayax' THEN 'Excluido del recomendador (migracion v5a, cuarentena): No existe ninguna edicion publicada que combine exactamente esas tres tragedias de Sofocles; probable ficha cruzada con otro volumen del catalogo.'
+        WHEN 'estoy-solo' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a un libro infantil ilustrado sobre las emociones (coleccion Mis Sentimientos), no a la novela mauritana de Beyrouk que describe la ficha.'
+        WHEN 'la-ley-del-talion' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a un libro de no ficcion sobre un caso real en Palencia (Calleja Ibanez), no a la antologia de ciencia ficcion de Gerard Klein que describe la ficha.'
+        WHEN 'la-tregua' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Homonimo real: el ISBN corresponde a ''La tregua'' de Mario Benedetti, pero el texto de la ficha describe la novela de Primo Levi con el mismo titulo.'
+        WHEN 'las-tecnologias-de-la-informacion-y-la-comunicacion' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Titulo generico de manual educativo sobre TIC, sin ISBN ni autor: circula en multiples ediciones, ninguna identificable con certeza.'
+        WHEN 'notas-de-prensa-i-obra-periodistica-1961-1984' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Primer tomo de una edicion real de Garcia Marquez en dos volumenes (Sudamericana), pero sin forma de confirmar que columnas especificas trae este tomo frente al otro con el mismo ISBN.'
+        WHEN 'notas-de-prensa-ii-obra-periodistica-1961-1984' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Segundo tomo de la misma edicion que el anterior, mismo ISBN, misma imposibilidad de diferenciar contenido entre los dos tomos.'
+        WHEN 'pioneros' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a un libro de cronica futbolistica (''Pioneros: una historia de la Copa America'', Jorge Barraza), no a ''O Pioneers!'' de Willa Cather que describe la ficha.'
+        WHEN 'poemas-escogidos' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a ''Poemas escogidos'' de Eliseo Diego, no a la seleccion de Pedro Salinas que describe la ficha.'
+        WHEN 'terror-y-suspenso' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Antologia de Conan Doyle sin ISBN ni titulo verificable contra ninguna edicion real conocida.'
+        WHEN 'tierra-fantasy' THEN 'Excluido del recomendador (migracion v5a, cuarentena): La propia ficha admite no poder confirmar cual de los volumenes numerados de la antologia corresponde a este ejemplar.'
+        WHEN 'un-relampago' THEN 'Excluido del recomendador (migracion v5a, cuarentena): Pulp de ciencia ficcion francesa (Maurice Limat) real pero sin fuente que confirme el argumento de este titulo puntual.'
+        WHEN 'vida' THEN 'Excluido del recomendador (migracion v5a, cuarentena): La propia ficha admite no poder confirmar la identidad de la autora ni el titulo exacto.'
+        WHEN 'zadig-o-el-destino' THEN 'Excluido del recomendador (migracion v5a, cuarentena): El ISBN corresponde a la antologia de Catedra ''Candido; Micromegas; Zadig'' completa, no a una edicion independiente de Zadig como describe la ficha.'
+    END
+WHERE id IN (
+    'aves', 'cuentos-perversos', 'desierto', 'diccionario-multilingue-ilustrado',
+    'educacion-sexual-integral-para-la-inclusion', 'el-buscon', 'el-dinero',
+    'el-viy-y-otros-relatos', 'electra-edipo-en-colono-ayax', 'estoy-solo',
+    'la-ley-del-talion', 'la-tregua', 'las-tecnologias-de-la-informacion-y-la-comunicacion',
+    'notas-de-prensa-i-obra-periodistica-1961-1984', 'notas-de-prensa-ii-obra-periodistica-1961-1984',
+    'pioneros', 'poemas-escogidos', 'terror-y-suspenso', 'tierra-fantasy',
+    'un-relampago', 'vida', 'zadig-o-el-destino'
+) AND embedding_abstracto IS NOT NULL;
+
+-- Codigos QR de las carpitas de mesa: cada carpita impresa lleva un token
+-- opaco propio (/qr/<token>), no la URL final de una libreria, para poder
+-- reciclar la misma carpita fisica entre librerias sin reimprimir. El
+-- vinculo (libreria_id) se hace despues de imprimir, desde el panel del
+-- libreria (token libre) o desde /admin (reasigna cualquiera).
+CREATE TABLE IF NOT EXISTS qr_codigos (
+    id SERIAL PRIMARY KEY,
+    token TEXT UNIQUE NOT NULL,
+    libreria_id INTEGER REFERENCES librerias(id),
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Historial completo de a que libreria apunto cada codigo, para poder
+-- reciclar la misma carpita fisica entre librerias con trazabilidad (quien
+-- la vinculo/reasigno y cuando). libreria_id NULL = quedo (o quedo) sin
+-- vincular en ese momento del historial.
+CREATE TABLE IF NOT EXISTS qr_codigos_historial (
+    id SERIAL PRIMARY KEY,
+    qr_codigo_id INTEGER NOT NULL REFERENCES qr_codigos(id),
+    libreria_id INTEGER REFERENCES librerias(id),
+    vinculado_por TEXT NOT NULL,  -- 'sistema' | 'librero' | 'superadmin'
+    vinculado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_qr_codigos_historial_codigo ON qr_codigos_historial(qr_codigo_id, vinculado_en);
+
+-- Una carpita se puede vincular tambien al Funes generico (/funes, sin
+-- libreria), para QR que van a circular fuera de cualquier libreria puntual
+-- (ej. redes, flyer). No es el default de una carpita nueva -nace sin
+-- vincular, como siempre-, es una tercera opcion explicita ademas de "sin
+-- vincular" y "vinculada a una libreria": libreria_id sigue NULL en ese
+-- caso, esta columna es lo que distingue "todavia sin decidir" de "decidido
+-- que va al generico". Solo /admin puede ponerla (ver routers/admin.py);
+-- si un librero despues toma esa carpita para su libreria (vincular-qr),
+-- vuelve a FALSE porque deja de ser generica.
+ALTER TABLE qr_codigos ADD COLUMN IF NOT EXISTS destino_generico BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE qr_codigos_historial ADD COLUMN IF NOT EXISTS destino_generico BOOLEAN NOT NULL DEFAULT FALSE;

@@ -11,7 +11,7 @@ data/
 # Muestra original de Funes (36 MB): el catalogo vive en funes_libros desde que
 # se migro a Postgres, ningun codigo lee este archivo. Solo lo usan los scripts
 # de migracion de funes/, que corren a mano y en local.
-app/funes_chat/muestra.json
+funes/funes_chat/muestra.json
 .DS_Store
 .idea/
 .vscode/
@@ -19,13 +19,13 @@ app/funes_chat/muestra.json
 # Datos crudos de los scrapers de catalogo (Yenny/Cuspide): bases SQLite de
 # 1-2 GB, sitemaps y logs. Son insumo local de la curacion, no del repo.
 # `*.sqlite3` no alcanza: WAL deja tambien -wal y -shm al lado.
-funes/_scraping/
+catalog/_scraping/
 
 # Herramientas de scraping de catalogo (Yenny/Cuspide) y sus datos.
 # Es utilitario local para juntar catalogo crudo, no parte de la app que
 # se despliega: no entra al repo.
-funes/scrapers/
+catalog/scrapers/
 
-# Respaldos de macros purgadas de produccion (funes/respaldar_y_purgar_macro.py):
+# Respaldos de macros purgadas de produccion (catalog/respaldar_y_purgar_macro.py):
 # copias completas del catalogo, no codigo.
-funes/_respaldos/
+catalog/_respaldos/
