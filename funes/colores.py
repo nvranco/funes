@@ -21,4 +21,8 @@ def color_catalogo(catalogo_id: int, clave: str | None = None) -> dict:
     tiene una clave guardada y valida se usa esa; si no, se deriva del id
     para que igual sea estable entre renders."""
     base = _POR_CLAVE.get(clave) or PALETA_CATALOGOS[catalogo_id % len(PALETA_CATALOGOS)]
-    return {"bg": f"bg-[{base['bg']}]", "borde": f"border-[{base['borde']}]"}
+    return {
+        "bg": f"bg-[{base['bg']}]", "borde": f"border-[{base['borde']}]",
+        # Valores crudos, para usarlos dentro de un degradado (una clase no alcanza).
+        "hex_bg": base["bg"], "hex_borde": base["borde"],
+    }

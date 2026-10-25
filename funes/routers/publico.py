@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from funes import db
+from funes.config import DOMINIO_FUNES
 from funes.colores import color_catalogo
 from funes.etiquetas import etiquetas
 
@@ -83,6 +84,8 @@ async def _render_catalogo(request: Request, slug: str, catalogo_slug: str | Non
 
     catalogo = None
     catalogos = []
+    # Chips de navegacion entre catalogos: solo en la pagina de un catalogo.
+    catalogos_nav = []
     padre = None
     if catalogo_slug is None:
         catalogos = await _catalogos_con_libros(libreria["id"])
@@ -100,6 +103,7 @@ async def _render_catalogo(request: Request, slug: str, catalogo_slug: str | Non
         if fila_catalogo is None:
             raise HTTPException(status_code=404)
         catalogo = {**dict(fila_catalogo), "color": color_catalogo(fila_catalogo["id"], fila_catalogo["color"])}
+        catalogos_nav = await _catalogos_con_libros(libreria["id"])
         # Un catalogo padre "contiene" los libros de sus subcatalogos: el
         # conteo que ve el visitante tiene que incluirlos.
         cant_publicados = await db.pool().fetchval(
@@ -134,6 +138,10 @@ async def _render_catalogo(request: Request, slug: str, catalogo_slug: str | Non
             "whatsapp_js": _js_string(libreria["whatsapp"]),
             "mensaje_wa_template_js": _js_string(libreria["mensaje_wa_template"]),
             "catalogos": catalogos,
+            "catalogos_nav": catalogos_nav,
+            # El logo del pie lleva a la landing de Funes, que vive en su propio dominio
+            # (la raiz de este host no es de Funes). Sin dominio configurado, no es un link.
+            "url_funes": f"https://{DOMINIO_FUNES}/" if DOMINIO_FUNES else "",
             "catalogo": catalogo,
             "padre": padre,
             "catalogos_map_js": catalogos_map_js,
