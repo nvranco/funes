@@ -30,14 +30,10 @@
 
   /* Buscador pegajoso bajo la linea de la cabecera. */
   .cat .barra { position: sticky; top: 0; z-index: 10; margin: 0 calc(-1 * var(--gutter)); padding: 1rem var(--gutter) .75rem; }
-  .cat .barra::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0; transition: opacity .2s;
-    background: rgba(251,247,238,.9); backdrop-filter: blur(10px);
-    -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent); mask-image: linear-gradient(to bottom, #000 62%, transparent); }
-  .cat .barra.pegada::before { opacity: 1; }
   .cat .buscador { position: relative; }
   .cat .buscador svg { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); width: 1.25rem; height: 1.25rem; color: rgb(var(--gris-cat)); pointer-events: none; }
   .cat .buscador input { width: 100%; min-height: 52px; padding: 0 1rem 0 2.9rem; border-radius: 14px; color: rgb(var(--tinta));
-    border: 1px solid #E2DED4; background: #fff; box-shadow: none;
+    border: 1px solid #E2DED4; background: #fff; box-shadow: 0 1px 3px rgba(46,33,22,.1), 0 5px 12px -6px rgba(46,33,22,.16);
   }
   .cat .buscador input::placeholder { color: rgb(var(--gris-cat)); }
 
@@ -297,14 +293,9 @@
   registrarEvento('vista', payloadCatalogo({ src: ORIGEN, origen: ORIGEN_CATALOGO }));
 
   const buscador = document.getElementById('buscador');
-  const barra = document.getElementById('barra');
   const conteo = document.getElementById('conteo');
   btnIconoGenerico = document.querySelector('[data-rol="icono-wa"]');
   if (btnIconoGenerico) btnIconoGenerico.innerHTML = ICONO_WHATSAPP;
-  // La barra de busqueda gana fondo propio recien cuando se pega arriba.
-  window.addEventListener('scroll', () => {
-    barra.classList.toggle('pegada', barra.getBoundingClientRect().top <= 0);
-  }, { passive: true });
   const resultados = document.getElementById('resultados');
   // Deja el chip activo a la vista en la fila de catalogos.
   const chips = document.getElementById('chips');
