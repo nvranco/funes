@@ -12,8 +12,13 @@
   /* Pagina blanca; solo la cabecera es una "hero" con el brillo difuso del hero de la landing
      (radiales que se apagan en transparente, en distintas posiciones y tamanos), en el color del
      catalogo (--acento). Una linea la separa del buscador y los libros. */
-  .cat { --acento: #7A9E78; background: color-mix(in srgb, var(--acento) 5%, rgb(var(--papel))); }
-  .cat .cab { padding: 2rem 1.25rem 1.75rem; border-bottom: 1px solid color-mix(in srgb, var(--acento) 65%, rgb(var(--borde)));
+  /* Responsive: --gutter es el margen lateral. En mobile 1.25rem; desde 640px el contenido se centra
+     en 72rem (como la landing) mientras el hero, la barra y el pie siguen a todo el ancho. Base.html
+     limita todo a 480px; aca se levanta ese tope. */
+  .cat { --acento: #7A9E78; --gutter: 1.25rem; max-width: none; background: color-mix(in srgb, var(--acento) 5%, rgb(var(--papel))); }
+  @media (min-width: 640px) { .cat { --gutter: max(2rem, calc((100vw - 72rem) / 2)); } }
+  .cat main { padding-left: var(--gutter); padding-right: var(--gutter); }
+  .cat .cab { padding: 2rem var(--gutter) 1.75rem; border-bottom: 1px solid color-mix(in srgb, var(--acento) 65%, rgb(var(--borde)));
     background-color: rgb(var(--fondo));
     background-image:
       radial-gradient(circle 340px at 92% 8%, color-mix(in srgb, var(--acento) 44%, transparent) 0, transparent 100%),
@@ -24,7 +29,7 @@
   .cat .cab .nota { margin-top: .75rem; text-wrap: balance; font-size: .8rem; line-height: 1.45; color: rgb(var(--gris-cat)); }
 
   /* Buscador pegajoso bajo la linea de la cabecera. */
-  .cat .barra { position: sticky; top: 0; z-index: 10; margin: 0 -1.25rem; padding: 1rem 1.25rem .75rem; }
+  .cat .barra { position: sticky; top: 0; z-index: 10; margin: 0 calc(-1 * var(--gutter)); padding: 1rem var(--gutter) .75rem; }
   .cat .barra::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0; transition: opacity .2s;
     background: color-mix(in srgb, var(--acento) 5%, rgba(251,247,238,.9)); backdrop-filter: blur(10px);
     -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent); mask-image: linear-gradient(to bottom, #000 62%, transparent); }
@@ -38,7 +43,7 @@
 
   /* Chips de catalogos, dentro del hero bajo la nota: fila con scroll horizontal; el catalogo actual
      (o el padre del subcatalogo, seguido del propio subcatalogo) va resaltado. */
-  .cat .chips { display: flex; gap: .5rem; margin: 1rem -1.25rem 0; padding: .1rem 1.25rem;
+  .cat .chips { display: flex; gap: .5rem; margin: 1rem calc(-1 * var(--gutter)) 0; padding: .1rem var(--gutter);
     overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
   .cat .chips::-webkit-scrollbar { display: none; }
   .cat .chip { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 1rem; border-radius: 12px;
@@ -63,7 +68,7 @@
   .cat .columna { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: .75rem; }
   .cat .lib { overflow: hidden; border-radius: 3px; background: rgba(255,255,255,.26); box-shadow: 0 1px 3px rgba(46,33,22,.1), 0 5px 12px -6px rgba(46,33,22,.16); border: 1px solid rgb(var(--borde)); }
   @media (prefers-reduced-motion: no-preference) {
-    .cat .columnas.entra .lib { animation: lib-entra .45s ease both; animation-delay: calc(var(--i, 0) * 45ms); }
+    .cat .columnas.entra .lib { animation: lib-entra .45s ease backwards; animation-delay: calc(var(--i, 0) * 45ms); }
   }
   @keyframes lib-entra { from { opacity: 0; transform: translateY(10px); } }
 
@@ -97,6 +102,39 @@
   .cat a.pie { transition: color .15s ease; }
   .cat a.pie:hover, .cat a.pie:active { color: rgba(46,33,22,.6); }
 
+
+  /* Tableta y escritorio */
+  @media (min-width: 640px) {
+    .cat .cab { padding-top: 2.75rem; padding-bottom: 2.25rem; }
+    .cat .cab h1 { font-size: 2.4rem; }
+    .cat .cab .nota { font-size: .95rem; margin-top: 1rem; }
+    .cat .cab .nota br { display: none; }
+    .cat .chips { margin-top: 1.5rem; }
+    .cat .buscador { max-width: 560px; }
+    .cat #catalogos-cards:not(.hidden) { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .75rem; }
+    .cat #catalogos-cards > * { margin: 0; }
+    .cat .columnas { gap: 1rem; }
+    .cat .columna { gap: 1rem; }
+    .cat .lib-titulo { font-size: .95rem; }
+    .cat .lib-autor { font-size: .82rem; }
+    /* Brillo del hero mas grande para el ancho de escritorio. */
+    .cat .cab { background-image:
+      radial-gradient(circle 560px at 88% 10%, color-mix(in srgb, var(--acento) 44%, transparent) 0, transparent 100%),
+      radial-gradient(circle 380px at 3% 100%, color-mix(in srgb, var(--acento) 26%, transparent) 0, transparent 100%),
+      radial-gradient(circle 320px at 55% 118%, color-mix(in srgb, var(--acento) 20%, transparent) 0, transparent 100%),
+      radial-gradient(circle 260px at 28% -15%, color-mix(in srgb, var(--acento) 16%, transparent) 0, transparent 100%); }
+  }
+  @media (min-width: 1024px) {
+    .cat .chips { flex-wrap: wrap; overflow: visible; }
+  }
+  /* El hover solo donde hay mouse. */
+  @media (hover: hover) {
+    .cat .lib { transition: transform .18s ease, box-shadow .18s ease; }
+    .cat .lib:hover { transform: translateY(-3px); box-shadow: 0 2px 6px rgba(46,33,22,.12), 0 14px 24px -10px rgba(46,33,22,.26); }
+    .cat .chip:not(.activo):hover { background: rgba(255,255,255,.7); }
+    .cat .fila-cat:hover { transform: translateY(-2px); }
+  }
+
   .cat .lib-txt { padding: .6rem .7rem .75rem; }
   .cat .lib-titulo { font-size: .9rem; line-height: 1.25; font-weight: 600; color: rgb(var(--tinta));
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -109,7 +147,7 @@
   <header class="cab">
     <h1>{{ libreria.nombre }}</h1>
     <p class="nota">
-      Las imágenes pueden ser ilustrativas;<br>consultá estado y disponibilidad por WhatsApp.
+      Las imágenes pueden ser ilustrativas; <br>consultá estado y disponibilidad por WhatsApp.
     </p>
     {% if catalogo and catalogos_nav %}
     {% set activo = padre.slug if padre else catalogo.slug %}
@@ -318,6 +356,20 @@
   let catalogo = [];
   let catalogoListo = false;
   let yaAnimo = false;  // la entrada animada se hace una sola vez, no en cada tecla
+  let ultimaLista = null;
+  let columnasActuales = 0;
+  // Mismos cortes que el CSS: 640, 1024 y 1280px.
+  function cantidadColumnas() {
+    const w = window.innerWidth;
+    return w >= 1280 ? 5 : w >= 1024 ? 4 : w >= 640 ? 3 : 2;
+  }
+  let timerResize = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(timerResize);
+    timerResize = setTimeout(() => {
+      if (ultimaLista && ultimaLista.length && cantidadColumnas() !== columnasActuales) renderResultados(ultimaLista);
+    }, 150);
+  });
 
   function subsetCatalogo() {
     if (CATALOGO_ID === null) return catalogo;
@@ -378,6 +430,7 @@
         return;
       }
       resultados.innerHTML = '';
+      ultimaLista = null;
       conteo.classList.add('hidden');
       estadoVacio.classList.remove('hidden');
       ocultarBotonGenerico();
@@ -422,6 +475,7 @@
     if (!catalogoListo) return;
     if (lista.length === 0) {
       resultados.innerHTML = '';
+      ultimaLista = null;
       conteo.classList.add('hidden');
       estadoVacio.classList.remove('hidden');
       const q = buscador.value.trim();
@@ -445,12 +499,15 @@
     estadoVacio.classList.add('hidden');
     ocultarBotonGenerico();
     ocultarPistaOtroCatalogo();
-    // Dos columnas independientes: cada libro va a la columna mas corta segun una estimacion de
-    // su altura (tapa + lineas de titulo), asi el orden de lectura se mantiene casi por filas.
-    const cols = [[], []], alturas = [0, 0];
+    // Columnas independientes (2 en celular, 3 en tableta, 4-5 en escritorio): cada libro va a la
+    // columna mas corta segun una estimacion de su altura (tapa + lineas de titulo), asi el orden de
+    // lectura se mantiene casi por filas.
+    ultimaLista = lista;
+    columnasActuales = cantidadColumnas();
+    const cols = Array.from({ length: columnasActuales }, () => []), alturas = new Array(columnasActuales).fill(0);
     lista.forEach((libro, i) => {
-      const est = (libro.imagen_url ? 1.25 : 1.25) + Math.min(3, Math.ceil((libro.titulo || '').length / 17)) * 0.2 + 0.6;
-      const k = alturas[1] < alturas[0] ? 1 : 0;
+      const est = 1.25 + Math.min(3, Math.ceil((libro.titulo || '').length / 17)) * 0.2 + 0.6;
+      const k = alturas.indexOf(Math.min(...alturas));
       alturas[k] += est;
       cols[k].push(`
         <article class="lib" data-idx="${i}" style="--i:${Math.min(i, 8)};--dur:${(2.2 + (i % 4) * 0.5).toFixed(1)}s;--del:-${((i * 0.8) % 3).toFixed(1)}s">
