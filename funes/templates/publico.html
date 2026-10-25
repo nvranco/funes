@@ -226,7 +226,7 @@
 <script>
   const SLUG = "{{ libreria.slug }}";
   const ET_LIBRO = "{{ et.libro }}", ET_LIBROS = "{{ et.libros }}";
-  const ET_AUTOR = "{{ et.autor }}", ET_AUTOR_CAP = "{{ et.Autor }}";
+  const ET_AUTOR = "{{ et.autor }}", ET_AUTOR_CAP = "{{ et.Autor }}", ET_AUTORES = "{{ et.autores }}";
   const WHATSAPP = {{ whatsapp_js | safe }};
   const MENSAJE_TEMPLATE = {{ mensaje_wa_template_js | safe }};
   const ORIGEN = {{ origen_js | safe }};
@@ -516,7 +516,10 @@
     resultados.classList.toggle('entra', !yaAnimo);
     yaAnimo = true;
     resultados.innerHTML = cols.map((c) => `<div class="columna">${c.join('')}</div>`).join('');
-    conteo.textContent = `${lista.length} ${lista.length === 1 ? ET_LIBRO : ET_LIBROS}`;
+    // Autores distintos (sin contar los libros que no tienen autor cargado).
+    const autores = new Set(lista.map((l) => normalizar(l.autor)).filter(Boolean)).size;
+    conteo.textContent = `${lista.length} ${lista.length === 1 ? ET_LIBRO : ET_LIBROS}`
+      + (autores ? ` · ${autores} ${autores === 1 ? ET_AUTOR : ET_AUTORES}` : '');
     conteo.classList.remove('hidden');
 
     resultados.querySelectorAll('[data-idx]').forEach((el) => {
