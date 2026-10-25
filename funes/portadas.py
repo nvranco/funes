@@ -53,6 +53,10 @@ _ANCHO_MINIMO = 300          # px: por debajo no sirve ni de miniatura
 _BYTES_MINIMOS = 5_000       # Open Library devuelve miniaturas de ~1 KB
 _BYTES_MAXIMOS = 8_000_000   # tope de descarga, para no tragarse cualquier cosa
 _LADO_MAYOR = 800
+# Alto/ancho de una tapa de libro: casi todas caen entre 1,4 y 1,7. Una foto de
+# producto de ML fuera de esa banda suele ser un libro fotografiado con
+# envoltorio, sobre una mesa o en caja, no la tapa de frente.
+_RELACION_TAPA = (1.38, 1.7)
 _REINTENTO_SIN_PORTADA_DIAS = 30
 
 # Open Library limita las busquedas por ISBN a 100 pedidos por IP cada 5 minutos.
@@ -178,6 +182,16 @@ async def _esperar_turno_ol(prioritario: bool = False) -> None:
 
 # --- Fuentes: cada una devuelve la URL de una imagen candidata, o None ---------
 
+def _tiene_forma_de_tapa(foto: dict) -> bool:
+    """La foto de ML declara su tamano (max_width/max_height). Sin tamano no se
+    puede saber y no se la prefiere."""
+    try:
+        relacion = float(foto["max_height"]) / float(foto["max_width"])
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return False
+    return _RELACION_TAPA[0] <= relacion <= _RELACION_TAPA[1]
+
+
 async def _url_ml(client: httpx.AsyncClient, token: str, params: dict, intento: _Intento,
                   titulo: str = "", autor: str = "", validar: bool = False) -> str | None:
     cabecera = {"Authorization": f"Bearer {token}"}
@@ -189,6 +203,10 @@ async def _url_ml(client: httpx.AsyncClient, token: str, params: dict, intento: 
         if busq.status_code != 200:
             intento.fallo = intento.fallo or _es_fallo_de_fuente(busq.status_code)
             return None
+        # Se corta en la primera foto con proporcion de tapa. Si ninguna la tiene se
+        # sigue mirando los otros productos (los datos de las fotos ya vienen en la
+        # misma respuesta, no cuesta bajar nada) y, de no haber, se usa la primera.
+        respaldo = None
         for res in busq.json().get("results", [])[:5]:
             prod = await client.get(f"{_API_ML}/products/{res['id']}", headers=cabecera)
             if prod.status_code != 200:
@@ -197,9 +215,13 @@ async def _url_ml(client: httpx.AsyncClient, token: str, params: dict, intento: 
             datos = prod.json()
             if validar and not _coincide(titulo, autor, str(datos.get("name", ""))):
                 continue
-            fotos = datos.get("pictures") or []
-            if fotos and fotos[0].get("url"):
-                return fotos[0]["url"]
+            fotos = [f for f in datos.get("pictures") or [] if f.get("url")]
+            for foto in fotos:
+                if _tiene_forma_de_tapa(foto):
+                    return foto["url"]
+            if fotos and respaldo is None:
+                respaldo = fotos[0]["url"]
+        return respaldo
     except (httpx.HTTPError, ValueError, KeyError):
         intento.fallo = True
     return None
