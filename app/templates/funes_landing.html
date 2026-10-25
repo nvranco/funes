@@ -1,18 +1,28 @@
 {% extends "base.html" %}
-{% block titulo %}Funes{% endblock %}
+{% block titulo %}Funes · Catálogos digitales y recomendador de libros para librerías{% endblock %}
+
+{# Los datos de contacto viven aca arriba para cambiarlos en un solo lugar. El
+   numero va en formato internacional para wa.me (54 9 + codigo de area + numero,
+   sin el 15). #}
+{% set WA = "5491126911499" %}
+{% set MAIL = "nvrancovich@gmail.com" %}
+{% set TEL = "11 2691-1499" %}
+{% macro wa(texto) -%}https://wa.me/{{ WA }}?text={{ texto | urlencode }}{%- endmacro %}
+
 {% block head %}
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Funes">
-<meta property="og:title" content="Funes">
-<meta property="og:description" content="Funes lee el catálogo digital de tu librería y charla con tus lectores hasta encontrar su próximo libro.">
+<meta property="og:title" content="Funes · Tu librería, visible y recomendable">
+<meta property="og:description" content="Catálogos digitales por categoría para compartir en redes o con un QR, y un recomendador que charla con tus clientes hasta encontrar su próximo libro.">
 <meta property="og:url" content="{{ base_url }}/">
 <meta property="og:image" content="{{ base_url }}/static/funes-og.png?v={{ og_version }}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Funes, un recomendador de libros">
+<meta property="og:image:alt" content="Funes, catálogos digitales y recomendador de libros para librerías">
 <meta property="og:locale" content="es_AR">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="description" content="Funes lee el catálogo digital de tu librería y charla con tus lectores hasta encontrar su próximo libro.">
+<meta name="description" content="Catálogos digitales por categoría para compartir en redes o con un QR, y un recomendador que charla con tus clientes hasta encontrar su próximo libro.">
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@700&family=Inter+Tight:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 {% if posthog_key %}
 <script src="{{ posthog_host }}/static/array.js"></script>
 <script>
@@ -24,88 +34,474 @@
 </script>
 {% endif %}
 <style>
-  @media (min-width: 768px) {
-    #hero { padding-top: 4.5rem; padding-bottom: 3.5rem; }
-    #hero h1 { font-size: 3rem; }
-    #hero p.mision { font-size: 1.25rem; }
+  /* Direccion A, "crema editorial": los tokens de base.html, con Inter Tight en los
+     titulos e Inter en el cuerpo. El verde decorativo (--celeste) no pasa
+     contraste como texto sobre crema; para texto se usa --verde-texto. */
+  :root { --verde-texto: 63 107 75; --gris-lp: 95 85 69; }
+  .lp { font-family: Inter, -apple-system, "Segoe UI", Roboto, sans-serif; color: rgb(var(--tinta)); }
+  .lp h1, .lp h2, .lp h3, .lp .serif { font-family: "Inter Tight", Inter, -apple-system, "Segoe UI", sans-serif; font-weight: 700; letter-spacing: -0.02em; }
+  .lp .contenedor { max-width: 72rem; margin: 0 auto; padding-left: 1.25rem; padding-right: 1.25rem; }
+  .lp .texto-verde { color: rgb(var(--verde-texto)); }
+  .lp .seccion { padding-top: 3.5rem; padding-bottom: 3.5rem; }
+  .lp .boton {
+    display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+    min-height: 52px; padding: 0 1.5rem; border-radius: 12px; font-weight: 600; text-align: center;
+    border: 2px solid transparent; transition: transform .15s ease, background-color .15s ease;
   }
+  .lp .boton:hover { transform: translateY(-1px); }
+  .lp .boton-principal { background: rgb(var(--tinta)); color: rgb(var(--crema)); }
+  .lp .boton-principal:hover { background: rgb(var(--verde-texto)); }
+  .lp .boton-secundario { background: transparent; color: rgb(var(--tinta)); border-color: rgba(46,33,22,.35); }
+  .lp .boton-secundario:hover { background: rgba(46,33,22,.06); }
+  .lp .tarjeta { background: rgb(var(--papel)); border: 1px solid rgb(var(--borde)); border-radius: 16px; }
+  .lp .numero {
+    width: 2rem; height: 2rem; border-radius: 9999px; flex: none; display: inline-flex;
+    align-items: center; justify-content: center; font-weight: 600; font-size: .875rem;
+    background: rgb(var(--verde-texto)); color: rgb(var(--crema));
+  }
+  .lp details > summary { cursor: pointer; list-style: none; }
+  .lp details > summary::-webkit-details-marker { display: none; }
+  .lp details[open] .mas { transform: rotate(45deg); }
+  .lp .mas { transition: transform .2s ease; }
+  @media (prefers-reduced-motion: no-preference) {
+    .lp .aparece { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease; }
+    .lp .aparece.visible { opacity: 1; transform: none; }
+  }
+  .lp .fondo-laberinto {
+    background-image: radial-gradient(circle at 85% 20%, rgba(122,158,120,.26) 0, rgba(122,158,120,0) 58%);
+  }
+  .lp .burbuja-funes { background: rgb(var(--papel)); border: 1px solid rgb(var(--borde)); border-radius: 14px 14px 14px 4px; }
+  .lp .burbuja-lector { background: rgb(var(--celeste-claro)); border-radius: 14px 14px 4px 14px; }
+
+  /* Celular del recomendador: mismas proporciones que el de catalogos (400x720). Todo se mide en
+     cqw para que la conversacion escale con el ancho del celular. */
+  .lp .cel-caja { container-type: inline-size; }
+  .lp .cel { aspect-ratio: 400 / 720; padding: 3cqw; border-radius: 11.5cqw; background: linear-gradient(135deg, #4A3A2C, #241A11);
+    filter: drop-shadow(0 18px 22px rgba(46,33,22,.24)); }
+  .lp .cel-pantalla { height: 100%; border-radius: 8.5cqw; overflow: hidden; background: rgb(var(--fondo)); display: flex; flex-direction: column; }
+  .lp .cel-top { flex: none; display: flex; align-items: center; justify-content: center; gap: 2cqw; padding: 5.5cqw 0 4.5cqw;
+    background: rgb(var(--celeste)); border-bottom: .6cqw solid rgb(var(--tinta)); }
+  .lp .cel-top span { font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 6.4cqw; line-height: 1; color: rgb(var(--tinta)); }
+  .lp .cel-top svg { width: 6.4cqw; height: 6.4cqw; color: rgb(var(--tinta)); }
+  .lp .cel-chat { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 2.4cqw;
+    padding: 3.5cqw 3.5cqw 2.5cqw; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7cqw); mask-image: linear-gradient(to bottom, transparent 0, #000 7cqw); }
+  .lp .cel .m { font-size: 4.1cqw; line-height: 1.38; padding: 2.5cqw 3.2cqw; max-width: 86%; flex: none; }
+  .lp .cel .m.f { align-self: flex-start; background: rgb(var(--papel)); border: 1px solid rgb(var(--borde)); border-radius: 3.6cqw 3.6cqw 3.6cqw 1cqw; }
+  .lp .cel .m.l { align-self: flex-end; background: rgb(var(--celeste-claro)); border: 1px solid rgb(var(--celeste)); border-radius: 3.6cqw 3.6cqw 1cqw 3.6cqw; }
+  .lp .cel .m.pensando { display: flex; gap: 1.2cqw; padding: 3.2cqw 3.6cqw; }
+  .lp .cel .m.pensando i { width: 1.8cqw; height: 1.8cqw; border-radius: 50%; background: rgb(var(--gris-lp)); opacity: .4; }
+  .lp .cel .zona { flex: none; display: flex; flex-direction: column; gap: 2cqw; padding: 0 3.5cqw 4cqw; }
+  .lp .cel .zona .fila { display: flex; gap: 2cqw; }
+  .lp .cel .zona .caja { flex: 1; font-size: 3.9cqw; line-height: 1.35; min-height: 12.5cqw; padding: 2.2cqw 3cqw; border-radius: 3cqw;
+    background: rgb(var(--papel)); border: 1.5px solid rgb(var(--borde)); color: rgb(var(--tinta)); }
+  .lp .cel .zona .caja:empty::before { content: attr(data-ph); color: rgb(var(--gris-lp)); opacity: .7; }
+  .lp .cel .zona .bot { font-size: 3.9cqw; font-weight: 600; text-align: center; padding: 2.6cqw 3cqw; border-radius: 3cqw; border: 1.5px solid rgb(var(--celeste));
+    background: rgb(var(--celeste-claro)); color: rgb(var(--tinta)); transition: background-color .2s ease, transform .2s ease, color .2s ease; }
+  .lp .cel .zona .envia { flex: none; align-self: stretch; display: flex; align-items: center; padding: 0 4cqw; }
+  .lp .cel .zona .votos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2cqw; }
+  .lp .cel .zona .votos .bot { padding: 2.6cqw 0; }
+  .lp .cel .zona .v-floja { background: #F4DEDA; border-color: #B8453A; }
+  .lp .cel .zona .v-dudosa { background: #F6E6C8; border-color: #C98A1E; }
+  .lp .cel .zona .v-precisa { background: #DCE9D6; border-color: rgb(var(--celeste)); }
+  .lp .cel .zona .bot.sel { background: rgb(var(--verde-texto)); border-color: rgb(var(--verde-texto)); color: rgb(var(--crema)); transform: scale(.97); }
+  .lp .cel .zona .caret::after { content: ""; display: inline-block; width: .35cqw; height: 4cqw; margin-left: .3cqw; vertical-align: -.7cqw; background: rgb(var(--tinta)); }
+  @media (prefers-reduced-motion: no-preference) {
+    .lp .cel .m.entra { animation: m-entra .35s ease both; }
+    .lp .cel .m.pensando i { animation: m-punto 1s ease-in-out infinite; }
+    .lp .cel .m.pensando i:nth-child(2) { animation-delay: .15s; }
+    .lp .cel .m.pensando i:nth-child(3) { animation-delay: .3s; }
+    .lp .cel .zona .caret::after { animation: m-caret 1s steps(1) infinite; }
+    .lp .cel-chat.sale { transition: opacity .5s ease; opacity: 0; }
+  }
+  @keyframes m-entra { from { opacity: 0; transform: translateY(1.6cqw); } to { opacity: 1; transform: none; } }
+  @keyframes m-punto { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+  @keyframes m-caret { 50% { opacity: 0; } }
+
+  /* Enlaces del hero a sus secciones: scroll suave, con margen para el banner fijo. */
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+  .lp section[id] { scroll-margin-top: 88px; }
+  .lp .enlace-seccion { font-weight: 600; color: rgb(var(--verde-texto)); text-decoration: underline;
+    text-decoration-color: rgba(63,107,75,.4); text-decoration-thickness: 1px; text-underline-offset: 4px;
+    transition: color .15s ease, text-decoration-color .15s ease; }
+  /* Cada enlace cambia de verde como un solo bloque, cada uno a su ritmo. */
+  @media (prefers-reduced-motion: no-preference) {
+    .lp .enlace-seccion { animation: lava 2.4s ease-in-out infinite alternate; }
+    .lp .enlace-seccion + .enlace-seccion, .lp .enlace-seccion[href="#recomendador"] { animation-duration: 3.1s; animation-delay: -1.2s; }
+  }
+  /* Botones de WhatsApp: borde y texto toman el mismo cambio de verde que los enlaces. */
+  .lp .boton-lava { background: transparent; color: rgb(var(--verde-texto)); border-color: currentColor; }
+  @media (prefers-reduced-motion: no-preference) { .lp .boton-lava { animation: lava 2.4s ease-in-out infinite alternate; } }
+  .lp .boton-lava:hover { animation: none; color: rgb(var(--tinta)); background: rgba(46,33,22,.05); }
+  /* El boton de la barra aparece cuando el del hero sale de pantalla. */
+  .lp .boton-barra { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .25s ease, visibility .25s; }
+  .lp .boton-barra.visible { opacity: 1; visibility: visible; pointer-events: auto; }
+  @keyframes lava { 0% { color: #3F6B4B; } 100% { color: #5E8F55; } }
+  .lp .enlace-seccion:hover { animation: none; color: rgb(var(--tinta)); text-decoration-color: rgba(46,33,22,.5); }
+
+  /* Banner fijo y siempre visible. */
+  /* Pastilla flotante, inset respecto de los bordes. */
+  .lp .banner { position: fixed; top: 10px; left: 1.25rem; right: 1.25rem; z-index: 20; max-width: calc(72rem - 2.5rem); margin: 0 auto;
+    border-radius: 12px; background: #F5EFE2;
+    border: .5px solid rgb(var(--borde)); box-shadow: 0 6px 20px rgba(46,33,22,.08); }
+  .lp .marca { display: inline-flex; align-items: center; gap: .5rem; color: #111; line-height: 1; }
+  /* El logo conserva la tipografia original de la marca. */
+  .lp .marca .serif, .lp .logo-funes { font-family: Lora, Georgia, serif; font-weight: 700; letter-spacing: -0.01em; }
+  .lp .marca .serif { font-size: 1.25rem; }
+  .lp .marca svg { width: 1.25rem; height: 1.25rem; }
 </style>
 {% endblock %}
 
 {% block contenido %}
-<div class="min-h-screen max-w-2xl mx-auto flex flex-col">
-  <main class="flex-1 px-5 pb-14">
+<div class="lp" style="max-width:none">
 
-    <section id="hero" class="text-center pt-10 pb-8">
-      <svg viewBox="0 0 32 32" class="w-14 h-14 mx-auto text-celeste" fill="none"
-           stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-        <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
-        <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
-        <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
-        <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
-      </svg>
-      <h1 class="font-sans text-4xl font-bold text-tinta leading-tight mt-3">Funes</h1>
-      <p class="mision text-base text-gris leading-relaxed mt-4 max-w-md mx-auto">
-        Tu librería ya digitalizó su catálogo, libro por libro. Yo lo leo
-        entero y charlo con tus lectores hasta ayudarlos a encontrar, ahí
-        adentro, el que todavía no sabían que buscaban.
-      </p>
-      <a href="/funes"
-         class="tap btn-primario border-celeste inline-flex items-center justify-center rounded-xl2 font-bold px-8 mt-6">
-        Hablar con Funes
+
+  <header class="banner" id="banner">
+    <div class="flex items-center justify-between" style="min-height: 56px; padding: 0 .75rem 0 1rem;">
+      <a href="/" class="marca" aria-label="Funes">
+        <span class="serif">Funes</span>
+        <svg viewBox="0 0 32 32"  fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+          <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
+          <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
+          <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
+          <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
+        </svg>
       </a>
+      <a href="{{ wa('Hola, tengo una librería y quiero saber más de Funes.') }}" target="_blank" rel="noopener"
+         id="wa-barra" data-evento="whatsapp" data-origen="barra"
+         class="boton boton-lava boton-barra" style="min-height:36px; padding: 0 .8rem; font-size:.8rem; gap:.4rem; border-radius:10px; border-width:1px">
+        Consultar
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+          <path d="M20.5 3.5A11.8 11.8 0 0 0 12 0C5.4 0 0 5.4 0 12c0 2.1.6 4.200 1.600 6L0 24l6.200-1.600A12 12 0 0 0 12 24c6.600 0 12-5.400 12-12 0-3.200-1.300-6.200-3.500-8.500zM12 22a10 10 0 0 1-5.100-1.400l-.4-.2-3.700 1 1-3.600-.2-.4A10 10 0 1 1 12 22zm5.500-7.500c-.3-.2-1.800-.9-2-1-.3-.1-.5-.2-.7.200-.2.300-.8 1-1 1.200-.2.200-.4.200-.7.100-.3-.2-1.300-.5-2.400-1.500-.9-.8-1.500-1.800-1.700-2.100-.2-.3 0-.5.100-.6l.5-.5.300-.5c.1-.2 0-.4 0-.5l-.9-2.200c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.100-.8.400-.3.300-1 1-1 2.500s1.100 2.900 1.200 3.100c.2.200 2.100 3.200 5.100 4.500.7.300 1.300.5 1.700.6.700.2 1.400.2 1.900.1.600-.1 1.800-.7 2-1.400.3-.7.300-1.300.2-1.400-.1-.1-.3-.2-.6-.3z"/>
+        </svg>
+      </a>
+    </div>
+  </header>
+
+  <main>
+
+    {# 1. Hero ------------------------------------------------------------- #}
+    <section class="fondo-laberinto" id="hero">
+      <div class="contenedor seccion grid md:grid-cols-2 gap-10 items-center" style="padding-top: calc(76px + 3.5rem)">
+        <div>
+          <h1 class="text-[2.25rem] md:text-[3.25rem] leading-tight">Tu librería, visible y recomendable.</h1>
+          <p class="text-[1.2rem] md:text-[1.4rem] mt-5 leading-relaxed" style="color: rgb(var(--gris-lp))">
+            Ofrecé a tus clientes una nueva forma de descubrir tu stock a través de <a href="#catalogos" class="enlace-seccion">catálogos digitales</a>
+            o un <a href="#recomendador" class="enlace-seccion">recomendador conversacional</a>, únicamente sacando fotos a tus estanterías.
+          </p>
+          <div class="flex flex-col sm:flex-row gap-3 mt-8">
+            <a href="/funes/{{ slug_demo }}?src=landing" data-evento="demo" data-origen="hero" class="boton boton-principal">
+              Conversar con Funes
+              <svg viewBox="0 0 32 32" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+                <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
+                <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
+                <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
+                <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
+              </svg>
+            </a>
+            <a href="{{ wa('Hola, tengo una librería y quiero saber más de Funes.') }}" target="_blank" rel="noopener"
+               id="wa-hero" data-evento="whatsapp" data-origen="hero" class="boton boton-lava">
+              Consultar por WhatsApp
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+          <path d="M20.5 3.5A11.8 11.8 0 0 0 12 0C5.4 0 0 5.4 0 12c0 2.1.6 4.200 1.600 6L0 24l6.200-1.600A12 12 0 0 0 12 24c6.600 0 12-5.400 12-12 0-3.200-1.300-6.200-3.500-8.500zM12 22a10 10 0 0 1-5.100-1.400l-.4-.2-3.700 1 1-3.600-.2-.4A10 10 0 1 1 12 22zm5.500-7.500c-.3-.2-1.800-.9-2-1-.3-.1-.5-.2-.7.200-.2.300-.8 1-1 1.200-.2.200-.4.200-.7.100-.3-.2-1.300-.5-2.400-1.500-.9-.8-1.500-1.800-1.700-2.100-.2-.3 0-.5.100-.6l.5-.5.300-.5c.1-.2 0-.4 0-.5l-.9-2.200c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.100-.8.400-.3.300-1 1-1 2.500s1.100 2.900 1.200 3.100c.2.200 2.100 3.200 5.100 4.500.7.300 1.300.5 1.700.6.700.2 1.400.2 1.900.1.600-.1 1.800-.7 2-1.400.3-.7.300-1.300.2-1.400-.1-.1-.3-.2-.6-.3z"/>
+        </svg>
+            </a>
+          </div>
+        </div>
+        <div class="relative">
+          <div role="img" aria-label="Espacio reservado para una foto: estantería de libros con la carpita de Funes"
+               class="w-full rounded-2xl flex flex-col items-center justify-center gap-3"
+               style="aspect-ratio: 4 / 3; background: #CFCBC2; color: #6F6A60;">
+            <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M21 16l-5-5-8 9"/>
+            </svg>
+            <span class="text-sm font-medium">Foto de la estantería con la carpita de Funes</span>
+          </div>
+        </div>
+      </div>
     </section>
 
-    {# Le habla al librero (audiencia de esta pagina), no al lector final: es
-       quien digitaliza el catalogo y decide sumar a Funes, y esta pagina lo
-       tiene que convencer a el. Por eso "tu"/"vos" es el librero, y "tus
-       lectores"/"ellos" son las personas que despues chatean. Sigue en
-       primera persona -es Funes quien habla de si mismo, no "nosotros" el
-       equipo. Orden: primero el corazon del producto -la charla misma-,
-       despues por que el catalogo del que habla no es generico sino EL
-       estante puntual del librero, y al final el motivo mas importante -que
-       la charla empuja de vuelta al mostrador, no lo reemplaza. #}
-    <section class="space-y-10 mt-4">
+    {# 3. Digitalizador ----------------------------------------------------- #}
+    <section class="seccion" id="catalogos" style="background: rgb(var(--papel)); border-top: 1px solid rgb(var(--borde)); border-bottom: 1px solid rgb(var(--borde));">
+      <div class="contenedor grid md:grid-cols-2 gap-12 items-center">
+        <div>
+          <h2 class="text-3xl md:text-4xl leading-tight">Un catálogo por categoría, listo para compartir en minutos.</h2>
+          <p class="mt-4 leading-relaxed" style="color: rgb(var(--gris-lp))">
+            Policiales, poesía, infantiles, usados de colección. Elegís una categoría, sacás las fotos
+            del estante y Funes arma un catálogo con su propio link y su QR, para publicar en redes,
+            mandar por WhatsApp o pegar en el estante.
+          </p>
+          <ol class="mt-8 space-y-5">
+            <li class="flex gap-4"><span class="numero">1</span>
+              <div><h3 class="text-lg">Fotografiás el estante</h3>
+              <p class="text-sm mt-1" style="color: rgb(var(--gris-lp))">Con el celular, sin ordenar ni sacar nada.</p></div></li>
+            <li class="flex gap-4"><span class="numero">2</span>
+              <div><h3 class="text-lg">Leemos los lomos y armamos el catálogo</h3>
+              <p class="text-sm mt-1" style="color: rgb(var(--gris-lp))">La IA identifica los libros y nosotros revisamos lo que le genera dudas.</p></div></li>
+            <li class="flex gap-4"><span class="numero">3</span>
+              <div><h3 class="text-lg">Lo compartís donde están tus clientes</h3>
+              <p class="text-sm mt-1" style="color: rgb(var(--gris-lp))">Link para redes y WhatsApp, y un QR que se imprime y se pega.</p></div></li>
+          </ol>
+          <p class="mt-8 text-sm leading-relaxed" style="color: rgb(var(--gris-lp))">
+            ¿Querés digitalizar todo el local? También lo hacemos, estante por estante.
+          </p>
+          <a href="{{ wa('Hola, tengo una librería y me interesa armar catálogos digitales por categoría con Funes.') }}"
+             target="_blank" rel="noopener" data-evento="whatsapp" data-origen="catalogos"
+             class="boton boton-secundario mt-5">Quiero mis catálogos</a>
+        </div>
 
-      <div>
-        <h2 class="font-bold text-lg leading-tight">No les pregunto qué género buscan</h2>
-        <p class="text-sm text-gris mt-1 leading-relaxed">
-          Les pregunto cómo están, qué les viene dando vueltas, qué leyeron
-          últimamente y qué les gustó. Vamos y venimos hasta que aparece un
-          libro — no el más rápido, el que tiene sentido para ellos ese día.
-        </p>
+        {# El catalogo resultante en un celular. Ilustracion: las tapas son dibujos, el catalogo
+           replica la pantalla real. Compacto y sin detalles de hardware. #}
+        <div class="mx-auto w-full" style="max-width: 300px;">
+          <img src="/static/landing-celular.svg" width="400" height="720" class="w-full h-auto"
+               alt="Celular que muestra un catálogo de Funes de la categoría Filosofía, con buscador y una lista de libros con su botón Consultar"
+               style="filter: drop-shadow(0 18px 22px rgba(46,33,22,.24));">
+          <p class="text-xs text-center mt-3" style="color: rgb(var(--gris-lp))">Imagen ilustrativa.</p>
+        </div>
       </div>
-
-      <div>
-        <h2 class="font-bold text-lg leading-tight">Lo que tenés, no lo que más se vende</h2>
-        <p class="text-sm text-gris mt-1 leading-relaxed">
-          No busco entre millones de libros. Busco en tu estante — lo que
-          vos decidiste tener, a mano, uno por uno. A veces así aparece algo
-          que en ningún otro lado le iban a recomendar a tu lector.
-        </p>
-      </div>
-
-      <div>
-        <h2 class="font-bold text-lg leading-tight">Termino la charla, no el vínculo</h2>
-        <p class="text-sm text-gris mt-1 leading-relaxed">
-          Cuando encontramos un libro, invito a tu lector a seguir la charla
-          con vos — presencial si está en el local, o por WhatsApp si no. Yo
-          hago el primer cruce; el vínculo sigue siendo tuyo.
-        </p>
-      </div>
-
     </section>
 
-    <section class="text-center mt-12">
-      <a href="/funes"
-         class="tap btn-primario border-celeste inline-flex items-center justify-center rounded-xl2 font-bold px-8">
-        Hablar con Funes
-      </a>
-      <p class="text-xs text-gris mt-3">
-        También me podés sumar a tu mostrador con un código QR propio.
-      </p>
+    {# 4. Recomendador -------------------------------------------------------- #}
+    <section class="seccion" id="recomendador">
+      <div class="contenedor grid md:grid-cols-2 gap-12 items-center">
+        {# Conversacion de ejemplo en un celular del mismo tamano que el de catalogos. El marcado es el
+           estado final (lo que ve quien no corre JS o pide menos movimiento); el script lo vacia y lo
+           reproduce mensaje a mensaje. Recorre el flujo real: referencia, desafio y longitud, que repetir,
+           recomendacion y voto. #}
+        <div class="order-2 md:order-1 mx-auto w-full" style="max-width: 300px;">
+          <div class="cel-caja">
+            <div class="cel" id="cel-demo" role="img"
+                 aria-label="Conversación de ejemplo: Funes pregunta por una referencia, el lector nombra a Sherlock Holmes, y Funes le recomienda Los crímenes de Oxford, de Guillermo Martínez.">
+              <div class="cel-pantalla" aria-hidden="true">
+                <div class="cel-top"><span>Funes</span>
+                  <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                    <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
+                    <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
+                    <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
+                    <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
+                  </svg></div>
+                <div class="cel-chat" id="cel-chat">
+                  <div class="m f">¿Tenés algún libro o autor que se parezca a lo que buscás hoy?</div>
+                  <div class="m l" data-escribe="Sherlock Holmes, de Conan Doyle">Sherlock Holmes, de Conan Doyle</div>
+                  <div class="m f">¿Qué nivel de desafío y longitud sentís que buscás en este momento?</div>
+                  <div class="m l" data-opcion="0">Algo corto y conciso, directo al punto</div>
+                  <div class="m f">¿Y qué hay en esa elección que te gustaría repetir en tu próxima lectura?</div>
+                  <div class="m l" data-escribe="Me gustó mucho que el misterio se resuelva razonando.">Me gustó mucho que el misterio se resuelva razonando.</div>
+                  <div class="m f" data-espera="1900">Entonces, te recomiendo <strong>Los crímenes de Oxford</strong>, de Guillermo Martínez.</div>
+                  <div class="m f">En Oxford, un joven estudiante argentino investiga una serie de muertes que siguen un patrón lógico.</div>
+                  <div class="m f">Es breve y se resuelve razonando, igual que en Sherlock Holmes.</div>
+                  <div class="m f">¿Qué te parece esta recomendación?</div>
+                </div>
+                <div class="zona" id="cel-zona">
+                  <div class="votos"><span class="bot v-floja">Floja 👎</span><span class="bot v-dudosa">Dudosa 🤏</span><span class="bot v-precisa sel">Precisa 👍</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="text-xs text-center mt-3" style="color: rgb(var(--gris-lp))">Conversación de ejemplo.</p>
+        </div>
+
+        <div class="order-1 md:order-2">
+          <h2 class="text-3xl md:text-4xl leading-tight">Un recomendador que conoce tu stock.</h2>
+          <p class="mt-4 leading-relaxed" style="color: rgb(var(--gris-lp))">
+            Funes es el personaje del cuento de Borges, el que no podía olvidar nada. Acá abstrae,
+            compara y recomienda un libro de tu catálogo.
+          </p>
+          <ol class="mt-8 space-y-5">
+            <li class="flex gap-4"><span class="numero">1</span>
+              <div><h3 class="text-lg">Tu cliente cuenta qué tiene ganas de leer</h3>
+              <p class="text-sm mt-1" style="color: rgb(var(--gris-lp))">En una charla corta, sin registrarse.</p></div></li>
+            <li class="flex gap-4"><span class="numero">2</span>
+              <div><h3 class="text-lg">Funes lo contrasta con tus libros</h3>
+              <p class="text-sm mt-1" style="color: rgb(var(--gris-lp))">Busca sólo entre lo que vos tenés disponible.</p></div></li>
+            <li class="flex gap-4"><span class="numero">3</span>
+              <div><h3 class="text-lg">Le propone un libro</h3>
+              <p class="text-sm mt-1" style="color: rgb(var(--gris-lp))">Si no le convence, cuenta por qué y Funes vuelve a intentar.</p></div></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    {# 10. Preguntas frecuentes ------------------------------------------------ #}
+    <section class="seccion" id="preguntas" style="background: rgb(var(--papel)); border-top: 1px solid rgb(var(--borde));">
+      <div class="contenedor" style="max-width: 48rem;">
+        <h2 class="text-3xl md:text-4xl leading-tight">Lo que suelen preguntar los libreros.</h2>
+        <div class="mt-8 divide-y" style="border-top: 1px solid rgb(var(--borde)); border-bottom: 1px solid rgb(var(--borde));">
+          {% for q, a in [
+            ('¿Cuántas fotos necesito?', 'Una por estante alcanza. Podés empezar con una sola categoría y sumar el resto después.'),
+            ('¿Qué pasa si la IA se equivoca con un libro?', 'Revisamos lo que le genera dudas antes de publicar, y después lo corregís vos desde tu panel.'),
+            ('¿Tengo que cambiar mi sistema de ventas?', 'No. Funes convive con lo que uses hoy.'),
+            ('¿Y si no tengo mi catálogo en ningún lado?', 'Para eso está el digitalizador: lo armamos a partir de las fotos de tus estantes.')] %}
+          <details class="py-4" style="border-color: rgb(var(--borde));">
+            <summary class="flex items-center justify-between gap-4">
+              <span class="serif text-lg">{{ q }}</span>
+              <span class="mas text-2xl leading-none texto-verde" aria-hidden="true">+</span>
+            </summary>
+            <p class="mt-3 text-sm leading-relaxed" style="color: rgb(var(--gris-lp))">{{ a }}</p>
+          </details>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    {# 11. Cierre ---------------------------------------------------------------- #}
+    <section class="seccion" id="contacto" style="background: rgb(var(--celeste)); color: rgb(var(--tinta));">
+      <div class="contenedor text-center" style="max-width: 44rem;">
+        <h2 class="text-3xl md:text-5xl leading-tight">Hablemos de tu librería.</h2>
+        <p class="mt-4 text-lg">Contanos qué vendés y te mostramos cómo quedaría tu catálogo.</p>
+        <div class="flex flex-col sm:flex-row gap-3 justify-center mt-8">
+          <a href="{{ wa('Hola, tengo una librería y quiero saber más de Funes.') }}" target="_blank" rel="noopener"
+             data-evento="whatsapp" data-origen="cierre" class="boton boton-principal">Escribir por WhatsApp</a>
+          <a href="mailto:{{ MAIL }}?subject={{ 'Funes para mi librería' | urlencode }}"
+             data-evento="mail" data-origen="cierre" class="boton boton-secundario">{{ MAIL }}</a>
+        </div>
+        <p class="text-sm mt-5">WhatsApp {{ TEL }}</p>
+      </div>
     </section>
 
   </main>
+
+  <footer style="background: rgb(var(--tinta)); color: rgb(var(--crema)); border-top: 8px solid #86AB55;">
+    <div class="contenedor" style="padding-top:2.25rem; padding-bottom:2rem">
+      <div class="flex items-center justify-between gap-4">
+        <a href="https://www.linkedin.com/in/nvrancovich/" target="_blank" rel="noopener noreferrer"
+           class="flex items-center gap-3" style="transition: opacity .15s" onmouseover="this.style.opacity=.8" onmouseout="this.style.opacity=1">
+          <img src="/static/nvranco.jpg" alt="Nicolás Vrancovich" width="44" height="44"
+               style="width:44px;height:44px;border-radius:6px;object-fit:cover;filter:grayscale(1) brightness(.85)">
+          <div style="line-height:1.3">
+            <p class="text-sm font-semibold">Nicolás Vrancovich</p>
+            <p class="text-xs flex items-center gap-1.5" style="font-family: ui-monospace, Consolas, monospace; color: rgb(var(--crema)/.65)">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M20.4 20.5h-3.6v-5.6c0-1.300 0-3-1.800-3s-2.100 1.400-2.100 2.900v5.700H9.300V9h3.400v1.600h.1c.5-.9 1.600-1.800 3.400-1.800 3.600 0 4.300 2.400 4.300 5.500v6.200zM5.300 7.400a2.100 2.100 0 1 1 0-4.200 2.100 2.100 0 0 1 0 4.200zM7.100 20.500H3.600V9h3.500v11.500zM22.200 0H1.800C.8 0 0 .8 0 1.700v20.600c0 .9.8 1.700 1.800 1.700h20.400c1 0 1.800-.8 1.800-1.700V1.700C24 .8 23.200 0 22.200 0z"/></svg>
+              nvrancovich
+            </p>
+          </div>
+        </a>
+        <a href="/" class="flex items-center gap-2" aria-label="Funes">
+          <span class="serif logo-funes text-xl" style="line-height:1">Funes</span>
+          <svg viewBox="0 0 32 32" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
+            <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
+            <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
+            <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
+          </svg>
+        </a>
+      </div>
+      <div class="text-center text-xs mt-8" style="color: rgb(var(--crema)/.65)">
+        <p>Funes 2026. Herramientas para fomentar la lectura.</p>
+        <p class="mt-3"><a href="/funes/privacidad" class="underline">Política de privacidad</a></p>
+      </div>
+    </div>
+  </footer>
 </div>
+
+<script>
+  // Eventos de la landing. La pagina no escribe en la base: todo va a PostHog, y
+  // la demo (origen "landing") queda aparte en /funes/admin/{token}/landing.
+  (function () {
+    function enviar(nombre, props) { try { if (window.posthog) posthog.capture(nombre, props || {}); } catch (e) {} }
+    enviar("landing_vista", { referrer: document.referrer || null });
+    document.addEventListener("click", function (ev) {
+      var a = ev.target.closest("[data-evento]");
+      if (a) enviar("landing_cta_" + a.dataset.evento, { origen: a.dataset.origen });
+    });
+    var waHero = document.getElementById("wa-hero"), waBarra = document.getElementById("wa-barra");
+    if ("IntersectionObserver" in window && waHero && waBarra) {
+      new IntersectionObserver(function (items) {
+        waBarra.classList.toggle("visible", !items[0].isIntersecting);
+      }, { rootMargin: "-76px 0px 0px 0px" }).observe(waHero);
+    } else if (waBarra) { waBarra.classList.add("visible"); }
+
+    // Conversacion de ejemplo: arranca al entrar en pantalla, se reinicia al salir y vuelve a empezar al terminar.
+    var cel = document.getElementById("cel-demo"), chat = document.getElementById("cel-chat"), zona = document.getElementById("cel-zona");
+    var reducido = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (cel && chat && zona && "IntersectionObserver" in window && !reducido) {
+      var mensajes = Array.prototype.slice.call(chat.children);
+      var zonaFinal = zona.innerHTML;
+      var corrida = 0, visible = false;
+      var OPCIONES = ["Algo corto y conciso, directo al punto", "Algo intermedio, un desarrollo moderado", "Algo largo y profundo, inmersión total"];
+      function pausa(ms, id) { return new Promise(function (ok) { setTimeout(function () { ok(id === corrida); }, ms); }); }
+      function el(tag, clase, texto) { var e = document.createElement(tag); if (clase) e.className = clase; if (texto) e.textContent = texto; return e; }
+      function vaciarZona() { zona.innerHTML = ""; }
+      function puntos() { var p = el("div", "m f pensando entra"); p.innerHTML = "<i></i><i></i><i></i>"; return p; }
+      function reiniciar() {
+        chat.classList.remove("sale"); chat.innerHTML = "";
+        vaciarZona();
+      }
+      async function funes(m, id) {
+        var p = puntos(); chat.appendChild(p);
+        var largo = m.textContent.length;
+        if (!(await pausa(m.dataset.espera ? +m.dataset.espera : Math.min(1500, 600 + largo * 12), id))) return false;
+        p.remove(); m.classList.add("entra"); chat.appendChild(m);
+        return pausa(450, id);
+      }
+      async function escribe(m, id) {
+        vaciarZona();
+        var caja = el("div", "caja caret"); caja.dataset.ph = "Escribí acá...";
+        var bot = el("span", "bot envia v-precisa", "Enviar");
+        var fila = el("div", "fila"); fila.appendChild(caja); fila.appendChild(bot); zona.appendChild(fila);
+        if (!(await pausa(700, id))) return false;
+        var texto = m.dataset.escribe;
+        for (var i = 1; i <= texto.length; i++) {
+          caja.textContent = texto.slice(0, i);
+          if (!(await pausa(48, id))) return false;
+        }
+        if (!(await pausa(450, id))) return false;
+        bot.classList.add("sel");
+        if (!(await pausa(350, id))) return false;
+        vaciarZona(); m.classList.add("entra"); chat.appendChild(m);
+        return pausa(500, id);
+      }
+      async function opcion(m, id) {
+        vaciarZona();
+        var botones = OPCIONES.map(function (t) { var b = el("span", "bot v-precisa", t); zona.appendChild(b); return b; });
+        if (!(await pausa(1100, id))) return false;
+        botones[+m.dataset.opcion].classList.add("sel");
+        if (!(await pausa(450, id))) return false;
+        vaciarZona(); m.classList.add("entra"); chat.appendChild(m);
+        return pausa(500, id);
+      }
+      async function correr(id) {
+        reiniciar();
+        if (!(await pausa(500, id))) return;
+        for (var i = 0; i < mensajes.length; i++) {
+          var m = mensajes[i], ok;
+          m.classList.remove("entra");
+          if (m.classList.contains("f")) ok = await funes(m, id);
+          else if (m.dataset.opcion) ok = await opcion(m, id);
+          else ok = await escribe(m, id);
+          if (!ok) return;
+        }
+        zona.innerHTML = zonaFinal;
+        var precisa = zona.querySelector(".v-precisa"); precisa.classList.remove("sel");
+        if (!(await pausa(1300, id))) return;
+        precisa.classList.add("sel");
+        if (!(await pausa(4200, id))) return;
+        chat.classList.add("sale");
+        if (!(await pausa(700, id))) return;
+        if (visible) correr(id);
+      }
+      new IntersectionObserver(function (items) {
+        visible = items[0].isIntersecting;
+        corrida++;
+        if (visible) correr(corrida);
+      }, { threshold: 0.5 }).observe(cel);
+    }
+
+    if ("IntersectionObserver" in window) {
+      var vistas = {};
+      var io = new IntersectionObserver(function (items) {
+        items.forEach(function (it) {
+          if (it.isIntersecting && !vistas[it.target.id]) {
+            vistas[it.target.id] = true;
+            enviar("landing_seccion", { seccion: it.target.id });
+          }
+          if (it.isIntersecting && it.target.classList.contains("aparece")) it.target.classList.add("visible");
+        });
+      }, { threshold: 0.25 });
+      document.querySelectorAll("main section[id]").forEach(function (s) { io.observe(s); });
+      document.querySelectorAll(".aparece").forEach(function (s) { io.observe(s); });
+    } else {
+      document.querySelectorAll(".aparece").forEach(function (s) { s.classList.add("visible"); });
+    }
+  })();
+</script>
 {% endblock %}

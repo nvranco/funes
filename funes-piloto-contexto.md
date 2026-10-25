@@ -152,6 +152,7 @@ calle no.** Mezclarlos produce un número que no significa nada.
 | Amigos | `amigo` | HF-4 (pareado) y las entrevistas | HF-2 en absoluto |
 | Facultad | `qr` | HF-1 y HF-3, que son comportamiento | — |
 | Calle | `flyer` | HF-1 y HF-3 | — |
+| Libreros (landing) | `landing` | Medir la demo para libreros en `/funes/admin/{token}/landing` | **Todas** las hipótesis: no son lectores. `piloto.py` los saca de la vista "todas" y de HF-1 a HF-4 |
 
 El diseño **pareado** de HF-4 es el que salva al piloto del sesgo: si el mismo
 lector califica la 1ª recomendación y después la 2ª corregida por su propio

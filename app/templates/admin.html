@@ -116,7 +116,7 @@
               </button>
               <button type="button" data-accion="abrir-cierre"
                 title="Lo que Funes dice después de que el lector acepta el libro, y el link de Cómo llegar"
-                class="tap rounded-lg px-3 flex items-center text-sm font-medium border-2 {{ 'border-celeste text-celeste' if lib.funes_cierre or lib.funes_sedes else 'border-borde text-gris' }}">
+                class="tap rounded-lg px-3 flex items-center text-sm font-medium border-2 {{ 'border-celeste text-celeste' if lib.funes_cierre or lib.funes_sedes or lib.funes_saludo else 'border-borde text-gris' }}">
                 Cierre
               </button>
               {% endif %}
@@ -131,6 +131,12 @@
              en el panel del librero a proposito: es texto que escribimos con la
              libreria, y una linea mal puesta sale en cada conversacion. #}
           <form data-rol="cierre" class="hidden mt-3 pt-3 border-t border-borde space-y-2">
+            <p class="text-xs text-gris">
+              Saludo propio (hasta 3 líneas): reemplaza la primera burbuja del chat. Vacío = el saludo de siempre.
+            </p>
+            <textarea name="saludo" rows="3" maxlength="600"
+              class="w-full rounded-lg border-2 border-borde px-3 py-2 text-sm"
+              placeholder="¡Hola! Soy *Ireneo Funes*.">{{ lib.funes_saludo or '' }}</textarea>
             <p class="text-xs text-gris">
               Una burbuja por línea, después de que el lector acepta el libro. Vacío = las burbujas genéricas.
               Va <em>*cursiva*</em> y <strong>**negrita**</strong> como en el chat.
@@ -341,6 +347,7 @@
             body: JSON.stringify({
               cierre: formCierre.elements.cierre.value,
               sedes: formCierre.elements.sedes.value,
+              saludo: formCierre.elements.saludo.value,
             }),
           });
           if (!resp.ok) {
@@ -348,7 +355,7 @@
             throw new Error(err.detail || `HTTP ${resp.status}`);
           }
           const datos = await resp.json();
-          const on = Boolean(datos.funes_cierre || datos.funes_sedes);
+          const on = Boolean(datos.funes_cierre || datos.funes_sedes || datos.funes_saludo);
           btnCierre.classList.toggle('border-celeste', on);
           btnCierre.classList.toggle('text-celeste', on);
           btnCierre.classList.toggle('border-borde', !on);

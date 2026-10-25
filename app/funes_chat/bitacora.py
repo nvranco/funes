@@ -53,7 +53,12 @@ logger = logging.getLogger("librero.funes_chat")
 #             puede atribuir ninguna distancia social. Por eso los conocidos
 #             tienen que ir con su tag y no con el link pelado: mezclarlos aca
 #             deja a HF-2 sin forma de sacarlos.
-ORIGENES_VALIDOS = {"qr", "directo", "whatsapp", "flyer", "link"}
+#   landing   libreros que llegan desde la landing de Funes y prueban la demo
+#             (/funes/{FUNES_SLUG_DEMO}). NO son lectores: son el comprador, y su
+#             opinion sobre un libro no dice nada del piloto. Por eso piloto.py
+#             los deja afuera de la vista "todas" y de cada hipotesis, y tienen
+#             su propio tablero en /funes/admin/{token}/landing.
+ORIGENES_VALIDOS = {"qr", "directo", "whatsapp", "flyer", "link", "landing"}
 
 
 def normalizar_origen(src: str | None) -> str:
