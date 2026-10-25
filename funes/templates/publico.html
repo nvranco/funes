@@ -1,55 +1,165 @@
 {% extends "base.html" %}
 {% block titulo %}{{ libreria.nombre }} — Funes{% endblock %}
 {% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
-{% block contenido %}
-<div class="min-h-screen flex flex-col">
+{% block head %}
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Vista publica: mismo lenguaje que la landing ("crema editorial"). Titulos en Inter Tight,
+     cuerpo en Inter, un solo acento verde. */
+  .cat { font-family: Inter, -apple-system, "Segoe UI", Roboto, sans-serif; --verde-texto: 63 107 75; --gris-cat: 95 85 69; }
+  .cat h1, .cat h2, .cat .lib-titulo, .cat .fila-cat-nombre { font-family: "Inter Tight", Inter, -apple-system, sans-serif; letter-spacing: -0.02em; }
 
-  <header class="{{ catalogo.color.bg if catalogo else 'bg-celeste' }} px-5 pt-8 pb-6 border-b-2 border-tinta">
-    <h1 class="text-2xl font-bold text-tinta leading-tight">{{ libreria.nombre }}</h1>
-    {% if catalogo %}
-    <p class="text-base font-medium text-tinta mt-1">{{ catalogo.nombre }}</p>
-    {% if padre %}
-    <a href="/{{ libreria.slug }}/c/{{ padre.slug }}" class="text-xs text-tinta/70 underline">← Volver a {{ padre.nombre }}</a>
-    {% else %}
-    <a href="/{{ libreria.slug }}" class="text-xs text-tinta/70 underline">← Ver catálogo general</a>
-    {% endif %}
-    {% endif %}
-    <p class="mt-2 text-sm text-tinta/80 leading-snug">
-      Este catálogo es una foto del estante al {{ fecha_hoy }}.
-      Confirmá disponibilidad por WhatsApp.
+  /* Pagina blanca; solo la cabecera es una "hero" con el brillo difuso del hero de la landing
+     (radiales que se apagan en transparente, en distintas posiciones y tamanos), en el color del
+     catalogo (--acento). Una linea la separa del buscador y los libros. */
+  .cat { --acento: #7A9E78; background: color-mix(in srgb, var(--acento) 5%, rgb(var(--papel))); }
+  .cat .cab { padding: 2rem 1.25rem 1.75rem; border-bottom: 1px solid color-mix(in srgb, var(--acento) 65%, rgb(var(--borde)));
+    background-color: rgb(var(--fondo));
+    background-image:
+      radial-gradient(circle 340px at 92% 8%, color-mix(in srgb, var(--acento) 44%, transparent) 0, transparent 100%),
+      radial-gradient(circle 240px at 4% 96%, color-mix(in srgb, var(--acento) 26%, transparent) 0, transparent 100%),
+      radial-gradient(circle 200px at 56% 112%, color-mix(in srgb, var(--acento) 20%, transparent) 0, transparent 100%),
+      radial-gradient(circle 160px at 30% -10%, color-mix(in srgb, var(--acento) 16%, transparent) 0, transparent 100%); }
+  .cat .cab h1 { font-size: 1.75rem; line-height: 1.1; font-weight: 700; color: rgb(var(--tinta)); }
+  .cat .cab .nota { margin-top: .75rem; text-wrap: balance; font-size: .8rem; line-height: 1.45; color: rgb(var(--gris-cat)); }
+
+  /* Buscador pegajoso bajo la linea de la cabecera. */
+  .cat .barra { position: sticky; top: 0; z-index: 10; margin: 0 -1.25rem; padding: 1rem 1.25rem .75rem; }
+  .cat .barra::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0; transition: opacity .2s;
+    background: color-mix(in srgb, var(--acento) 5%, rgba(251,247,238,.9)); backdrop-filter: blur(10px);
+    -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent); mask-image: linear-gradient(to bottom, #000 62%, transparent); }
+  .cat .barra.pegada::before { opacity: 1; }
+  .cat .buscador { position: relative; }
+  .cat .buscador svg { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); width: 1.25rem; height: 1.25rem; color: rgb(var(--gris-cat)); pointer-events: none; }
+  .cat .buscador input { width: 100%; min-height: 52px; padding: 0 1rem 0 2.9rem; border-radius: 14px; color: rgb(var(--tinta));
+    border: 1px solid #E2DED4; background: #fff; box-shadow: none;
+  }
+  .cat .buscador input::placeholder { color: rgb(var(--gris-cat)); }
+
+  /* Chips de catalogos, dentro del hero bajo la nota: fila con scroll horizontal; el catalogo actual
+     (o el padre del subcatalogo, seguido del propio subcatalogo) va resaltado. */
+  .cat .chips { display: flex; gap: .5rem; margin: 1rem -1.25rem 0; padding: .1rem 1.25rem;
+    overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  .cat .chips::-webkit-scrollbar { display: none; }
+  .cat .chip { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 1rem; border-radius: 12px;
+    font-size: .88rem; font-weight: 500; color: rgb(var(--tinta)); border: 1px solid rgba(46,33,22,.2); background: rgba(255,255,255,.4);
+    transition: background-color .15s ease, color .15s ease; }
+  .cat .chip:active { transform: scale(.97); }
+  .cat .chip.activo { background: rgb(var(--tinta)); border-color: rgb(var(--tinta)); color: rgb(var(--crema)); font-weight: 600; }
+
+  /* Catalogos: filas simples con punto de color, nombre y cantidad. */
+  .cat .fila-cat { display: flex; align-items: center; gap: .75rem; min-height: 56px; padding: .65rem .9rem; border-radius: 14px;
+    background: #fff; border: 1px solid rgb(var(--borde)); transition: transform .15s ease; }
+  .cat .fila-cat:active { transform: scale(.985); }
+  .cat .fila-cat .punto { width: .8rem; height: .8rem; border-radius: 9999px; flex: none; border-width: 1px; }
+  .cat .fila-cat-nombre { font-weight: 600; font-size: .98rem; line-height: 1.2; color: rgb(var(--tinta)); }
+  .cat .fila-cat small { display: block; margin-top: .15rem; font-size: .75rem; color: rgb(var(--gris-cat)); }
+  .cat .fila-cat svg { margin-left: auto; width: 1.1rem; height: 1.1rem; flex: none; color: rgb(var(--gris-cat)); }
+
+  /* Resultados: dos columnas de ancho fijo. Las alturas varian segun el titulo y la tapa,
+     por eso son columnas independientes y no una grilla de filas. */
+  .cat .conteo { margin-top: 1rem; font-size: .8rem; color: rgb(var(--gris-cat)); }
+  .cat .columnas { display: flex; gap: .75rem; align-items: flex-start; margin-top: .6rem; }
+  .cat .columna { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: .75rem; }
+  .cat .lib { overflow: hidden; border-radius: 3px; background: rgba(255,255,255,.26); box-shadow: 0 1px 3px rgba(46,33,22,.1), 0 5px 12px -6px rgba(46,33,22,.16); border: 1px solid rgb(var(--borde)); }
+  @media (prefers-reduced-motion: no-preference) {
+    .cat .columnas.entra .lib { animation: lib-entra .45s ease both; animation-delay: calc(var(--i, 0) * 45ms); }
+  }
+  @keyframes lib-entra { from { opacity: 0; transform: translateY(10px); } }
+
+  /* Tapa: entre cuadrada (1:1) y 2:3 como maximo. Las imagenes mas altas se recortan y las mas
+     anchas se estiran hasta el cuadrado, asi ninguna tarjeta se dispara en altura. */
+  .cat .lib-tapa { position: relative; container-type: inline-size; background: rgb(var(--fondo)); }
+  .cat .lib-tapa img { display: block; width: 100%; height: auto; min-height: 100cqw; max-height: 150cqw; object-fit: cover; }
+  .cat .lib-sin { aspect-ratio: 4 / 5; display: flex; align-items: center; justify-content: center;
+    background: rgb(var(--celeste-claro)); color: rgb(var(--verde-texto)); }
+  .cat .lib-sin span { font-family: "Inter Tight", Inter, sans-serif; font-weight: 700; font-size: 22cqw; line-height: 1; opacity: .55; }
+
+  /* Boton "Consultar": el de la landing, de ancho completo bajo el titulo y el autor. Contorno y texto
+     cambian de verde como los botones "lava" de la landing, cada uno con su ritmo (--dur, --del). */
+  .cat .lib-wa { display: flex; align-items: center; justify-content: center; gap: .45rem; width: 100%; min-height: 44px; margin-top: .7rem;
+    border-radius: 10px; color: #2F5539; border: 1.5px solid currentColor; background: transparent;
+    font-size: .88rem; font-weight: 600; transition: transform .15s ease, background-color .15s ease; }
+  @media (prefers-reduced-motion: no-preference) {
+    .cat .lib-wa { animation: lava-wa var(--dur, 2.4s) ease-in-out var(--del, 0s) infinite alternate; }
+  }
+  @keyframes lava-wa { 0% { color: #2F5539; } 100% { color: #4C8250; } }
+  .cat .lib-wa:hover { animation: none; color: rgb(var(--tinta)); background: rgba(46,33,22,.05); }
+  .cat .lib-wa:active { transform: scale(.97); }
+  .cat .lib-wa svg { width: 18px; height: 18px; flex: none; }
+
+  /* Pie: el logo de Funes en tinta, tenue y translucido. */
+  .cat .pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; padding: 2rem 1.25rem 1.75rem;
+    color: rgba(46,33,22,.34); line-height: 1; }
+  .cat .pie .logo-funes { display: inline-flex; align-items: center; gap: .3rem; }
+  .cat .pie .logo-funes span { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; }
+  .cat .pie svg { width: 1.15rem; height: 1.15rem; }
+  .cat a.pie { transition: color .15s ease; }
+  .cat a.pie:hover, .cat a.pie:active { color: rgba(46,33,22,.6); }
+
+  .cat .lib-txt { padding: .6rem .7rem .75rem; }
+  .cat .lib-titulo { font-size: .9rem; line-height: 1.25; font-weight: 600; color: rgb(var(--tinta));
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .cat .lib-autor { margin-top: .2rem; font-size: .78rem; line-height: 1.3; color: rgb(var(--gris-cat)); }
+</style>
+{% endblock %}
+{% block contenido %}
+<div class="cat min-h-screen flex flex-col"{% if catalogo %} style="--acento: {{ catalogo.color.hex_borde }}"{% endif %}>
+
+  <header class="cab">
+    <h1>{{ libreria.nombre }}</h1>
+    <p class="nota">
+      Las imágenes pueden ser ilustrativas;<br>consultá estado y disponibilidad por WhatsApp.
     </p>
+    {% if catalogo and catalogos_nav %}
+    {% set activo = padre.slug if padre else catalogo.slug %}
+    <nav class="chips" id="chips" aria-label="Catálogos">
+      <a href="/{{ libreria.slug }}?origen=nav" class="chip">Todo</a>
+      {% for c in catalogos_nav %}
+      <a href="/{{ libreria.slug }}/c/{{ c.slug }}?origen=nav" class="chip{{ ' activo' if c.slug == activo else '' }}"{% if c.slug == activo and not padre %} aria-current="page"{% endif %}>{{ c.nombre }}</a>
+      {% if padre and c.slug == activo %}<a href="/{{ libreria.slug }}/c/{{ catalogo.slug }}" class="chip activo" aria-current="page">{{ catalogo.nombre }}</a>{% endif %}
+      {% endfor %}
+    </nav>
+    {% endif %}
   </header>
 
-  <main class="flex-1 px-5 -mt-3 pb-10">
-    <div class="relative">
-      <span class="absolute left-4 top-1/2 -translate-y-1/2 text-lg pointer-events-none">🔎</span>
-      <input
-        id="buscador"
-        type="search"
-        autofocus
-        inputmode="search"
-        placeholder="Buscar por título o {{ et.autor }}…"
-        class="tap w-full rounded-xl2 border-2 border-tinta bg-papel pl-11 pr-4 py-2 text-lg outline-none placeholder:text-gris"
-      >
+  <main class="flex-1 px-5 pb-10">
+    <div class="barra" id="barra">
+      <div class="buscador">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/>
+        </svg>
+        <input
+          id="buscador"
+          type="search"
+          autofocus
+          inputmode="search"
+          aria-label="Buscar por título o {{ et.autor }}"
+          placeholder="Buscar por título o {{ et.autor }}…"
+        >
+      </div>
     </div>
 
     {% if catalogos %}
     <div id="catalogos-cards" class="mt-4 space-y-2">
       {% for c in catalogos %}
-      <a href="/{{ libreria.slug }}/c/{{ c.slug }}?origen=card"
-        class="tap block rounded-xl2 border p-3 {{ c.color.bg }} {{ c.color.borde }}">
-        <p class="font-medium">{{ c.nombre }}</p>
-        {% if c.descripcion %}<p class="text-sm text-gris">{{ c.descripcion }}</p>{% endif %}
-        <p class="text-xs text-gris mt-1">
-          {{ c.cant_libros }} {{ et.libro if c.cant_libros == 1 else et.libros }}
-          {% if c.ultima_actualizacion %} · actualizado {{ c.ultima_actualizacion.strftime('%d/%m') }}{% endif %}
-        </p>
+      <a href="/{{ libreria.slug }}/c/{{ c.slug }}?origen=card" class="fila-cat">
+        <i class="punto {{ c.color.bg }} {{ c.color.borde }}"></i>
+        <div class="min-w-0">
+          <p class="fila-cat-nombre">{{ c.nombre }}</p>
+          <small>
+            {{ c.cant_libros }} {{ et.libro if c.cant_libros == 1 else et.libros }}
+            {% if c.ultima_actualizacion %} · actualizado {{ c.ultima_actualizacion.strftime('%d/%m') }}{% endif %}
+          </small>
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
       </a>
       {% endfor %}
     </div>
     {% endif %}
 
-    <div id="resultados" class="mt-4 space-y-3"></div>
+    <p id="conteo" class="conteo hidden"></p>
+    <div id="resultados" class="columnas"></div>
 
     <div id="estado-vacio" class="mt-14 text-center text-gris px-4">
       <p id="mensaje-vacio" class="text-base">
@@ -65,14 +175,22 @@
       </p>
       <a id="btn-whatsapp-generico" target="_blank" rel="noopener"
         class="hidden tap btn-whatsapp mt-4 inline-flex items-center justify-center gap-2 rounded-xl2 font-medium px-6">
-        Preguntar por WhatsApp 💬
+        <span data-rol="icono-wa"></span>
+        Preguntar por WhatsApp
       </a>
     </div>
   </main>
 
-  <footer class="px-5 py-4 text-center text-xs text-gris safe-b">
-    Catálogo generado por Funes
-  </footer>
+  {% set tag = 'a' if url_funes else 'footer' %}
+  <{{ tag }} class="pie safe-b" aria-label="Catálogo generado utilizando Funes"{% if url_funes %} href="{{ url_funes }}" target="_blank" rel="noopener" data-rol="logo-funes"{% endif %}>
+    <span class="logo-funes"><span>Funes</span>
+    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+      <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
+      <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
+      <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
+      <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
+    </svg></span>
+  </{{ tag }}>
 </div>
 
 <script>
@@ -127,8 +245,9 @@
     return div.innerHTML;
   }
 
-  const ICONO_WHATSAPP = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm5.83 14.1c-.24.68-1.4 1.32-1.93 1.4-.5.08-1.12.11-1.8-.11-.42-.13-.96-.31-1.65-.6-2.9-1.25-4.79-4.17-4.94-4.36-.14-.19-1.18-1.57-1.18-3 0-1.42.75-2.12 1.02-2.41.27-.29.58-.36.78-.36.19 0 .39 0 .56.01.18.01.42-.07.66.5.24.58.83 2 .9 2.15.07.15.12.32.02.51-.1.19-.15.31-.3.48-.15.17-.31.38-.44.51-.15.15-.3.31-.13.61.17.29.75 1.24 1.6 2.01 1.1.98 2.03 1.29 2.32 1.44.29.14.46.12.64-.07.18-.19.75-.87.95-1.17.2-.29.4-.24.67-.15.27.1 1.7.8 1.99.95.29.14.48.22.55.34.07.13.07.72-.17 1.39z"/>
+  let btnIconoGenerico = null;
+  const ICONO_WHATSAPP = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M20.5 3.5A11.8 11.8 0 0 0 12 0C5.4 0 0 5.4 0 12c0 2.1.6 4.200 1.600 6L0 24l6.200-1.600A12 12 0 0 0 12 24c6.600 0 12-5.400 12-12 0-3.200-1.300-6.200-3.500-8.500zM12 22a10 10 0 0 1-5.100-1.400l-.4-.2-3.700 1 1-3.600-.2-.4A10 10 0 1 1 12 22zm5.500-7.500c-.3-.2-1.800-.9-2-1-.3-.1-.5-.2-.7.200-.2.300-.8 1-1 1.200-.2.200-.4.200-.7.100-.3-.2-1.300-.5-2.400-1.500-.9-.8-1.500-1.800-1.700-2.100-.2-.3 0-.5.100-.6l.5-.5.300-.5c.1-.2 0-.4 0-.5l-.9-2.200c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.100-.8.400-.3.300-1 1-1 2.500s1.100 2.900 1.200 3.100c.2.200 2.100 3.200 5.100 4.500.7.300 1.300.5 1.700.6.700.2 1.400.2 1.900.1.600-.1 1.800-.7 2-1.400.3-.7.300-1.300.2-1.400-.1-.1-.3-.2-.6-.3z"/>
   </svg>`;
 
   function payloadCatalogo(extra) {
@@ -143,7 +262,20 @@
   registrarEvento('vista', payloadCatalogo({ src: ORIGEN, origen: ORIGEN_CATALOGO }));
 
   const buscador = document.getElementById('buscador');
+  const barra = document.getElementById('barra');
+  const conteo = document.getElementById('conteo');
+  btnIconoGenerico = document.querySelector('[data-rol="icono-wa"]');
+  if (btnIconoGenerico) btnIconoGenerico.innerHTML = ICONO_WHATSAPP;
+  // La barra de busqueda gana fondo propio recien cuando se pega arriba.
+  window.addEventListener('scroll', () => {
+    barra.classList.toggle('pegada', barra.getBoundingClientRect().top <= 0);
+  }, { passive: true });
   const resultados = document.getElementById('resultados');
+  // Deja el chip activo a la vista en la fila de catalogos.
+  const chips = document.getElementById('chips');
+  const chipActivo = chips && chips.querySelector('.activo');
+  if (chipActivo) chips.scrollLeft = chipActivo.offsetLeft - (chips.clientWidth - chipActivo.offsetWidth) / 2;
+
   const estadoVacio = document.getElementById('estado-vacio');
   const mensajeVacio = document.getElementById('mensaje-vacio');
   const btnWhatsappGenerico = document.getElementById('btn-whatsapp-generico');
@@ -185,6 +317,7 @@
 
   let catalogo = [];
   let catalogoListo = false;
+  let yaAnimo = false;  // la entrada animada se hace una sola vez, no en cada tecla
 
   function subsetCatalogo() {
     if (CATALOGO_ID === null) return catalogo;
@@ -245,6 +378,7 @@
         return;
       }
       resultados.innerHTML = '';
+      conteo.classList.add('hidden');
       estadoVacio.classList.remove('hidden');
       ocultarBotonGenerico();
       ocultarPistaOtroCatalogo();
@@ -288,6 +422,7 @@
     if (!catalogoListo) return;
     if (lista.length === 0) {
       resultados.innerHTML = '';
+      conteo.classList.add('hidden');
       estadoVacio.classList.remove('hidden');
       const q = buscador.value.trim();
       if (q) {
@@ -310,26 +445,37 @@
     estadoVacio.classList.add('hidden');
     ocultarBotonGenerico();
     ocultarPistaOtroCatalogo();
-    resultados.innerHTML = lista.map((libro, i) => `
-      <div class="bg-papel border border-borde rounded-xl2 overflow-hidden flex" data-idx="${i}">
-        ${libro.imagen_url ? `
-          <img src="${libro.imagen_url}" loading="lazy" alt=""
-            class="w-28 shrink-0 object-cover">
-        ` : ''}
-        <div class="min-w-0 flex-1 p-3 flex flex-col">
-          <p class="font-medium">${escaparHtml(libro.titulo)}</p>
-          <p class="text-sm text-gris">${escaparHtml(libro.autor || `${ET_AUTOR_CAP} no disponible`)}</p>
-          ${chipSubcatalogo(libro)}
-          <div class="flex justify-end mt-auto pt-2">
-            <a data-rol="whatsapp" target="_blank" rel="noopener"
-              class="tap inline-flex items-center justify-center gap-2 rounded-xl2 font-medium px-4 border-2 border-whatsapp text-whatsapp">
+    // Dos columnas independientes: cada libro va a la columna mas corta segun una estimacion de
+    // su altura (tapa + lineas de titulo), asi el orden de lectura se mantiene casi por filas.
+    const cols = [[], []], alturas = [0, 0];
+    lista.forEach((libro, i) => {
+      const est = (libro.imagen_url ? 1.25 : 1.25) + Math.min(3, Math.ceil((libro.titulo || '').length / 17)) * 0.2 + 0.6;
+      const k = alturas[1] < alturas[0] ? 1 : 0;
+      alturas[k] += est;
+      cols[k].push(`
+        <article class="lib" data-idx="${i}" style="--i:${Math.min(i, 8)};--dur:${(2.2 + (i % 4) * 0.5).toFixed(1)}s;--del:-${((i * 0.8) % 3).toFixed(1)}s">
+          <div class="lib-tapa">
+            ${libro.imagen_url
+              ? `<img src="${libro.imagen_url}" loading="lazy" alt="">`
+              : `<div class="lib-sin" aria-hidden="true"><span>${escaparHtml((libro.titulo || '?').trim().charAt(0).toUpperCase())}</span></div>`}
+          </div>
+          <div class="lib-txt">
+            <p class="lib-titulo">${escaparHtml(libro.titulo)}</p>
+            <p class="lib-autor">${escaparHtml(libro.autor || `${ET_AUTOR_CAP} no disponible`)}</p>
+            ${chipSubcatalogo(libro)}
+            <a data-rol="whatsapp" target="_blank" rel="noopener" aria-label="Consultar por WhatsApp: ${escaparHtml(libro.titulo).replace(/"/g, '&quot;')}" class="lib-wa">
               ${ICONO_WHATSAPP}
               Consultar
             </a>
           </div>
-        </div>
-      </div>
-    `).join('');
+        </article>
+      `);
+    });
+    resultados.classList.toggle('entra', !yaAnimo);
+    yaAnimo = true;
+    resultados.innerHTML = cols.map((c) => `<div class="columna">${c.join('')}</div>`).join('');
+    conteo.textContent = `${lista.length} ${lista.length === 1 ? ET_LIBRO : ET_LIBROS}`;
+    conteo.classList.remove('hidden');
 
     resultados.querySelectorAll('[data-idx]').forEach((el) => {
       const libro = lista[Number(el.dataset.idx)];
