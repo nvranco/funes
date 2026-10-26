@@ -2,23 +2,24 @@
 {% block titulo %}Vincular QR — {{ libreria.nombre }}{% endblock %}
 {% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
 {% block head %}
+{% include "_estilo_panel.html" %}
 {# jsQR: primer uso de camara/QR-scanning del proyecto, no hay nada previo
    para reusar. Solo lo necesita esta pantalla. #}
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 {% endblock %}
 {% block contenido %}
-<header class="bg-celeste px-5 pt-8 pb-6">
-  <div class="max-w-2xl mx-auto">
-    <a href="{{ url_atras }}" class="text-tinta text-sm font-medium">← Volver</a>
-    <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Vincular QR</h1>
-    <p class="text-sm text-tinta/80 mt-1">
-      Sacale una foto al código QR de la carpita para asociarla a {{ libreria.nombre }}.
-    </p>
-  </div>
-</header>
+{% include "_banner_panel.html" %}
 
-<div class="min-h-screen max-w-2xl mx-auto flex flex-col">
-  <main class="flex-1 px-5 py-5 pb-10">
+<div class="max-w-6xl mx-auto px-5 pt-3 pb-10">
+<div id="panel-todo">
+<div class="max-w-2xl mx-auto">
+  <a href="{{ url_atras }}" class="text-tinta text-sm font-medium">← Volver</a>
+  <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Vincular QR</h1>
+  <p class="text-sm text-tinta/80 mt-1">
+    Sacale una foto al código QR de la carpita para asociarla a {{ libreria.nombre }}.
+  </p>
+
+  <main class="flex-1 pt-5 pb-10">
 
     <div id="pantalla-inicial">
 
@@ -74,7 +75,8 @@
 
   </main>
 </div>
-
+</div>
+</div>
 <script>
   const URL_API = "{{ url_vincular_api }}";
   const URL_ATRAS = "{{ url_atras }}";
@@ -265,3 +267,4 @@
   }
 </script>
 {% endblock %}
+{% block emoji %}{% include "_twemoji.html" %}{% endblock %}

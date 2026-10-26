@@ -51,28 +51,24 @@
           d.rango.desde == desde and d.rango.hasta == hasta) }}
 {%- endmacro %}
 
+{% block head %}
+{% include "_estilo_panel.html" %}
+{% endblock %}
 {% block contenido %}
 {# El header va como <header> y no como <div> para escaparle a la regla
    `body > div { max-width: 480px }` de base.html, que matchea por tipo de
    elemento: asi la barra verde llega a los dos bordes de la pantalla y el
    contenido de abajo se queda en su columna. #}
-<header class="bg-celeste">
-  <div class="max-w-6xl mx-auto px-6 py-5 flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+{% include "_banner_panel.html" %}
+<div class="max-w-6xl mx-auto px-5 pt-3 pb-10">
+<div id="panel-todo">
+<div class="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 mb-6">
     <div>
       {# El mismo laberinto que la cabecera del chat, inline y con currentColor
          para que herede el color del titulo. Es Borges, la memoria de Funes y
          el recorrido hasta el libro; aca ademas ata el tablero a la pantalla
          que mide, que es la unica razon por la que este tablero existe. #}
-      <div class="flex items-center gap-2">
-        <h1 class="text-3xl font-bold text-tinta leading-tight" style="font-family: var(--font-display);">Funes</h1>
-        <svg viewBox="0 0 32 32" class="w-7 h-7 text-tinta shrink-0" fill="none"
-             stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-          <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
-          <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
-          <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
-          <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
-        </svg>
-      </div>
+      <h1 class="text-2xl font-bold text-tinta leading-tight">Dashboard</h1>
       <p class="text-xs text-tinta/80 mt-1 tabular-nums">
         {{ d.generado.strftime('%d/%m/%Y %H:%M') }} hs ·
         {{ d.salud.sesiones }} conversacion{{ 'es' if d.salud.sesiones != 1 else '' }}
@@ -114,10 +110,9 @@
         {% endfor %}
       </div>
     </div>
-  </div>
-</header>
+</div>
 
-<div class="min-h-screen max-w-6xl mx-auto px-6 py-6">
+<div>
 
   {# Con una sola cohorte, HF-2 no esta protegida del sesgo de cortesia. Se
      avisa arriba de todo y no en una nota al pie: es la condicion que decide si
@@ -294,6 +289,8 @@
     </div>
   </section>
 
+</div>
+</div>
 </div>
 {% endblock %}
 {% block emoji %}{% include "_twemoji.html" %}{% endblock %}

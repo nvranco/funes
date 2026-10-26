@@ -5,66 +5,18 @@
    base.html a proposito: el panel de la libreria sigue con el suyo. #}
 {% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
 {% block head %}
-<style>
-  /* Mismo trato que el chat: en pantalla ancha el banner llega de punta a
-     punta y el texto se lee mas grande. Abajo de 768px no cambia nada.
-
-     La columna la arman los hijos y no el envoltorio, para no estirar el
-     header con 100vw: esa unidad incluye la barra de scroll y 100% no, asi
-     que el banner saldria mas ancho que la pagina y agregaria scroll
-     horizontal.
-
-     La flecha es lo unico que necesita una regla propia. Va absoluta contra
-     el header, que ahora es tan ancho como la pestana, asi que sin esto
-     quedaria pegada al borde de la ventana y a 300px del titulo. `left` la
-     trae al borde de la columna. El max() la protege de pantallas justo por
-     encima del corte, donde la columna toca los bordes y calc() daria
-     negativo. */
-  @media (min-width: 768px) {
-    body > #envoltorio { max-width: none; }
-    #texto { max-width: 640px; margin-left: auto; margin-right: auto; width: 100%;
-             padding-left: 2rem; padding-right: 2rem; font-size: 1rem; }
-    #envoltorio header h1 { font-size: 1.75rem; }
-    #envoltorio header > a { left: max(0.5rem, calc(50% - 320px)); }
-  }
-</style>
+{% include "_estilo_panel.html" %}
 {% endblock %}
 
 {% block contenido %}
-<div id="envoltorio" class="min-h-screen flex flex-col">
+<div class="max-w-2xl mx-auto">
+  {% with rotulo_banner = '' %}{% include "_banner_panel.html" %}{% endwith %}
+  <div class="px-5 pt-3 pb-10">
+  <div id="panel-todo">
+  <a href="/funes" class="text-tinta text-sm font-medium">← Volver</a>
+  <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1 mb-4">Privacidad</h1>
 
-  <!-- La flecha va absoluta y no como primer hijo del flex: asi el titulo sigue
-       centrado respecto de la pantalla y no respecto del espacio que sobra al
-       lado de la flecha, que lo correria unos pixeles a la derecha.
-       El area tocable se estira de borde a borde del banner (top-0 bottom-0) y
-       centra la flecha por dentro con flex. Antes se agrandaba con un padding
-       mas un margen negativo, y eso la subia 12px: en un elemento absoluto
-       `top: 50%` ubica el borde del MARGEN, asi que el margen negativo se
-       descuenta antes de que el translate lo centre. -->
-  <header class="bg-celeste px-5 py-4 relative">
-    <a href="/funes" aria-label="Volver"
-       class="tap absolute left-2 top-0 bottom-0 w-12 flex items-center justify-center text-tinta">
-      <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor"
-           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M15 4 L7 12 L15 20"/>
-      </svg>
-    </a>
-    <div class="flex items-center justify-center gap-2">
-      <h1 class="text-2xl font-bold text-tinta leading-tight" style="font-family: var(--font-display);">Funes</h1>
-      <svg viewBox="0 0 32 32" class="w-6 h-6 text-tinta shrink-0" fill="none"
-           stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-        <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
-        <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
-        <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
-        <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
-      </svg>
-    </div>
-  </header>
-
-  <!-- Esta pagina la abre alguien que escaneo un QR en la calle y desconfia.
-       Se escribe corta y en criollo a proposito: una pagina larga y notarial
-       se cierra sin leer, y entonces no informo nada. -->
-  <div id="texto" class="flex-1 px-5 py-6 safe-b text-sm leading-relaxed">
+  <div id="texto" class="text-sm leading-relaxed">
     {# Cinco secciones: que es Funes, como funciona, que datos recolecta, si se
        pueden borrar y a quien escribirle. Las de datos van despues de las dos
        primeras porque el motivo de la recoleccion no se entiende sin ellas, y
@@ -163,5 +115,8 @@
     </p>
   </div>
 
+  </div>
+  </div>
 </div>
 {% endblock %}
+{% block emoji %}{% include "_twemoji.html" %}{% endblock %}

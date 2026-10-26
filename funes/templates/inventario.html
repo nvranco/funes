@@ -3,6 +3,24 @@
 {% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
 {% block head %}
 {% include "_estilo_panel.html" %}
+<style>
+  /* Inventario con la forma del catalogo publico: columnas de ancho fijo y alto variable, tapa acotada entre
+     1:1 y 2:3 (las imagenes mas altas se recortan), y los libros sin tapa al final, solo con su recuadro. */
+  .inv-columnas { display: flex; gap: .75rem; align-items: flex-start; }
+  .inv-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: .75rem; }
+  @media (min-width: 640px) { .inv-columnas, .inv-col { gap: 1rem; } }
+  .inv-card { overflow: hidden; border-radius: 10px; background: #fff; border: 1px solid var(--borde-panel);
+    box-shadow: 0 1px 3px rgba(46,33,22,.07), 0 6px 14px -8px rgba(46,33,22,.14); }
+  .inv-tapa { container-type: inline-size; background: rgb(var(--fondo)); }
+  .inv-tapa img { display: block; width: 100%; height: auto; min-height: 100cqw; max-height: 150cqw; object-fit: cover; }
+  .inv-txt { padding: .6rem .7rem .75rem; }
+  .inv-titulo { font-family: "Inter Tight", Inter, sans-serif; font-weight: 600; font-size: .92rem; line-height: 1.25; letter-spacing: -0.01em;
+    color: rgb(var(--tinta)); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .inv-autor { margin-top: .2rem; font-size: .78rem; line-height: 1.3; color: rgb(95 85 69); }
+  .inv-chip { display: inline-flex; align-items: center; min-height: 28px; padding: 0 .55rem; border-radius: 8px; font-size: .75rem; font-weight: 500; }
+  @media (hover: hover) { .inv-card { transition: transform .18s ease, box-shadow .18s ease; }
+    .inv-card:hover { transform: translateY(-2px); box-shadow: 0 2px 6px rgba(46,33,22,.1), 0 12px 22px -10px rgba(46,33,22,.22); } }
+</style>
 {% endblock %}
 {% block contenido %}
 {% include "_banner_panel.html" %}
@@ -12,43 +30,36 @@
   <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
   <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Inventario ({{ cant_libros }})</h1>
   <main class="flex-1 pt-5">
-    <div class="lg:flex lg:gap-8 lg:items-start">
-      <div class="lg:w-80 lg:shrink-0">
-        <div class="bg-papel border border-borde rounded-xl2 p-3">
-          <p class="font-medium">Catálogo general</p>
-          <p class="text-xs text-gris mt-1">Todos tus {{ et.libros }} publicados</p>
-          <div class="flex gap-2 mt-2">
-            <button type="button" id="btn-copiar-general" data-link="{{ url_publica }}"
-              class="tap btn-secundario flex-1 rounded-lg px-3 py-2 text-sm font-medium">Copiar link 📋</button>
-            <a href="{{ url_publica }}" target="_blank" rel="noopener"
-              class="tap btn-secundario shrink-0 flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium">Ir 🔗</a>
-            <a href="{{ url_qr }}" download="qr-{{ libreria.slug }}.png"
-              class="tap btn-secundario shrink-0 flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium">QR 🏷️</a>
-          </div>
-        </div>
-
-        <input
-          id="buscador"
-          type="search"
-          inputmode="search"
-          placeholder="Buscar un {{ et.libro }} puntual…"
-          class="tap w-full rounded-xl2 border-2 border-tinta bg-papel px-4 py-2 text-lg outline-none placeholder:text-gris mt-4"
-        >
-
-        <div id="filtro-catalogo" class="hidden mt-3 flex items-center justify-between gap-2 bg-celeste-claro/50 border border-celeste rounded-lg px-3 py-2 text-sm">
-          <span>Mostrando: <strong id="filtro-catalogo-nombre"></strong></span>
-          <button type="button" id="btn-quitar-filtro" class="tap text-tinta font-medium underline underline-offset-2 shrink-0">Ver todos</button>
-        </div>
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+      <input
+        id="buscador"
+        type="search"
+        inputmode="search"
+        aria-label="Buscar un {{ et.libro }} puntual"
+        placeholder="Buscar un {{ et.libro }} puntual…"
+        class="tap w-full lg:flex-1 rounded-xl2 bg-papel px-4 py-2 text-lg outline-none placeholder:text-gris"
+      >
+      <div class="flex gap-2 shrink-0">
+        <button type="button" id="btn-copiar-general" data-link="{{ url_publica }}" title="Copiar el link del catálogo general"
+          class="tap btn-secundario flex-1 lg:flex-none rounded-lg px-4 py-2 text-sm font-medium">Copiar link 📋</button>
+        <a href="{{ url_publica }}" target="_blank" rel="noopener" title="Abrir el catálogo general"
+          class="tap btn-secundario shrink-0 flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium">Ir 🔗</a>
+        <a href="{{ url_qr }}" download="qr-{{ libreria.slug }}.png" title="Descargar el QR del catálogo general"
+          class="tap btn-secundario shrink-0 flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium">QR 🏷️</a>
       </div>
+    </div>
 
-      <div class="lg:flex-1 lg:min-w-0">
-        <div id="lista" class="mt-4 space-y-2 lg:mt-0 lg:grid lg:grid-cols-3 lg:gap-3 lg:space-y-0"></div>
+    <div id="filtro-catalogo" class="hidden mt-3 flex items-center justify-between gap-2 bg-celeste-claro/50 border border-celeste rounded-lg px-3 py-2 text-sm">
+      <span>Mostrando: <strong id="filtro-catalogo-nombre"></strong></span>
+      <button type="button" id="btn-quitar-filtro" class="tap text-tinta font-medium underline underline-offset-2 shrink-0">Ver todos</button>
+    </div>
 
-        <div id="estado-vacio" class="hidden mt-14 text-center text-gris px-4">
-          <p class="text-4xl mb-3">📚</p>
-          <p>Todavía no tenés {{ et.libros }} publicados. Cargá y publicá un estante primero.</p>
-        </div>
-      </div>
+    <p id="conteo" class="mt-4 mb-3 text-sm text-gris"></p>
+    <div id="lista" class="inv-columnas"></div>
+
+    <div id="estado-vacio" class="hidden mt-10 text-center text-gris px-4">
+      <p class="text-4xl mb-3">📚</p>
+      <p>Todavía no tenés {{ et.libros }} publicados. Cargá y publicá un estante primero.</p>
     </div>
 
     {% if cant_libros %}
@@ -88,7 +99,7 @@
 <script>
   const LIBRERO_SLUG = "{{ libreria.slug }}";
   const LIBRERO_TOKEN = "{{ libreria.token_panel }}";
-  const ET_LIBROS = "{{ et.libros }}";
+  const ET_LIBROS = "{{ et.libros }}", ET_LIBRO = "{{ et.libro }}";
   const ET_AUTOR_CAP = "{{ et.Autor }}";
   const API_BASE = `/api/${LIBRERO_SLUG}/${LIBRERO_TOKEN}`;
 
@@ -98,6 +109,7 @@
 
   const buscador = document.getElementById('buscador');
   const lista = document.getElementById('lista');
+  const conteo = document.getElementById('conteo');
   const estadoVacio = document.getElementById('estado-vacio');
   const bloqueVaciar = document.getElementById('bloque-vaciar');
   const filtroCatalogo = document.getElementById('filtro-catalogo');
@@ -169,8 +181,20 @@
     // vive sin tener que entrar a la pantalla de reasignar.
     const padre = c && c.padre_id !== null ? catalogosPorId[c.padre_id] : null;
     const nombre = c ? escaparHtml(padre ? `${padre.nombre} · ${c.nombre}` : c.nombre) : 'Catálogo general';
-    return `<a href="${href}" class="tap inline-flex items-center text-xs ${clases} rounded-full px-2 py-1 font-medium">📁 ${nombre} ›</a>`;
+    return `<a href="${href}" class="inv-chip ${clases}">${nombre} ›</a>`;
   }
+
+  // Mismos cortes que el CSS del catalogo publico: 640, 1024 y 1280px.
+  let ultimaCantidad = 0;
+  function cantidadColumnas() {
+    const w = window.innerWidth;
+    return w >= 1280 ? 5 : w >= 1024 ? 4 : w >= 640 ? 3 : 2;
+  }
+  let timerResize = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(timerResize);
+    timerResize = setTimeout(() => { if (cantidadColumnas() !== ultimaCantidad && libros.length) render(); }, 150);
+  });
 
   function render() {
     const q = normalizar(buscador.value);
@@ -186,6 +210,7 @@
 
     if (libros.length === 0) {
       lista.innerHTML = '';
+      conteo.textContent = '';
       estadoVacio.classList.remove('hidden');
       if (bloqueVaciar) bloqueVaciar.classList.add('hidden');
       return;
@@ -195,47 +220,59 @@
 
     if (filtrados.length === 0) {
       lista.innerHTML = catalogoFiltro
-        ? `<p class="lg:col-span-3 text-center text-gris py-8">Este catálogo todavía no tiene ${ET_LIBROS}.</p>`
-        : '<p class="lg:col-span-3 text-center text-gris py-8">Nada coincide con esa búsqueda.</p>';
+        ? `<p class="w-full text-center text-gris py-8">Este catálogo todavía no tiene ${ET_LIBROS}.</p>`
+        : '<p class="w-full text-center text-gris py-8">Nada coincide con esa búsqueda.</p>';
+      conteo.textContent = '';
       return;
     }
 
-    lista.innerHTML = filtrados.map((libro) => `
-      <div class="bg-papel border border-borde rounded-xl2 p-3" data-id="${libro.id}">
-        <div class="w-full flex items-center gap-2">
+    // Columnas independientes (2 en celular, 3 en tableta, 4-5 en escritorio): cada libro va a la columna
+    // mas corta segun una estimacion de su altura. Los que tienen tapa van primero y los que no, al final.
+    const ordenados = [...filtrados.filter((l) => l.imagen_url), ...filtrados.filter((l) => !l.imagen_url)];
+    ultimaCantidad = cantidadColumnas();
+    const cols = Array.from({ length: ultimaCantidad }, () => []), alturas = new Array(ultimaCantidad).fill(0);
+    ordenados.forEach((libro) => {
+      const est = (libro.imagen_url ? 1.25 : 0) + Math.min(3, Math.ceil((libro.titulo || '').length / 17)) * 0.2 + 0.8;
+      const k = alturas.indexOf(Math.min(...alturas));
+      alturas[k] += est;
+      cols[k].push(`
+        <article class="inv-card" data-id="${libro.id}">
           ${libro.imagen_url ? `
-            <a href="${libro.imagen_url}" target="_blank" rel="noopener" class="tap shrink-0">
-              <img src="${libro.imagen_url}" alt="" class="w-10 h-12 object-cover rounded border border-borde">
+            <a href="${libro.imagen_url}" target="_blank" rel="noopener" class="inv-tapa block" aria-label="Ver la tapa">
+              <img src="${libro.imagen_url}" loading="lazy" alt="">
             </a>
           ` : ''}
-          <button type="button" data-rol="expandir" class="tap flex-1 min-w-0 text-left flex items-center justify-between gap-2">
-            <span class="min-w-0">
-              <p class="font-medium truncate">${escaparHtml(libro.titulo)}</p>
-              <p class="text-sm text-gris truncate">${escaparHtml(libro.autor || `${ET_AUTOR_CAP} no detectado`)}</p>
-            </span>
-          </button>
-        </div>
-        <div class="mt-2">${badgeCatalogo(libro)}</div>
+          <div class="inv-txt">
+            <button type="button" data-rol="expandir" class="w-full min-w-0 text-left">
+              <p class="inv-titulo">${escaparHtml(libro.titulo)}</p>
+              <p class="inv-autor">${escaparHtml(libro.autor || `${ET_AUTOR_CAP} no detectado`)}</p>
+            </button>
+            <div class="mt-2">${badgeCatalogo(libro)}</div>
         <div data-rol="detalle" class="hidden mt-3 pt-3 border-t border-borde space-y-2">
-          <div data-rol="vista" class="flex gap-2">
-            <button type="button" data-accion="vendido" class="tap btn-secundario flex-1 rounded-lg text-sm font-medium">Marcar removido</button>
-            <button type="button" data-accion="editar" class="tap btn-secundario flex-1 rounded-lg text-sm font-medium">Editar ✏️</button>
-            <button type="button" data-accion="eliminar" class="tap btn-secundario flex-1 rounded-lg text-sm font-medium">Eliminar 🗑️</button>
+          <div data-rol="vista" class="flex flex-col gap-1.5">
+            <button type="button" data-accion="vendido" class="tap btn-secundario w-full rounded-lg text-sm font-medium">Marcar removido</button>
+            <button type="button" data-accion="editar" class="tap btn-secundario w-full rounded-lg text-sm font-medium">Editar ✏️</button>
+            <button type="button" data-accion="eliminar" class="tap btn-secundario w-full rounded-lg text-sm font-medium">Eliminar 🗑️</button>
           </div>
-          <div class="flex gap-2">
-            <button type="button" data-accion="foto" class="tap btn-secundario flex-1 rounded-lg text-sm font-medium">
+          <div class="flex flex-col gap-1.5">
+            <button type="button" data-accion="foto" class="tap btn-secundario w-full rounded-lg text-sm font-medium">
               ${libro.imagen_url ? 'Cambiar foto 🖼️' : 'Agregar foto de tapa 📷'}
             </button>
-            ${libro.imagen_url ? '<button type="button" data-accion="quitar-foto" class="tap btn-secundario flex-1 rounded-lg text-sm font-medium">Quitar foto 🗑️</button>' : ''}
+            ${libro.imagen_url ? '<button type="button" data-accion="quitar-foto" class="tap btn-secundario w-full rounded-lg text-sm font-medium">Quitar foto 🗑️</button>' : ''}
           </div>
           <div data-rol="edicion" class="hidden space-y-2">
-            <input data-campo="titulo" value="${escaparHtml(libro.titulo)}" class="tap w-full rounded-lg border-2 border-tinta px-3 py-2 text-sm">
-            <input data-campo="autor" value="${escaparHtml(libro.autor)}" class="tap w-full rounded-lg border-2 border-tinta px-3 py-2 text-sm">
+            <input data-campo="titulo" value="${escaparHtml(libro.titulo)}" class="tap w-full rounded-lg border border-borde px-3 py-2 text-sm">
+            <input data-campo="autor" value="${escaparHtml(libro.autor)}" class="tap w-full rounded-lg border border-borde px-3 py-2 text-sm">
             <button type="button" data-accion="guardar" class="tap btn-primario w-full rounded-lg text-sm font-bold">Guardar</button>
           </div>
         </div>
-      </div>
-    `).join('');
+          </div>
+        </article>
+      `);
+    });
+    lista.innerHTML = cols.map((c) => `<div class="inv-col">${c.join('')}</div>`).join('');
+    const autores = new Set(filtrados.map((l) => normalizar(l.autor)).filter(Boolean)).size;
+    conteo.textContent = `${filtrados.length} ${filtrados.length === 1 ? ET_LIBRO : ET_LIBROS}` + (autores ? ` · ${autores} ${autores === 1 ? 'autor' : 'autores'}` : '');
 
     lista.querySelectorAll('[data-id]').forEach((fila) => {
       const id = Number(fila.dataset.id);

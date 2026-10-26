@@ -1,16 +1,19 @@
 {% extends "base.html" %}
 {% block titulo %}Revisar lote — {{ libreria.nombre }}{% endblock %}
 {% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
+{% block head %}
+{% include "_estilo_panel.html" %}
+{% endblock %}
 {% block contenido %}
-<header class="bg-celeste px-5 pt-8 pb-6">
-  <div class="max-w-6xl mx-auto">
-    <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
-    <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Revisar estante</h1>
-  </div>
-</header>
+{% include "_banner_panel.html" %}
 
-<div class="min-h-screen max-w-6xl mx-auto flex flex-col">
-  <main id="contenido-fotos" class="flex-1 px-5 py-5 pb-32">
+<div class="max-w-6xl mx-auto px-5 pt-3 pb-10">
+<div id="panel-todo">
+<div class="max-w-6xl mx-auto">
+  <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
+  <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Revisar estante</h1>
+
+  <main id="contenido-fotos" class="flex-1 pt-5 pb-32">
     {% if not tiene_libros and not cant_duplicados %}
     <div class="text-center text-gris px-4 py-10">
       <p class="text-4xl mb-3">🤷</p>
@@ -42,7 +45,7 @@
     </div>
   </main>
 
-  <div class="fixed bottom-0 left-0 right-0 max-w-6xl mx-auto bg-crema/95 border-t border-borde px-5 py-3 safe-b space-y-2 lg:flex lg:space-y-0 lg:gap-2 lg:justify-end">
+  <div class="barra-accion safe-b space-y-2 lg:flex lg:space-y-0 lg:gap-2 lg:justify-end">
     <button id="btn-publicar" type="button"
       class="tap btn-primario w-full lg:w-auto lg:px-8 rounded-xl2 font-bold text-lg lg:order-2">
       Publicar
@@ -53,7 +56,8 @@
     </button>
   </div>
 </div>
-
+</div>
+</div>
 <script>
   const LIBRERO_SLUG = "{{ libreria.slug }}";
   const LIBRERO_TOKEN = "{{ libreria.token_panel }}";
@@ -316,3 +320,4 @@
   renderTodo();
 </script>
 {% endblock %}
+{% block emoji %}{% include "_twemoji.html" %}{% endblock %}

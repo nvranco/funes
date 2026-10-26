@@ -3,6 +3,28 @@
 {% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
 {% block head %}
 {% include "_estilo_panel.html" %}
+<style>
+  /* Tarjeta de catalogo: blanca con un degradado del color elegido (--acento), en capas y en distintas
+     direcciones para que no sea un plano; el subcatalogo se marca con un filo del mismo color. */
+  .card-cat { --acento: #7A9E78; position: relative; padding: 1rem; border-radius: 16px; background-color: #fff;
+    border: 1px solid color-mix(in srgb, var(--acento) 32%, var(--borde-panel));
+    background-image:
+      linear-gradient(135deg, color-mix(in srgb, var(--acento) 34%, transparent) 0%, transparent 58%),
+      linear-gradient(318deg, color-mix(in srgb, var(--acento) 18%, transparent) 0%, transparent 52%),
+      linear-gradient(205deg, transparent 38%, color-mix(in srgb, var(--acento) 11%, transparent) 62%, transparent 86%);
+    box-shadow: 0 1px 3px rgba(46,33,22,.07), 0 10px 22px -14px color-mix(in srgb, var(--acento) 55%, transparent); }
+  .card-cat.sub { margin-left: 1rem; border-left: 4px solid var(--acento); }
+  .card-cat-nombre { font-family: "Inter Tight", Inter, sans-serif; font-weight: 600; font-size: 1.1rem; letter-spacing: -0.02em; line-height: 1.2; color: rgb(var(--tinta)); }
+  .card-cat-meta { margin-top: .25rem; font-size: .78rem; color: rgb(95 85 69); }
+  .card-cat .acciones { display: grid; grid-template-columns: 1.7fr 1fr 1fr; gap: .4rem; margin-top: .6rem; }
+  .card-cat .acciones > * { min-height: 42px; font-size: .82rem; white-space: nowrap; }
+  .card-cat .pie { display: flex; flex-wrap: wrap; align-items: center; gap: .1rem; margin-top: .75rem; padding-top: .55rem;
+    border-top: 1px solid color-mix(in srgb, var(--acento) 25%, var(--borde-panel)); }
+  .card-cat .txt-btn { min-height: 36px; min-width: 0; padding: 0 .45rem; border-radius: 8px; border: 0; background: transparent;
+    font-size: .82rem; white-space: nowrap; font-weight: 500; color: rgb(var(--tinta)); transition: background-color .15s ease; }
+  .card-cat .txt-btn:hover { background: rgba(255,255,255,.7); }
+  .card-cat .txt-btn.peligro { margin-left: auto; color: #A54B3F; }
+</style>
 {% endblock %}
 {% block contenido %}
 {% include "_banner_panel.html" %}
@@ -77,32 +99,31 @@
        '[id^="catalogo-"]', asi que padre e hijo siguen siendo tarjetas
        hermanas entre si a los ojos del JS.) #}
     <div id="catalogo-{{ c.id }}" data-nivel="{{ c.nivel }}" data-padre-nombre="{{ c.padre_nombre or '' }}"
-      class="{{ c.color.bg }} border {{ c.color.borde }} rounded-lg p-2.5 {{ 'ml-4 border-l-4' if c.nivel == 1 else '' }}">
+      class="card-cat{{ ' sub' if c.nivel == 1 else '' }}" style="--acento: {{ c.color.hex_borde }}">
       <div data-rol="vista">
-        <p class="font-medium">{{ c.nombre }}</p>
-        {% if c.descripcion %}<p class="text-sm text-gris leading-snug">{{ c.descripcion }}</p>{% endif %}
-        <p class="text-xs text-gris mt-1">
+        <p class="card-cat-nombre">{{ c.nombre }}</p>
+        {% if c.descripcion %}<p class="text-sm text-gris leading-snug mt-0.5">{{ c.descripcion }}</p>{% endif %}
+        <p class="card-cat-meta">
           {{ c.cant_libros }} {{ et.libro if c.cant_libros == 1 else et.libros }}
           {% if c.ultima_actualizacion %} · actualizado {{ c.ultima_actualizacion.strftime('%d/%m') }}{% endif %}
         </p>
-        <div class="grid grid-cols-2 gap-1.5 mt-2">
+        <a href="{{ c.url_libros }}"
+          class="tap btn-primario w-full mt-3 px-3 text-sm">Ver {{ et.libros }} 📖</a>
+        <div class="acciones">
           <button type="button" data-rol="copiar" data-link="{{ c.url }}"
-            class="tap btn-secundario rounded-lg px-3 py-2 text-sm font-medium">Copiar link 📋</button>
+            class="tap btn-secundario rounded-lg px-2 font-medium">Copiar link 📋</button>
           <a href="{{ c.url }}" target="_blank" rel="noopener"
-            class="tap btn-secundario flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium">Ir 🔗</a>
+            class="tap btn-secundario flex items-center justify-center rounded-lg px-2 font-medium">Ir 🔗</a>
           <a href="{{ c.url_qr }}" download="qr-{{ libreria.slug }}-{{ c.slug }}.png"
-            class="tap btn-secundario flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium">QR 🏷️</a>
-          <a href="{{ c.url_libros }}"
-            class="tap btn-secundario flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium">Ver {{ et.libros }} 📖</a>
-          <button type="button" data-rol="editar"
-            class="tap btn-secundario rounded-lg px-3 py-2 text-sm font-medium">Editar ✏️</button>
-          <button type="button" data-rol="borrar"
-            class="tap rounded-lg px-3 py-2 text-sm font-medium border-2 border-terracota text-terracota">Borrar 🗑️</button>
+            class="tap btn-secundario flex items-center justify-center rounded-lg px-2 font-medium">QR 🏷️</a>
         </div>
-        {% if c.nivel == 0 %}
-        <button type="button" data-rol="nuevo-sub"
-          class="tap btn-secundario w-full rounded-lg px-3 py-2 text-sm font-medium mt-1.5">+ Subcatálogo</button>
-        {% endif %}
+        <div class="pie">
+          <button type="button" data-rol="editar" class="tap txt-btn">Editar ✏️</button>
+          {% if c.nivel == 0 %}
+          <button type="button" data-rol="nuevo-sub" class="tap txt-btn">+ Subcatálogo</button>
+          {% endif %}
+          <button type="button" data-rol="borrar" class="tap txt-btn peligro">Borrar 🗑️</button>
+        </div>
       </div>
 
       <div data-rol="edicion" class="hidden space-y-2">

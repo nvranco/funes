@@ -1,27 +1,30 @@
 {% extends "base.html" %}
 {% block titulo %}Elegir catálogo — {{ libreria.nombre }}{% endblock %}
 {% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
+{% block head %}
+{% include "_estilo_panel.html" %}
+{% endblock %}
 {% block contenido %}
-<header class="bg-celeste px-5 pt-8 pb-6">
-  <div class="max-w-2xl mx-auto">
-    <a href="{{ volver }}" class="text-tinta text-sm font-medium">← Volver</a>
-    <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Elegir catálogo</h1>
-    <p class="text-sm text-tinta/80 mt-1 truncate">Para: {{ libro.titulo }}</p>
-  </div>
-</header>
+{% include "_banner_panel.html" %}
 
-<div class="min-h-screen max-w-2xl mx-auto flex flex-col">
-  <main class="flex-1 px-5 pt-5 pb-10 space-y-2">
+<div class="max-w-6xl mx-auto px-5 pt-3 pb-10">
+<div id="panel-todo">
+<div class="max-w-2xl mx-auto">
+  <a href="{{ volver }}" class="text-tinta text-sm font-medium">← Volver</a>
+  <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Elegir catálogo</h1>
+  <p class="text-sm text-tinta/80 mt-1 truncate">Para: {{ libro.titulo }}</p>
+
+  <main class="flex-1 pt-5 pb-10 space-y-2">
     <button type="button" data-catalogo-id=""
       class="tap w-full text-left bg-papel rounded-xl2 p-3 {{ 'border-2 border-celeste' if libro.catalogo_id is none else 'border border-borde' }}">
-      <p class="font-medium">📁 Catálogo general</p>
+      <p class="font-medium">Catálogo general</p>
       <p class="text-xs text-gris mt-1">Sin catálogo puntual</p>
     </button>
 
     {% for c in catalogos %}
     <button type="button" data-catalogo-id="{{ c.id }}"
       class="tap {{ 'w-[calc(100%-1rem)] ml-4' if c.nivel == 1 else 'w-full' }} text-left bg-papel rounded-xl2 p-3 {{ 'border-2 border-celeste' if libro.catalogo_id == c.id else 'border border-borde' }}">
-      <p class="font-medium">📁 {{ '↳ ' if c.nivel == 1 else '' }}{{ c.nombre }}</p>
+      <p class="font-medium">{{ '↳ ' if c.nivel == 1 else '' }}{{ c.nombre }}</p>
       {% if c.descripcion %}<p class="text-sm text-gris mt-1">{{ c.descripcion }}</p>{% endif %}
       <p class="text-xs text-gris mt-1">{{ c.cant_libros }} {{ et.libro if c.cant_libros == 1 else et.libros }}</p>
     </button>
@@ -30,7 +33,8 @@
     {% endfor %}
   </main>
 </div>
-
+</div>
+</div>
 <script>
   const LIBRERO_SLUG = "{{ libreria.slug }}";
   const LIBRERO_TOKEN = "{{ libreria.token_panel }}";
@@ -55,3 +59,4 @@
   });
 </script>
 {% endblock %}
+{% block emoji %}{% include "_twemoji.html" %}{% endblock %}

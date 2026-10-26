@@ -1,19 +1,22 @@
 {% extends "base.html" %}
 {% block titulo %}Cómo cargar tus {{ et.libros }} — {{ libreria.nombre }}{% endblock %}
 {% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
+{% block head %}
+{% include "_estilo_panel.html" %}
+{% endblock %}
 {% block contenido %}
-<header class="bg-celeste px-5 pt-8 pb-6">
-  <div class="max-w-2xl mx-auto">
-    <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
-    <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Cómo cargar tus {{ et.libros }}</h1>
-    <p class="text-sm text-tinta/80 mt-1">
-      Funes digitaliza tu catálogo de 2 formas — podés usar las dos, incluso mezcladas en una misma carga.
-    </p>
-  </div>
-</header>
+{% include "_banner_panel.html" %}
 
-<div class="min-h-screen max-w-2xl mx-auto flex flex-col">
-  <main class="flex-1 px-5 py-5 pb-10">
+<div class="max-w-6xl mx-auto px-5 pt-3 pb-10">
+<div id="panel-todo">
+<div class="max-w-2xl mx-auto">
+  <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
+  <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Cómo cargar tus {{ et.libros }}</h1>
+  <p class="text-sm text-tinta/80 mt-1">
+    Funes digitaliza tu catálogo de 2 formas — podés usar las dos, incluso mezcladas en una misma carga.
+  </p>
+
+  <main class="flex-1 pt-5 pb-10">
 
     <div id="paso-1">
       <p class="text-xs font-bold text-gris uppercase tracking-wide mb-1">Paso 1 de 2 · Digitalización masiva</p>
@@ -107,7 +110,8 @@
 
   <input id="input-fotos" type="file" accept="image/*" multiple class="hidden">
 </div>
-
+</div>
+</div>
 <script>
   const LIBRERO_SLUG = "{{ libreria.slug }}";
   const LIBRERO_TOKEN = "{{ libreria.token_panel }}";
@@ -313,3 +317,4 @@
   }
 </script>
 {% endblock %}
+{% block emoji %}{% include "_twemoji.html" %}{% endblock %}

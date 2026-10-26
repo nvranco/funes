@@ -25,11 +25,16 @@
           d.rango.desde == desde and d.rango.hasta == hasta) }}
 {%- endmacro %}
 
+{% block head %}
+{% include "_estilo_panel.html" %}
+{% endblock %}
 {% block contenido %}
-<header class="bg-celeste">
-  <div class="max-w-6xl mx-auto px-6 py-5 flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+{% include "_banner_panel.html" %}
+<div class="max-w-6xl mx-auto px-5 pt-3 pb-10">
+<div id="panel-todo">
+<div class="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 mb-6">
     <div>
-      <h1 class="text-3xl font-bold text-tinta leading-tight" style="font-family: var(--font-display);">Funes · Landing</h1>
+      <h1 class="text-2xl font-bold text-tinta leading-tight">Landing</h1>
       <p class="text-xs text-tinta/80 mt-1 tabular-nums">
         {{ d.generado.strftime('%d/%m/%Y %H:%M') }} hs · {{ d.sesiones }} demo{{ 's' if d.sesiones != 1 else '' }}
         {%- if d.rango.desde or d.rango.hasta %}
@@ -45,10 +50,9 @@
       {{ atajo('7 días', d.rango.hace_7, d.rango.hoy) }}
       {{ atajo('30 días', d.rango.hace_30, d.rango.hoy) }}
     </div>
-  </div>
-</header>
+</div>
 
-<main class="max-w-6xl mx-auto px-6 py-6 space-y-8">
+<main class="space-y-8">
 
   <section>
     <h2 class="text-base font-semibold mb-3">Embudo de la demo</h2>
@@ -123,4 +127,7 @@
   </section>
 
 </main>
+</div>
+</div>
 {% endblock %}
+{% block emoji %}{% include "_twemoji.html" %}{% endblock %}

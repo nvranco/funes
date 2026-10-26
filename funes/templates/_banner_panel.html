@@ -12,7 +12,8 @@
           <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
         </svg>
       </span>
-      <span class="text-tinta/70 text-sm font-medium ml-1">Admin</span>
+      {% set rot = rotulo_banner if rotulo_banner is defined else 'Admin' %}
+      {% if rot %}<span class="text-tinta/70 text-sm font-medium ml-1">{{ rot }}</span>{% endif %}
     </div>
     {% if libreria is defined and libreria %}<p class="text-lg font-semibold text-tinta">{{ libreria.nombre }}</p>{% endif %}
   </div>
