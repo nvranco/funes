@@ -1,7 +1,8 @@
 {# Emoji de Twemoji en vez de los del sistema: se cargan como SVG. Las paginas que lo quieren lo
    incluyen en el bloque `emoji` de base.html. Para texto que arma el JS despues de cargar, llamar a
    parsearEmoji(elemento). #}
-<script src="https://cdn.jsdelivr.net/npm/@twemoji/api@15.1.0/dist/twemoji.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@twemoji/api@15.1.0/dist/twemoji.min.js"
+  integrity="sha384-o28+zJO3/45GHIy+9TFKGaYnbt0KQcFRzyBrb0WSSrz7bPGwGI1d64worBiXPgXw" crossorigin="anonymous"></script>
 <script>
   (function () {
     var opciones = { folder: 'svg', ext: '.svg', base: 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/' };

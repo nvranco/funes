@@ -247,7 +247,6 @@ async def admin_crear(
     whatsapp: str = Form(...),
     slug: str = Form(""),
     mensaje_wa_template: str = Form(MENSAJE_WA_DEFAULT),
-    funes_habilitado: bool = Form(False),
 ):
     _validar_token(token)
 
@@ -264,15 +263,14 @@ async def admin_crear(
             await db.pool().execute(
                 """
                 INSERT INTO librerias
-                    (slug, nombre, whatsapp, token_panel, mensaje_wa_template, funes_habilitado)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                    (slug, nombre, whatsapp, token_panel, mensaje_wa_template)
+                VALUES ($1, $2, $3, $4, $5)
                 """,
                 slug_final,
                 nombre.strip(),
                 whatsapp,
                 token_panel,
                 mensaje_wa_template.strip() or MENSAJE_WA_DEFAULT,
-                funes_habilitado,
             )
             base = str(request.base_url).rstrip("/")
             nueva = {

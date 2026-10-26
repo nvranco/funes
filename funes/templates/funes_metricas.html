@@ -4,16 +4,6 @@
 {% from "_funes_tarjetas.html" import tarjeta, TONOS, grafico_calidad, log_actividad %}
 {% block head %}
 {% include "_estilo_panel.html" %}
-<style>
-  /* Por default el scroll del log solo se ve al pasar el mouse (o nunca, en
-     mac con "mostrar barras: automaticamente"). Estilar el pseudo-elemento
-     lo saca del modo overlay y lo deja siempre pintado, en las dos versiones
-     (misma clase .log-actividad-scroll para mobile y desktop). */
-  .log-actividad-scroll { scrollbar-width: thin; scrollbar-color: rgb(var(--borde)) transparent; }
-  .log-actividad-scroll::-webkit-scrollbar { width: 6px; }
-  .log-actividad-scroll::-webkit-scrollbar-track { background: transparent; }
-  .log-actividad-scroll::-webkit-scrollbar-thumb { background: rgb(var(--borde)); border-radius: 3px; }
-</style>
 {% endblock %}
 
 {#

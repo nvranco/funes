@@ -100,7 +100,7 @@
   const LIBRERO_SLUG = "{{ libreria.slug }}";
   const LIBRERO_TOKEN = "{{ libreria.token_panel }}";
   const ET_LIBROS = "{{ et.libros }}", ET_LIBRO = "{{ et.libro }}";
-  const ET_AUTOR_CAP = "{{ et.Autor }}";
+  const ET_AUTOR_CAP = "{{ et.Autor }}", ET_AUTOR = "{{ et.autor }}", ET_AUTORES = "{{ et.autores }}";
   const API_BASE = `/api/${LIBRERO_SLUG}/${LIBRERO_TOKEN}`;
 
   const libros = {{ libros_json | safe }};
@@ -159,9 +159,9 @@
 
   function copiar(texto, btn) {
     navigator.clipboard.writeText(texto).then(function () {
-      var original = btn.textContent;
+      var original = btn.innerHTML;
       btn.textContent = '¡Listo!';
-      setTimeout(function () { btn.textContent = original; }, 1500);
+      setTimeout(function () { btn.innerHTML = original; }, 1500);
     });
   }
 
@@ -184,11 +184,11 @@
     return `<a href="${href}" class="inv-chip ${clases}">${nombre} ›</a>`;
   }
 
-  // Mismos cortes que el CSS del catalogo publico: 640, 1024 y 1280px.
+  // Una columna en celular; desde 640px mismos cortes que el catalogo publico (3, 4 y 5).
   let ultimaCantidad = 0;
   function cantidadColumnas() {
     const w = window.innerWidth;
-    return w >= 1280 ? 5 : w >= 1024 ? 4 : w >= 640 ? 3 : 2;
+    return w >= 1280 ? 5 : w >= 1024 ? 4 : w >= 640 ? 3 : 1;
   }
   let timerResize = null;
   window.addEventListener('resize', () => {
@@ -243,10 +243,14 @@
             </a>
           ` : ''}
           <div class="inv-txt">
-            <button type="button" data-rol="expandir" class="w-full min-w-0 text-left">
-              <p class="inv-titulo">${escaparHtml(libro.titulo)}</p>
-              <p class="inv-autor">${escaparHtml(libro.autor || `${ET_AUTOR_CAP} no detectado`)}</p>
-            </button>
+            <div class="flex items-start gap-2">
+              <button type="button" data-rol="expandir" class="flex-1 min-w-0 text-left">
+                <p class="inv-titulo">${escaparHtml(libro.titulo)}</p>
+                <p class="inv-autor">${escaparHtml(libro.autor || `${ET_AUTOR_CAP} no detectado`)}</p>
+              </button>
+              <button type="button" data-rol="expandir" aria-label="Editar" title="Editar"
+                class="tap btn-secundario shrink-0 rounded-lg w-9 h-9 flex items-center justify-center text-sm">✏️</button>
+            </div>
             <div class="mt-2">${badgeCatalogo(libro)}</div>
         <div data-rol="detalle" class="hidden mt-3 pt-3 border-t border-borde space-y-2">
           <div data-rol="vista" class="flex flex-col gap-1.5">
@@ -272,7 +276,8 @@
     });
     lista.innerHTML = cols.map((c) => `<div class="inv-col">${c.join('')}</div>`).join('');
     const autores = new Set(filtrados.map((l) => normalizar(l.autor)).filter(Boolean)).size;
-    conteo.textContent = `${filtrados.length} ${filtrados.length === 1 ? ET_LIBRO : ET_LIBROS}` + (autores ? ` · ${autores} ${autores === 1 ? 'autor' : 'autores'}` : '');
+    if (window.parsearEmoji) parsearEmoji(lista);
+    conteo.textContent = `${filtrados.length} ${filtrados.length === 1 ? ET_LIBRO : ET_LIBROS}` + (autores ? ` · ${autores} ${autores === 1 ? ET_AUTOR : ET_AUTORES}` : '');
 
     lista.querySelectorAll('[data-id]').forEach((fila) => {
       const id = Number(fila.dataset.id);
@@ -281,9 +286,9 @@
       const vista = fila.querySelector('[data-rol="vista"]');
       const edicion = fila.querySelector('[data-rol="edicion"]');
 
-      fila.querySelector('[data-rol="expandir"]').addEventListener('click', () => {
+      fila.querySelectorAll('[data-rol="expandir"]').forEach((b) => b.addEventListener('click', () => {
         detalle.classList.toggle('hidden');
-      });
+      }));
 
       const btnVendido = fila.querySelector('[data-accion="vendido"]');
       if (btnVendido) {

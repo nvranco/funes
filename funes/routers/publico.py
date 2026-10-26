@@ -4,7 +4,6 @@ innovación (requisitos §9). También sirve las páginas de catálogos
 segmentados (/{slug}/c/{catalogo_slug}) reusando el mismo template."""
 
 import json
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -122,7 +121,6 @@ async def _render_catalogo(request: Request, slug: str, catalogo_slug: str | Non
 
     catalogos_map_js = json.dumps(await _mapa_catalogos(libreria["id"])).replace("</", "<\\/")
 
-    fecha_hoy = datetime.now(timezone.utc).astimezone().strftime("%d/%m")
     origen = request.query_params.get("src", "link")
     origen_catalogo = request.query_params.get("origen", "link")
 
@@ -133,7 +131,6 @@ async def _render_catalogo(request: Request, slug: str, catalogo_slug: str | Non
             "libreria": libreria,
             "et": etiquetas(libreria["tipo_catalogo"]),
             "hay_libros": cant_publicados > 0,
-            "fecha_hoy": fecha_hoy,
             "origen_js": _js_string(origen),
             "whatsapp_js": _js_string(libreria["whatsapp"]),
             "mensaje_wa_template_js": _js_string(libreria["mensaje_wa_template"]),

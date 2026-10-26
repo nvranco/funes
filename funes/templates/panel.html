@@ -458,9 +458,9 @@
 
   function copiarLink(texto, btn) {
     navigator.clipboard.writeText(texto).then(function () {
-      var original = btn.textContent;
+      var original = btn.innerHTML;
       btn.textContent = '¡Copiado!';
-      setTimeout(function () { btn.textContent = original; }, 1500);
+      setTimeout(function () { btn.innerHTML = original; }, 1500);
     });
   }
 

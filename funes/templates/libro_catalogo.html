@@ -40,7 +40,7 @@
   const LIBRERO_TOKEN = "{{ libreria.token_panel }}";
   const LIBRO_ID = {{ libro.id }};
   const API_BASE = `/api/${LIBRERO_SLUG}/${LIBRERO_TOKEN}`;
-  const VOLVER = document.querySelector('header a').getAttribute('href');
+  const VOLVER = {{ volver|tojson }};
 
   document.querySelectorAll('[data-catalogo-id]').forEach((btn) => {
     btn.addEventListener('click', async () => {
