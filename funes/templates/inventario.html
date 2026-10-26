@@ -18,6 +18,13 @@
     color: rgb(var(--tinta)); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .inv-autor { margin-top: .2rem; font-size: .78rem; line-height: 1.3; color: rgb(95 85 69); }
   .inv-chip { display: inline-flex; align-items: center; min-height: 28px; padding: 0 .55rem; border-radius: 8px; font-size: .75rem; font-weight: 500; }
+  /* Celular: una columna, tapa a la izquierda y titulo, autor y acciones a la derecha. */
+  @media (max-width: 639px) {
+    .inv-card { display: flex; align-items: flex-start; }
+    .inv-tapa { flex: 0 0 30%; max-width: 120px; align-self: stretch; }
+    .inv-tapa img { height: auto; min-height: 0; max-height: none; aspect-ratio: 2 / 3; }
+    .inv-txt { flex: 1 1 0; min-width: 0; }
+  }
   @media (hover: hover) { .inv-card { transition: transform .18s ease, box-shadow .18s ease; }
     .inv-card:hover { transform: translateY(-2px); box-shadow: 0 2px 6px rgba(46,33,22,.1), 0 12px 22px -10px rgba(46,33,22,.22); } }
 </style>
