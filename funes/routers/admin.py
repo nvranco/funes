@@ -16,7 +16,6 @@ from pydantic import BaseModel, Field
 from funes import db
 from funes.config import ADMIN_TOKEN, MENSAJE_WA_DEFAULT
 from funes.funes_chat import qr as funes_qr
-from funes.metricas import calcular_metricas
 from funes.tokens import nuevo_token_panel, slugify
 
 router = APIRouter()
@@ -296,63 +295,6 @@ async def admin_crear(
             "nuevo_codigo": None,
             "error": error,
             "token": token,
-        },
-    )
-
-
-@router.get("/admin/{token}/librerias/{libreria_id}/metricas", response_class=HTMLResponse)
-async def admin_metricas(request: Request, token: str, libreria_id: int):
-    """Panel de lectura de la tabla eventos + estado del catalogo para una
-    libreria puntual."""
-    _validar_token(token)
-
-    libreria = await db.pool().fetchrow(
-        "SELECT id, slug, nombre, creado_en FROM librerias WHERE id = $1", libreria_id
-    )
-    if libreria is None:
-        raise HTTPException(status_code=404)
-
-    filas_eventos = await db.pool().fetch(
-        "SELECT tipo, payload, session_id, creado_en FROM eventos "
-        "WHERE libreria_id = $1 ORDER BY creado_en DESC",
-        libreria_id,
-    )
-    filas_libros = await db.pool().fetchrow(
-        """
-        SELECT
-            COUNT(*) FILTER (WHERE estado = 'publicado' AND archivado_en IS NULL) AS publicados,
-            COUNT(*) FILTER (WHERE estado = 'vendido' AND archivado_en IS NULL) AS vendidos,
-            COUNT(*) FILTER (WHERE estado = 'pendiente' AND archivado_en IS NULL) AS pendientes,
-            COUNT(*) FILTER (WHERE duplicado_de IS NOT NULL) AS duplicados_detectados,
-            COUNT(*) FILTER (WHERE archivado_en IS NOT NULL) AS archivados
-        FROM libros WHERE libreria_id = $1
-        """,
-        libreria_id,
-    )
-    filas_lotes = await db.pool().fetchrow(
-        """
-        SELECT
-            COUNT(*) AS total,
-            COUNT(*) FILTER (WHERE estado = 'publicado') AS publicados,
-            COUNT(*) FILTER (WHERE archivado_en IS NOT NULL) AS archivados
-        FROM lotes WHERE libreria_id = $1
-        """,
-        libreria_id,
-    )
-    filas_catalogos = await db.pool().fetch(
-        "SELECT id, nombre, color, padre_id FROM catalogos WHERE libreria_id = $1", libreria_id
-    )
-
-    metricas = calcular_metricas(filas_eventos, filas_libros, filas_lotes, filas_catalogos)
-
-    return templates.TemplateResponse(
-        request,
-        "metricas.html",
-        {
-            "libreria": libreria,
-            "token": token,
-            "es_admin": True,
-            **metricas,
         },
     )
 

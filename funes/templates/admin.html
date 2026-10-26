@@ -83,10 +83,6 @@
                 class="tap btn-secundario rounded-lg px-3 flex items-center text-sm font-medium">
                 Panel ↗
               </a>
-              <a href="/admin/{{ token }}/librerias/{{ lib.id }}/metricas" target="_blank" rel="noopener"
-                class="tap btn-secundario rounded-lg px-3 flex items-center text-sm font-medium">
-                Métricas 📊
-              </a>
               {% if lib.tipo_catalogo == 'libros' %}
               <button type="button" data-accion="toggle-funes"
                 class="tap rounded-lg px-3 flex items-center text-sm font-medium border-2 {{ 'border-celeste text-celeste' if lib.funes_habilitado else 'border-borde text-gris' }}">

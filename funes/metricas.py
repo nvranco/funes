@@ -1,6 +1,6 @@
-"""Agregacion de metricas por libreria, compartida entre el panel del admin
-(`/admin/{token}/librerias/{id}/metricas`) y el panel del propio librero
-(`/{slug}/panel/{token}/metricas`).
+"""Agregacion de metricas por libreria, para los indicadores del panel del librero
+(`/{slug}/panel/{token}`). Las paginas de metricas completas (la del admin y la del propio
+librero) se eliminaron: hoy solo la usa el panel.
 
 Todo se agrega en Python (Counter sobre filas ya traidas), no en SQL: el
 volumen de eventos de un MVP es chico y asi queda mas facil de leer/ajustar.
@@ -12,7 +12,7 @@ from collections import Counter
 from funes.colores import color_catalogo
 
 # Cuantos eventos como maximo viajan al HTML para "Actividad reciente". La
-# tarjeta pagina de a 15 del lado del cliente (ver metricas.html), asi que
+# tarjeta pagina de a 15 del lado del cliente, asi que
 # esto es el techo de cuanto se puede hojear hacia atras, no el tamaño de
 # pagina.
 TOPE_EVENTOS_RECIENTES = 150
@@ -115,7 +115,7 @@ def calcular_metricas(filas_eventos, filas_libros, filas_lotes, filas_catalogos)
         "top_busquedas_sin_resultado": top_busquedas_sin_resultado,
         "top_libros_consultados": top_libros_consultados,
         # El tope existia para no volcar el historico entero al HTML; ahora
-        # que la tarjeta pagina de a 15 (ver metricas.html) conviene un tope
+        # que la tarjeta pagina de a 15 conviene un tope
         # mas generoso, para que "cargar mas paginas" tenga con que trabajar
         # antes de quedarse corto.
         "eventos_recientes": eventos[:TOPE_EVENTOS_RECIENTES],
