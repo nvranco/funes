@@ -83,6 +83,9 @@
   .safe-b { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
   .tap { min-height: 48px; min-width: 48px; }
 
+  /* Emoji de Twemoji (donde la pagina carga _twemoji.html): del tamaño del texto. */
+  img.emoji { height: 1.15em; width: 1.15em; display: inline-block; vertical-align: -0.2em; margin: 0 .05em 0 .5em; }
+
   /* iOS hace zoom automatico al enfocar un input con font-size < 16px.
      Forzamos 16px en todo campo editable, sin importar la clase de Tailwind. */
   input, textarea, select { font-size: 16px !important; }
@@ -128,5 +131,6 @@
 </head>
 <body class="font-sans text-texto-papel bg-fondo min-h-screen antialiased">
 {% block contenido %}{% endblock %}
+{% block emoji %}{% endblock %}
 </body>
 </html>

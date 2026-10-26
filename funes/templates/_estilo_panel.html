@@ -1,0 +1,101 @@
+{# Estilo compartido del panel del librero y del admin: Inter, fondo con velos que derivan despacio, bordes
+   grises, botones y bloques blancos, el banner flotante con la marca y el contenedor grande. Se incluye
+   en el bloque head de cada pagina. #}
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Mismo lenguaje que la landing y el catalogo publico: fondo crema papel, Inter en el cuerpo e
+     Inter Tight en los numeros, tarjetas con borde fino y la sombra suave de las tarjetas de libros. */
+  /* Mas especificos que las utilidades de Tailwind (bg-fondo / bg-papel), que se inyectan despues. */
+  /* El fondo va en <html> (el lienzo): asi el degradado arranca en el borde de arriba, sin una franja
+     cuando el margen del banner se escapa del body. */
+  @property --a1 { syntax: '<angle>'; inherits: false; initial-value: 112deg; }
+  @property --a2 { syntax: '<angle>'; inherits: false; initial-value: 63deg; }
+  @property --a3 { syntax: '<angle>'; inherits: false; initial-value: 158deg; }
+  @property --a4 { syntax: '<angle>'; inherits: false; initial-value: 31deg; }
+  @property --a5 { syntax: '<angle>'; inherits: false; initial-value: 135deg; }
+  @property --a6 { syntax: '<angle>'; inherits: false; initial-value: 84deg; }
+  @property --p1 { syntax: '<percentage>'; inherits: false; initial-value: 24%; }
+  @property --p2 { syntax: '<percentage>'; inherits: false; initial-value: 47%; }
+  @property --p3 { syntax: '<percentage>'; inherits: false; initial-value: 71%; }
+  html { background-color: rgb(var(--fondo));
+    /* Velos de color muy tenues y superpuestos, cada uno con su angulo, su ancho y su posicion: sin formas
+       definidas, solo cambios suaves de tono (verde del hero, con apenas ambar, azul y terracota).
+       Los angulos y tres de las posiciones derivan despacio (40 a 80 segundos, cada uno con su
+       duracion), asi que el fondo casi no se nota moverse y nunca repite exactamente la misma imagen. */
+    background-image:
+      linear-gradient(var(--a1), transparent 6%, rgba(122,158,120,.17) var(--p1), transparent 47%),
+      linear-gradient(var(--a2), transparent 28%, rgba(184,134,58,.09) var(--p2), transparent 67%),
+      linear-gradient(var(--a3), transparent 50%, rgba(122,158,120,.14) var(--p3), transparent 94%),
+      linear-gradient(var(--a4), transparent 4%, rgba(92,122,138,.10) 21%, transparent 41%),
+      linear-gradient(var(--a5), transparent 57%, rgba(122,158,120,.11) 77%, transparent 100%),
+      linear-gradient(var(--a6), transparent 60%, rgba(165,75,63,.06) 81%, transparent 97%); }
+  @media (prefers-reduced-motion: no-preference) {
+    html { animation: d-a1 43s ease-in-out infinite alternate, d-a2 57s ease-in-out infinite alternate,
+                      d-a3 71s ease-in-out infinite alternate, d-a4 53s ease-in-out infinite alternate,
+                      d-a5 67s ease-in-out infinite alternate, d-a6 79s ease-in-out infinite alternate,
+                      d-p1 49s ease-in-out infinite alternate, d-p2 61s ease-in-out infinite alternate,
+                      d-p3 73s ease-in-out infinite alternate; }
+  }
+  @keyframes d-a1 { to { --a1: 128deg; } }
+  @keyframes d-a2 { to { --a2: 48deg; } }
+  @keyframes d-a3 { to { --a3: 172deg; } }
+  @keyframes d-a4 { to { --a4: 46deg; } }
+  @keyframes d-a5 { to { --a5: 119deg; } }
+  @keyframes d-a6 { to { --a6: 98deg; } }
+  @keyframes d-p1 { to { --p1: 31%; } }
+  @keyframes d-p2 { to { --p2: 40%; } }
+  @keyframes d-p3 { to { --p3: 64%; } }
+  body.bg-fondo { background-color: transparent; padding-top: 10px; }
+  /* body.font-sans: la clase de Tailwind que fija la fuente del sistema le gana a un selector de elemento. */
+  body.font-sans { font-family: Inter, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  /* Los botones secundarios se ven y se comportan como los contenedores: blanco translucido, borde fino y la misma sombra. */
+  :root { --borde-panel: rgba(60,55,45,.13); }
+  /* Bordes en un gris neutro translucido en vez del marron del resto de la app. */
+  body [class*="border-borde"] { border-color: var(--borde-panel); }
+  body .btn-secundario { background-color: rgba(255,255,255,.5); border: 1px solid var(--borde-panel) !important;
+    box-shadow: 0 1px 3px rgba(46,33,22,.1), 0 5px 12px -6px rgba(46,33,22,.16); transition: background-color .15s ease, transform .15s ease; }
+  body .btn-secundario:hover { background-color: rgba(255,255,255,.75); }
+  body .btn-secundario:active { transform: scale(.99); }
+  body .bg-papel { background-color: rgba(255,255,255,.5); box-shadow: 0 1px 3px rgba(46,33,22,.1), 0 5px 12px -6px rgba(46,33,22,.16); }
+
+  /* Todo el panel va dentro de un solo contenedor con el formato del banner (mismo fondo, radio,
+     borde y sombra, y el mismo ancho), y los bloques de adentro son planos: sin sombra propia. */
+  #panel-todo { background: #FCFAF4; border: 1px solid var(--borde-panel); border-radius: 12px; padding: 1rem;
+    box-shadow: 0 6px 20px rgba(46,33,22,.08); }
+  @media (min-width: 640px) { #panel-todo { padding: 1.5rem; } }
+  @media (min-width: 1024px) { #panel-todo { padding: 2rem; } }
+  #panel-todo .bg-papel, #panel-todo .btn-secundario { box-shadow: none; background-color: #fff; }
+  #panel-todo .btn-secundario:hover { background-color: #FCFAF4; }
+  /* Si la etiqueta de un acordeon ocupa dos lineas (pantallas angostas), que no toque los bordes. */
+  #panel-todo [data-acordeon] { padding-top: .5rem; padding-bottom: .5rem; }
+
+  /* Botones principales: el boton de la landing (tinta con texto crema, 12px de radio) que vira al verde
+     del hero al pasar el mouse y sube 1px. El de "salida" (border-ambar) conserva su tono ambar. */
+  body .btn-primario, body .btn-primario.border-celeste { background-color: rgb(var(--tinta)); color: rgb(var(--crema));
+    border: 0 !important; border-radius: 12px; font-weight: 600; box-shadow: none;
+    display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+    transition: background-color .15s ease, transform .15s ease; }
+  body .btn-primario:hover, body .btn-primario.border-celeste:hover { background-color: #3F6B4B; transform: translateY(-1px); }
+  body .btn-primario.border-ambar { border-radius: 12px; font-weight: 600; }
+  body .btn-primario:active { transform: scale(.98); }
+  #panel-todo input[type="search"] { border-width: 1px !important; border-color: var(--borde-panel) !important; }
+  #panel-todo h1 { font-family: "Inter Tight", Inter, sans-serif; letter-spacing: -0.02em; }
+  #panel-todo input:not([type="checkbox"]):not([type="radio"]), #panel-todo textarea, #panel-todo select { background-color: #fff; border-color: var(--borde-panel); }
+  .text-2xl.font-bold, .text-4xl.font-bold { font-family: "Inter Tight", Inter, sans-serif; letter-spacing: -0.02em; }
+
+  /* Banner de la landing: pastilla flotante e inset respecto de los bordes, con la marca de Funes
+     a la izquierda y la libreria a la derecha. Scrollea con la pagina. */
+  .banner-panel { position: relative; z-index: 20; width: calc(100% - 2.5rem); max-width: calc(72rem - 2.5rem);
+    margin: 0 auto; border-radius: 12px; background: #FCFAF4; border: 1px solid var(--borde-panel);
+    box-shadow: 0 6px 20px rgba(46,33,22,.08); }
+  .banner-panel .marca { display: inline-flex; align-items: center; gap: .5rem; color: #111; line-height: 1; }
+  .banner-panel .marca span.nombre-marca { font-family: Lora, Georgia, serif; font-weight: 700; letter-spacing: -0.01em; font-size: 1.25rem; }
+  .banner-panel .marca svg { width: 1.25rem; height: 1.25rem; }
+
+  /* El scroll del log de actividad se ve siempre (por default solo aparece al pasar el mouse, o nunca en
+     mac con "mostrar barras: automaticamente"). */
+  .log-actividad-scroll { scrollbar-width: thin; scrollbar-color: rgb(var(--borde)) transparent; }
+  .log-actividad-scroll::-webkit-scrollbar { width: 6px; }
+  .log-actividad-scroll::-webkit-scrollbar-track { background: transparent; }
+  .log-actividad-scroll::-webkit-scrollbar-thumb { background: rgb(var(--borde)); border-radius: 3px; }
+</style>

@@ -67,9 +67,43 @@
     .lp .aparece { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease; }
     .lp .aparece.visible { opacity: 1; transform: none; }
   }
+  @property --a1 { syntax: '<angle>'; inherits: false; initial-value: 112deg; }
+  @property --a2 { syntax: '<angle>'; inherits: false; initial-value: 63deg; }
+  @property --a3 { syntax: '<angle>'; inherits: false; initial-value: 158deg; }
+  @property --a4 { syntax: '<angle>'; inherits: false; initial-value: 31deg; }
+  @property --a5 { syntax: '<angle>'; inherits: false; initial-value: 135deg; }
+  @property --a6 { syntax: '<angle>'; inherits: false; initial-value: 84deg; }
+  @property --p1 { syntax: '<percentage>'; inherits: false; initial-value: 24%; }
+  @property --p2 { syntax: '<percentage>'; inherits: false; initial-value: 47%; }
+  @property --p3 { syntax: '<percentage>'; inherits: false; initial-value: 71%; }
+  /* Fondo del hero: velos de color muy tenues y superpuestos, cada uno con su angulo, ancho y posicion
+     (verde del hero con apenas ambar, azul y terracota). Los angulos y tres posiciones derivan despacio,
+     de 43 a 79 segundos cada uno, asi que casi no se nota moverse y nunca repite la misma imagen. */
   .lp .fondo-laberinto {
-    background-image: radial-gradient(circle at 85% 20%, rgba(122,158,120,.26) 0, rgba(122,158,120,0) 58%);
+    background-image:
+      linear-gradient(var(--a1), transparent 6%, rgba(122,158,120,.17) var(--p1), transparent 47%),
+      linear-gradient(var(--a2), transparent 28%, rgba(184,134,58,.09) var(--p2), transparent 67%),
+      linear-gradient(var(--a3), transparent 50%, rgba(122,158,120,.14) var(--p3), transparent 94%),
+      linear-gradient(var(--a4), transparent 4%, rgba(92,122,138,.10) 21%, transparent 41%),
+      linear-gradient(var(--a5), transparent 57%, rgba(122,158,120,.11) 77%, transparent 100%),
+      linear-gradient(var(--a6), transparent 60%, rgba(165,75,63,.06) 81%, transparent 97%);
   }
+  @media (prefers-reduced-motion: no-preference) {
+    .lp .fondo-laberinto { animation: d-a1 43s ease-in-out infinite alternate, d-a2 57s ease-in-out infinite alternate,
+                      d-a3 71s ease-in-out infinite alternate, d-a4 53s ease-in-out infinite alternate,
+                      d-a5 67s ease-in-out infinite alternate, d-a6 79s ease-in-out infinite alternate,
+                      d-p1 49s ease-in-out infinite alternate, d-p2 61s ease-in-out infinite alternate,
+                      d-p3 73s ease-in-out infinite alternate; }
+  }
+  @keyframes d-a1 { to { --a1: 128deg; } }
+  @keyframes d-a2 { to { --a2: 48deg; } }
+  @keyframes d-a3 { to { --a3: 172deg; } }
+  @keyframes d-a4 { to { --a4: 46deg; } }
+  @keyframes d-a5 { to { --a5: 119deg; } }
+  @keyframes d-a6 { to { --a6: 98deg; } }
+  @keyframes d-p1 { to { --p1: 31%; } }
+  @keyframes d-p2 { to { --p2: 40%; } }
+  @keyframes d-p3 { to { --p3: 64%; } }
   .lp .burbuja-funes { background: rgb(var(--papel)); border: 1px solid rgb(var(--borde)); border-radius: 14px 14px 14px 4px; }
   .lp .burbuja-lector { background: rgb(var(--celeste-claro)); border-radius: 14px 14px 4px 14px; }
 

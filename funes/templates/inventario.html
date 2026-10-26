@@ -1,16 +1,17 @@
 {% extends "base.html" %}
 {% block titulo %}Inventario — {{ libreria.nombre }}{% endblock %}
 {% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
+{% block head %}
+{% include "_estilo_panel.html" %}
+{% endblock %}
 {% block contenido %}
-<header class="bg-celeste px-5 pt-8 pb-6">
-  <div class="max-w-6xl mx-auto">
-    <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
-    <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Inventario ({{ cant_libros }})</h1>
-  </div>
-</header>
+{% include "_banner_panel.html" %}
 
-<div class="min-h-screen max-w-6xl mx-auto flex flex-col">
-  <main class="flex-1 px-5 pt-5 pb-10">
+<div class="max-w-6xl mx-auto px-5 pt-3 pb-10">
+<div id="panel-todo">
+  <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
+  <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Inventario ({{ cant_libros }})</h1>
+  <main class="flex-1 pt-5">
     <div class="lg:flex lg:gap-8 lg:items-start">
       <div class="lg:w-80 lg:shrink-0">
         <div class="bg-papel border border-borde rounded-xl2 p-3">
@@ -81,6 +82,7 @@
   </main>
 
   <input id="input-foto-libro" type="file" accept="image/*" class="hidden">
+</div>
 </div>
 
 <script>
@@ -353,3 +355,4 @@
   }
 </script>
 {% endblock %}
+{% block emoji %}{% include "_twemoji.html" %}{% endblock %}

@@ -7,43 +7,18 @@
    emoji-, para el icono compuesto (camara+"?") del boton de info de la
    guia: no hay un emoji que combine las dos cosas. #}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.46.0/tabler-icons.min.css">
-<style>
-  /* Mismo motivo que en funes_metricas.html: sin esto el scroll del log solo
-     se ve al pasar el mouse (o nunca, en mac con "mostrar barras: automaticamente"). */
-  .log-actividad-scroll { scrollbar-width: thin; scrollbar-color: rgb(var(--borde)) transparent; }
-  .log-actividad-scroll::-webkit-scrollbar { width: 6px; }
-  .log-actividad-scroll::-webkit-scrollbar-track { background: transparent; }
-  .log-actividad-scroll::-webkit-scrollbar-thumb { background: rgb(var(--borde)); border-radius: 3px; }
-</style>
+{% include "_estilo_panel.html" %}
 {% endblock %}
 {% block contenido %}
-{# <header>, no <div>: escapa a `body > div { max-width: 480px }` de base.html
-   para que el banner verde llegue a los dos bordes en desktop, igual que en
-   /admin y en el tablero de piloto. #}
-<header class="bg-celeste">
-  {# px-6/py-4 uniformes (sin bump en mobile) y "Admin" siempre visible:
-     mismo tamaño, mismo padding y mismo contenido que el header de
-     admin.html en todas las pantallas -asi el logo de Funes cae exactamente
-     en el mismo lugar en las dos pantallas, no solo se parecen. #}
-  <div class="max-w-6xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
-    <div class="flex items-center gap-2">
-      <h1 class="text-2xl font-bold text-tinta leading-tight" style="font-family: var(--font-display);">Funes</h1>
-      <svg viewBox="0 0 32 32" class="w-6 h-6 text-tinta shrink-0" fill="none"
-           stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-        <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
-        <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
-        <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
-        <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
-      </svg>
-      <span class="text-tinta/70 text-sm font-medium ml-1">Admin</span>
-    </div>
-    <p class="text-lg font-semibold text-tinta">{{ libreria.nombre }}</p>
-  </div>
-</header>
+{# <header>, no <div>: escapa a `body > div { max-width: 480px }` de base.html para que el banner
+   llegue a los dos bordes en desktop. Es el banner de la landing (marca de Funes a la izquierda,
+   la libreria a la derecha), pegado arriba al hacer scroll. #}
+{% include "_banner_panel.html" %}
 
-<div class="min-h-screen max-w-6xl mx-auto flex flex-col">
+<div class="max-w-6xl mx-auto flex flex-col">
 
-  <main class="flex-1 px-5 pt-6 pb-10 lg:pt-8">
+  <main class="flex-1 px-5 pt-3 pb-10">
+  <div id="panel-todo">
   {# Resumen primero en mobile -no espera al final de Gestión/Actividad para
      que el librero vea sus numeros-, con menos aire entre tarjetas (mismo
      gap-1.5 que separa los botones de Gestión) que en desktop, donde no
@@ -99,13 +74,6 @@
   <div class="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 lg:gap-8 items-start">
 
     <div class="min-w-0">
-    {% if cant_libros == 0 %}
-    <div class="text-center text-gris px-4">
-      <p class="text-4xl mb-3">📷</p>
-      <p>Todavía no cargaste ningún estante. Sacá 5 o 6 fotos y probá.</p>
-    </div>
-    {% endif %}
-
     {# Mismo formato que el resto de las secciones -titulo uppercase, tarjetas
        con borde fino sin color-: se ve tanto mientras se procesa un lote
        recien subido (carga-estado, arrancado por JS) como mientras hay
@@ -147,7 +115,7 @@
           <button type="button" data-acordeon="gestion-inventario"
             class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium"
             style="border: 1px solid rgb(var(--borde))">
-            Gestionar inventario 📚
+            <span class="text-left">Gestionar <span class="whitespace-nowrap">inventario 📚</span></span>
             <span class="acordeon-flecha text-gris transition-transform duration-300" aria-hidden="true">▾</span>
           </button>
           {# grid-template-rows 0fr->1fr (con overflow-hidden adentro) en vez
@@ -180,7 +148,7 @@
           <button type="button" data-acordeon="gestion-funes"
             class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium"
             style="border: 1px solid rgb(var(--borde))">
-            Gestionar recomendaciones 🧙
+            <span class="text-left">Gestionar <span class="whitespace-nowrap">recomendaciones 🧙</span></span>
             <span class="acordeon-flecha text-gris transition-transform duration-300" aria-hidden="true">▾</span>
           </button>
           <div id="gestion-funes" class="grid transition-[grid-template-rows] duration-300 ease-in-out" style="grid-template-rows: 0fr">
@@ -282,7 +250,7 @@
     {# Solo desktop: debajo de las dos bifurcaciones, en la misma columna
        -ancho 420px-, no al lado de los indicadores. Titulo afuera de la
        tarjeta, mismo patron que "Lo que mas funciono" en la columna de al
-       lado. alto=420 es solo el arranque -antes de que corra el JS de mas
+       lado. alto=370 es solo el arranque -antes de que corra el JS de mas
        abajo-: un alto fijo en CSS nunca puede igualar el de la columna
        derecha porque esa columna no tiene un alto fijo tampoco (depende de
        si Funes esta prendido y de cuantos catalogos hay), asi que
@@ -290,10 +258,10 @@
        pagina y pisa este alto con el real (ver el script al final del
        archivo). En mobile esta misma info va al final de la pagina (ver el
        bloque lg:hidden despues de "Catálogos", mas abajo) -no tiene con que
-       igualar el alto aca, asi que ahi si se deja el alto=420 fijo. #}
+       igualar el alto aca, asi que ahi si se deja el alto=370 fijo. #}
     <div id="bloque-actividad-desktop" class="hidden lg:block mt-6">
       <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-2">Actividad</h2>
-      {{ log_actividad(eventos_combinados, TONOS, alto=420, mostrar_titulo=false) }}
+      {{ log_actividad(eventos_combinados, TONOS, alto=370, mostrar_titulo=false) }}
     </div>
     {% endif %}
     </div>
@@ -364,10 +332,10 @@
       <div class="space-y-6">
       <div>
         <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5 lg:mb-2">Visitas</h2>
-        {# Mismo alto fijo que Recomendaciones de al lado (alto_seccion=233 en
+        {# Mismo alto fijo que Recomendaciones de al lado (alto_seccion=206 en
            su macro): las dos tarjetas se reparten lo que le sobraba a esta
            columna contra la de Actividad, sin pasarse. #}
-        <div class="bg-papel border border-borde rounded-xl2 p-3 flex flex-col" style="height: 233px">
+        <div class="bg-papel border border-borde rounded-xl2 p-3 flex flex-col" style="height: 206px">
           <div class="flex-1 flex items-end justify-between gap-1">
             {% for d in visitas_semana %}
             <div class="flex-1 flex flex-col items-center justify-end h-full gap-1">
@@ -404,7 +372,7 @@
          comparar las dos señales del ciclo actual. #}
       <div>
         <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5 lg:mb-2">Recomendaciones</h2>
-        {{ grafico_calidad(dashboard_funes, TONOS, alto_seccion=233, alto_barras=140, mostrar_titulo=false, mostrar_grilla=false) }}
+        {{ grafico_calidad(dashboard_funes, TONOS, alto_seccion=206, alto_barras=118, mostrar_titulo=false, mostrar_grilla=false) }}
       </div>
       {% endif %}
 
@@ -441,14 +409,16 @@
          tenerla), la pagina simplemente sigue y se scrollea. #}
       <div class="lg:hidden">
         <h2 class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5">Actividad</h2>
-        {{ log_actividad(eventos_combinados, TONOS, alto=420, mostrar_titulo=false) }}
+        {{ log_actividad(eventos_combinados, TONOS, alto=370, mostrar_titulo=false) }}
       </div>
       {% endif %}
       </div>
     </div>
 
   </div>
+  </div>
   </main>
+
 
   <input id="input-fotos" type="file" accept="image/*" multiple class="hidden">
 </div>
@@ -531,7 +501,7 @@
   // CSS: un grid/flex con alto "auto" no tiene ningun presupuesto de alto
   // real contra el cual achicar el lado mas largo -"stretch" solo empareja
   // ambos lados al contenido MAS alto de los dos, nunca al mas corto-, asi
-  // que hace falta medir la columna ya pintada y pisar el alto=420 inicial
+  // que hace falta medir la columna ya pintada y pisar el alto=370 inicial
   // (el que se ve un instante antes de que esto corra, o sin JS) con el real.
   (function () {
     const columna = document.getElementById('columna-metricas');
@@ -733,6 +703,7 @@
         let texto = `📚 ${cantLibros} ${cantLibros === 1 ? ET_LIBRO : ET_LIBROS} nuevo${cantLibros === 1 ? '' : 's'} hasta ahora`;
         if (dups > 0) texto += ` · 🔁 ${dups} que ya tenías`;
         cargaContador.textContent = texto;
+        if (window.parsearEmoji) parsearEmoji(cargaContador);
       }
 
       if (datos.estado === 'procesando') {
@@ -778,3 +749,4 @@
   }
 </script>
 {% endblock %}
+{% block emoji %}{% include "_twemoji.html" %}{% endblock %}

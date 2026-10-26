@@ -1,16 +1,17 @@
 {% extends "base.html" %}
 {% block titulo %}Mis catálogos — {{ libreria.nombre }}{% endblock %}
 {% block favicon %}<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">{% endblock %}
+{% block head %}
+{% include "_estilo_panel.html" %}
+{% endblock %}
 {% block contenido %}
-<header class="bg-celeste px-5 pt-8 pb-6">
-  <div class="max-w-6xl mx-auto">
-    <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
-    <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Mis catálogos</h1>
-  </div>
-</header>
+{% include "_banner_panel.html" %}
 
-<div class="min-h-screen max-w-6xl mx-auto flex flex-col">
-  <main class="flex-1 px-5 py-5 pb-10">
+<div class="max-w-6xl mx-auto px-5 pt-3 pb-10">
+<div id="panel-todo">
+  <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
+  <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Mis catálogos</h1>
+  <main class="flex-1 pt-5">
     <div class="space-y-2 lg:max-w-xl">
       <div class="bg-papel border border-borde rounded-xl2 p-3">
         <p class="font-medium">Catálogo general</p>
@@ -161,6 +162,7 @@
     {% endfor %}
     </div>
   </main>
+</div>
 </div>
 
 <script>
@@ -350,3 +352,4 @@
   });
 </script>
 {% endblock %}
+{% block emoji %}{% include "_twemoji.html" %}{% endblock %}
