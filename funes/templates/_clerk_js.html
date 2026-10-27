@@ -1,0 +1,23 @@
+{# Clerk.js (login con Google) y los dos helpers que usan registro e ingreso.
+   Requiere clerk_clave y clerk_host en el contexto. #}
+<script async crossorigin="anonymous" data-clerk-publishable-key="{{ clerk_clave }}"
+  src="https://{{ clerk_host }}/npm/@clerk/clerk-js@5/dist/clerk.browser.js"></script>
+<script>
+  // Espera a que el script async de Clerk exista y lo inicializa.
+  async function clerkListo() {
+    for (let i = 0; i < 100 && !window.Clerk; i++) await new Promise(r => setTimeout(r, 100));
+    if (!window.Clerk) throw new Error('Clerk no cargó');
+    await window.Clerk.load();
+    return window.Clerk;
+  }
+  // Manda a Google. Al volver, /sso-callback cierra el circuito y sigue a `destino`.
+  async function continuarConGoogle(destino) {
+    const clerk = await clerkListo();
+    try { sessionStorage.setItem('funes_destino', destino); } catch (e) {}
+    await clerk.client.signIn.authenticateWithRedirect({
+      strategy: 'oauth_google',
+      redirectUrl: '/sso-callback',
+      redirectUrlComplete: destino,
+    });
+  }
+</script>

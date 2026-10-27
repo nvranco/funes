@@ -42,9 +42,10 @@
 </div>
 <script>
   const LIBRERO_SLUG = "{{ libreria.slug }}";
-  const LIBRERO_TOKEN = "{{ libreria.token_panel }}";
+  const PANEL_RAIZ = "{{ request.state.panel_raiz }}";
+  const API_RAIZ = "{{ request.state.api_raiz }}";
   const LOTE_ID = {{ lote_id }};
-  const API_BASE = `/api/${LIBRERO_SLUG}/${LIBRERO_TOKEN}`;
+  const API_BASE = `${API_RAIZ}`;
 
   const catalogos = {{ catalogos_json | safe }};
   const paleta = {{ paleta_json | safe }};
@@ -135,7 +136,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ catalogo_id: catalogoId }),
       });
-      window.location.href = `/${LIBRERO_SLUG}/panel/${LIBRERO_TOKEN}`;
+      window.location.href = `${PANEL_RAIZ}`;
     } catch (err) {
       alert('No se pudo guardar. Probá de nuevo.');
       btnConfirmar.disabled = false;

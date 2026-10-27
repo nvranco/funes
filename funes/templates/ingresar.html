@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block titulo %}Ingresar · Funes{% endblock %}
+{% block head %}
+{% include "_estilo_panel.html" %}
+{% endblock %}
+{% block contenido %}
+{% set rotulo_banner = '' %}
+{% include "_banner_panel.html" %}
+
+<div class="max-w-md mx-auto flex flex-col">
+  <main class="flex-1 px-5 pt-6 pb-10">
+    <div id="panel-todo">
+      <h1 class="text-2xl font-bold text-tinta mb-1">Ingresá a tu panel</h1>
+      <p class="text-gris mb-5 leading-snug">Entrá con la cuenta de Google con la que te registraste.</p>
+
+      <p id="error" class="hidden text-sm font-medium text-terracota mb-3" role="alert"></p>
+      <button id="btn-google" type="button" class="tap btn-primario w-full rounded-xl2" style="gap:.75rem; font-size: 1rem; font-weight: 500">
+        <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
+          <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3A12 12 0 0 1 12 24a12 12 0 0 1 12-12c3.1 0 5.8 1.200 8 3l5.700-5.700A20 20 0 0 0 24 4a20 20 0 1 0 19.600 16.100z"/>
+          <path fill="#FF3D00" d="m6.300 14.700 6.600 4.800A12 12 0 0 1 24 12c3.100 0 5.800 1.200 8 3l5.700-5.700A20 20 0 0 0 24 4 20 20 0 0 0 6.300 14.700z"/>
+          <path fill="#4CAF50" d="M24 44c5.200 0 9.900-2 13.400-5.200l-6.200-5.200A12 12 0 0 1 24 36a12 12 0 0 1-11.300-8l-6.500 5A20 20 0 0 0 24 44z"/>
+          <path fill="#1976D2" d="M43.600 20.100H42V20H24v8h11.300a12 12 0 0 1-4.100 5.600l6.200 5.200C37 39.200 44 34 44 24c0-1.300-.1-2.600-.4-3.900z"/>
+        </svg>
+        <span id="btn-texto">Continuar con Google</span>
+      </button>
+
+      <p class="text-sm text-gris mt-5 text-center">¿Todavía no tenés cuenta? <a href="/registro" class="text-tinta font-semibold underline">Registrá tu librería</a></p>
+    </div>
+  </main>
+</div>
+
+{% include "_clerk_js.html" %}
+<script>
+  const btn = document.getElementById('btn-google');
+  btn.addEventListener('click', async () => {
+    document.getElementById('error').classList.add('hidden');
+    btn.disabled = true;
+    document.getElementById('btn-texto').textContent = 'Abriendo Google…';
+    try {
+      const clerk = await clerkListo();
+      if (clerk.user) { location.href = '/ingresar/destino'; return; }
+      await continuarConGoogle('/ingresar/destino');
+    } catch (e) {
+      btn.disabled = false;
+      document.getElementById('btn-texto').textContent = 'Continuar con Google';
+      const el = document.getElementById('error');
+      el.textContent = 'No pudimos conectar con Google. Probá de nuevo en un momento.';
+      el.classList.remove('hidden');
+    }
+  });
+</script>
+{% endblock %}

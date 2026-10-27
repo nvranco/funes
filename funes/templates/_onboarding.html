@@ -1,0 +1,130 @@
+{# Bienvenida del panel con sesión de Clerk: unas slides que explican qué hace
+   Funes y cómo se usa. Se abre sola la primera vez (onboarding_completo=FALSE)
+   y desde "Cómo funciona Funes". Mismo patrón que #dialogo-instalar. También
+   trae el cierre de sesión, que necesita Clerk.js. #}
+{% include "_clerk_js.html" %}
+<div id="dialogo-intro" class="hidden fixed inset-0 z-50 bg-fondo overflow-y-auto" style="max-width: none"
+  role="dialog" aria-modal="true" aria-labelledby="intro-titulo">
+  <div class="min-h-full max-w-md mx-auto px-6 py-10 flex flex-col" style="padding-bottom: max(env(safe-area-inset-bottom), 2.5rem)">
+    <div class="flex items-center justify-between">
+      <p id="intro-paso" class="text-sm font-bold text-gris uppercase tracking-wide"></p>
+      <button id="intro-saltar" type="button" class="text-sm text-gris underline">Saltar</button>
+    </div>
+
+    <div class="flex-1 flex flex-col justify-center py-6">
+      <section data-slide class="hidden">
+        <p class="text-5xl mb-4" aria-hidden="true">👋</p>
+        <h2 class="text-2xl font-bold text-tinta mb-4">Bienvenido a Funes, {{ libreria.nombre }}</h2>
+        <p class="text-lg leading-snug">Funes convierte <strong class="text-celeste">fotos de tus estantes</strong> en un catálogo digital que tus clientes pueden recorrer desde el celular, y te muestra cuánto lo miran.</p>
+        <p class="mt-4 text-sm text-gris">En cuatro pasos te contamos cómo se usa.</p>
+      </section>
+
+      <section data-slide class="hidden">
+        <p class="text-5xl mb-4" aria-hidden="true">📷</p>
+        <h2 class="text-2xl font-bold text-tinta mb-4">Cargá tu stock con fotos</h2>
+        <ol class="space-y-4 text-lg leading-snug">
+          <li><span class="text-gris">1.</span> Tocá <strong>Cargar estante</strong> y sacale fotos a tu estantería.</li>
+          <li><span class="text-gris">2.</span> Funes lee los lomos y arma la lista de {{ et.libros }}.</li>
+          <li><span class="text-gris">3.</span> Revisás, corregís lo que haga falta y <strong>publicás</strong>.</li>
+        </ol>
+        <p class="mt-4 text-sm text-gris">Cuando vendas algo, usá <strong>Remover {{ et.libros }}</strong> y listo.</p>
+      </section>
+
+      <section data-slide class="hidden">
+        <p class="text-5xl mb-4" aria-hidden="true">🗂️</p>
+        <h2 class="text-2xl font-bold text-tinta mb-4">Compartí tus catálogos</h2>
+        <p class="text-lg leading-snug">Ordená tu stock en <strong class="text-celeste">catálogos</strong> por categoría. Cada uno tiene su <strong>link</strong> y su <strong>código QR</strong>: pegalo en redes, mandalo por WhatsApp o imprimilo para tu vidriera.</p>
+        <p class="mt-4 text-sm text-gris">Los clientes te escriben por WhatsApp desde cada {{ et.libro }}.</p>
+      </section>
+
+      <section data-slide class="hidden">
+        <p class="text-5xl mb-4" aria-hidden="true">🧙</p>
+        {% if libreria.funes_habilitado %}
+        <h2 class="text-2xl font-bold text-tinta mb-4">Funes charla con tus clientes</h2>
+        <p class="text-lg leading-snug">Tu recomendador ya está activo. Tus clientes conversan con Funes, cuentan qué les gusta y reciben <strong class="text-celeste">recomendaciones de tu stock</strong>.</p>
+        <p class="mt-4 text-sm text-gris">Encontrás el link y las estadísticas en «Gestionar recomendaciones».</p>
+        {% else %}
+        <h2 class="text-2xl font-bold text-tinta mb-4">El recomendador, cuando quieras</h2>
+        <p class="text-lg leading-snug">Funes también puede charlar con tus clientes y <strong class="text-celeste">recomendarles libros de tu stock</strong>. Ahora no lo elegiste, pero lo podés sumar cuando quieras.</p>
+        <p class="mt-4 text-sm text-gris">Escribinos por WhatsApp y te lo activamos.</p>
+        {% endif %}
+      </section>
+    </div>
+
+    <div class="mt-4">
+      <div id="intro-puntos" class="flex justify-center gap-2 mb-5" aria-hidden="true"></div>
+      <div class="flex gap-3">
+        <button id="intro-atras" type="button"
+          class="hidden flex-1 inline-flex items-center justify-center font-semibold text-tinta hover:bg-tinta/5 transition-colors"
+          style="min-height: 52px; padding: 0 1.5rem; border-radius: 12px; border: 2px solid rgba(46,33,22,.35); background: transparent">Atrás</button>
+        <button id="intro-siguiente" type="button" class="tap btn-primario flex-1 rounded-xl2 text-lg" style="min-height: 52px">Siguiente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const dlg = document.getElementById('dialogo-intro');
+    const slides = Array.from(dlg.querySelectorAll('[data-slide]'));
+    const puntos = document.getElementById('intro-puntos');
+    const btnAtras = document.getElementById('intro-atras');
+    const btnSig = document.getElementById('intro-siguiente');
+    let actual = 0;
+
+    slides.forEach(() => {
+      const p = document.createElement('span');
+      p.style.cssText = 'width:8px;height:8px;border-radius:9999px;background:rgba(46,33,22,.2);transition:background .2s,width .2s';
+      puntos.appendChild(p);
+    });
+
+    function mostrar(i) {
+      actual = i;
+      slides.forEach((s, n) => s.classList.toggle('hidden', n !== i));
+      Array.from(puntos.children).forEach((p, n) => {
+        p.style.background = n === i ? 'rgb(46,33,22)' : 'rgba(46,33,22,.2)';
+        p.style.width = n === i ? '20px' : '8px';
+      });
+      document.getElementById('intro-paso').textContent = (i + 1) + ' de ' + slides.length;
+      btnAtras.classList.toggle('hidden', i === 0);
+      btnSig.textContent = i === slides.length - 1 ? 'Empezar' : 'Siguiente';
+    }
+
+    function abrir() {
+      mostrar(0);
+      dlg.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      btnSig.focus();
+    }
+
+    function cerrar() {
+      dlg.classList.add('hidden');
+      document.body.style.overflow = '';
+      // Avisa al servidor una sola vez; si falla no pasa nada, vuelve a abrirse.
+      fetch(PANEL_RAIZ + '/onboarding/completo', { method: 'POST' }).catch(() => {});
+    }
+
+    btnSig.addEventListener('click', () => (actual === slides.length - 1 ? cerrar() : mostrar(actual + 1)));
+    btnAtras.addEventListener('click', () => mostrar(actual - 1));
+    document.getElementById('intro-saltar').addEventListener('click', cerrar);
+    document.addEventListener('keydown', (ev) => {
+      if (dlg.classList.contains('hidden')) return;
+      if (ev.key === 'Escape') cerrar();
+      else if (ev.key === 'ArrowRight' && actual < slides.length - 1) mostrar(actual + 1);
+      else if (ev.key === 'ArrowLeft' && actual > 0) mostrar(actual - 1);
+    });
+    document.querySelectorAll('.js-ver-intro').forEach((b) => b.addEventListener('click', abrir));
+
+    document.querySelectorAll('.js-salir').forEach((b) => b.addEventListener('click', async () => {
+      b.disabled = true;
+      try {
+        const clerk = await clerkListo();
+        await clerk.signOut({ redirectUrl: '/ingresar' });
+      } catch (e) {
+        b.disabled = false;
+      }
+    }));
+
+    {% if not libreria.onboarding_completo %}abrir();{% endif %}
+  })();
+</script>

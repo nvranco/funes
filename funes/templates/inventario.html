@@ -41,7 +41,7 @@
 
 <div class="max-w-6xl mx-auto px-5 pt-3 pb-10">
 <div id="panel-todo">
-  <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
+  <a href="{{ request.state.panel_raiz }}" class="text-tinta text-sm font-medium">← Volver</a>
   <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Inventario ({{ cant_libros }})</h1>
   <main class="flex-1 pt-5">
     <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -112,10 +112,11 @@
 
 <script>
   const LIBRERO_SLUG = "{{ libreria.slug }}";
-  const LIBRERO_TOKEN = "{{ libreria.token_panel }}";
+  const PANEL_RAIZ = "{{ request.state.panel_raiz }}";
+  const API_RAIZ = "{{ request.state.api_raiz }}";
   const ET_LIBROS = "{{ et.libros }}", ET_LIBRO = "{{ et.libro }}";
   const ET_AUTOR_CAP = "{{ et.Autor }}", ET_AUTOR = "{{ et.autor }}", ET_AUTORES = "{{ et.autores }}";
-  const API_BASE = `/api/${LIBRERO_SLUG}/${LIBRERO_TOKEN}`;
+  const API_BASE = `${API_RAIZ}`;
 
   const libros = {{ libros_json | safe }};
   const catalogosPorId = {};
@@ -188,7 +189,7 @@
   // vuelve sola a esta lista, con el filtro/busqueda actual, apenas se elige uno.
   function badgeCatalogo(libro) {
     const volver = encodeURIComponent(location.pathname + location.search);
-    const href = `/${LIBRERO_SLUG}/panel/${LIBRERO_TOKEN}/libros/${libro.id}/catalogo?volver=${volver}`;
+    const href = `${PANEL_RAIZ}/libros/${libro.id}/catalogo?volver=${volver}`;
     const c = (libro.catalogo_id !== null && libro.catalogo_id !== undefined) ? catalogosPorId[libro.catalogo_id] : null;
     const clases = c ? `${c.color.bg} border ${c.color.borde}` : 'bg-crema border border-borde';
     // Si es un subcatalogo, mostrar "Padre · Hijo" para que se entienda donde
@@ -400,7 +401,7 @@
       try {
         const resp = await fetch(`${API_BASE}/reiniciar`, { method: 'POST' });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        window.location.href = `/${LIBRERO_SLUG}/panel/${LIBRERO_TOKEN}`;
+        window.location.href = `${PANEL_RAIZ}`;
       } catch (err) {
         alert('No se pudo vaciar. Probá de nuevo.');
         btnConfirmar.disabled = false;

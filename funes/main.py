@@ -14,7 +14,7 @@ from fastapi.templating import Jinja2Templates
 
 from funes import db
 from funes.config import DOMINIO_FUNES
-from funes.routers import admin, api_librero, api_publico, funes_chat, panel, publico, qr
+from funes.routers import admin, api_librero, api_publico, funes_chat, panel, publico, qr, registro
 
 # Los logs de funes.vision (latencia/tokens/respuesta cruda del modelo) son el
 # baseline de calidad y de unit economics del pipeline (requisitos §7 y §9).
@@ -128,10 +128,16 @@ async def health():
 # cualquier ruta literal de un segmento (como /health) tiene que registrarse
 # ANTES de incluir este router, o el catch-all se la come primero.
 app.include_router(admin.router)
-app.include_router(api_librero.router)
+app.include_router(registro.router)
+# El panel y su API cuelgan de dos puertas: sesion de Clerk (/app/{slug}) y el
+# link secreto de siempre (ver funes/acceso.py). Primero la nueva: sin eso,
+# /api/app/{slug}/lotes lo agarraria la vieja como slug="app", token=<slug>.
+app.include_router(api_librero.router, prefix="/api/app/{slug}")
+app.include_router(api_librero.router, prefix="/api/{slug}/{token}")
 app.include_router(api_publico.router)
 app.include_router(funes_chat.router)
-app.include_router(panel.router)
+app.include_router(panel.router, prefix="/app/{slug}")
+app.include_router(panel.router, prefix="/{slug}/panel/{token}")
 app.include_router(qr.router)
 app.include_router(publico.router)
 

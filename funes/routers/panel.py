@@ -2,14 +2,14 @@
 secreto (D2: sin login)."""
 
 import json
-import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from funes import db
+from funes import auth_clerk, db
+from funes.acceso import Acceso, acceso
 from funes.catalogos import ordenar_jerarquico
 from funes.colores import PALETA_CATALOGOS, color_catalogo
 from funes.etiquetas import etiquetas
@@ -23,18 +23,9 @@ router = APIRouter()
 templates = Jinja2Templates(directory="funes/templates")
 
 
-async def _libreria_por_slug_y_token(slug: str, token: str):
-    fila = await db.pool().fetchrow(
-        "SELECT * FROM librerias WHERE slug = $1 AND activa", slug
-    )
-    if fila is None or not secrets.compare_digest(fila["token_panel"], token):
-        raise HTTPException(status_code=404)
-    return fila
-
-
-@router.get("/{slug}/panel/{token}", response_class=HTMLResponse)
-async def panel_home(request: Request, slug: str, token: str):
-    libreria = await _libreria_por_slug_y_token(slug, token)
+@router.get("", response_class=HTMLResponse)
+async def panel_home(request: Request, slug: str, acc: Acceso = Depends(acceso)):
+    libreria = acc.libreria
     cant_libros = await db.pool().fetchval(
         """
         SELECT COUNT(*) FROM libros
@@ -166,13 +157,16 @@ async def panel_home(request: Request, slug: str, token: str):
             "eventos_combinados": eventos_combinados,
             "url_publica": f"{base}/{slug}",
             "url_funes": f"{base}/funes/{slug}",
-            "url_inventario": f"{base}/{slug}/panel/{token}/libros",
-            "url_vender": f"{base}/{slug}/panel/{token}/vender",
-            "url_catalogos": f"{base}/{slug}/panel/{token}/catalogos",
-            "url_funes_metricas": f"{base}/{slug}/panel/{token}/funes-metricas",
-            "url_guia": f"{base}/{slug}/panel/{token}/guia",
-            "url_qr": f"/api/{slug}/{token}/qr.png",
-            "url_vincular_qr": f"{base}/{slug}/panel/{token}/vincular-qr",
+            "url_inventario": f"{base}{acc.panel}/libros",
+            "url_vender": f"{base}{acc.panel}/vender",
+            "url_catalogos": f"{base}{acc.panel}/catalogos",
+            "url_funes_metricas": f"{base}{acc.panel}/funes-metricas",
+            "url_guia": f"{base}{acc.panel}/guia",
+            "url_qr": f"{acc.api}/qr.png",
+            "url_vincular_qr": f"{base}{acc.panel}/vincular-qr",
+            # Clerk.js: el panel con sesion lo necesita para cerrarla.
+            "clerk_clave": auth_clerk.CLERK_PUBLISHABLE_KEY,
+            "clerk_host": auth_clerk.host_frontend_api() if auth_clerk.habilitado() else "",
         },
     )
 
@@ -208,30 +202,41 @@ def _combinar_eventos(eventos_catalogo: list[dict], eventos_funes: list[dict]) -
     return combinados[-panel_funes.EVENTOS_LIMITE:]
 
 
-@router.get("/{slug}/panel/{token}/vincular-qr", response_class=HTMLResponse)
-async def panel_vincular_qr(request: Request, slug: str, token: str):
+@router.post("/onboarding/completo")
+async def panel_onboarding_completo(slug: str, acc: Acceso = Depends(acceso)):
+    """Marca vistas las slides de bienvenida. Solo tiene sentido con sesion
+    (el panel con link secreto nunca las muestra)."""
+    if acc.por_sesion:
+        await db.pool().execute(
+            "UPDATE librerias SET onboarding_completo = TRUE WHERE id = $1", acc.libreria["id"]
+        )
+    return {"ok": True}
+
+
+@router.get("/vincular-qr", response_class=HTMLResponse)
+async def panel_vincular_qr(request: Request, slug: str, acc: Acceso = Depends(acceso)):
     """Pantalla para vincular una carpita (codigo qr_codigos) a esta libreria
     -mobile arranca con la camara, desktop con el campo manual (ver
     templates/vincular_qr.html). El POST que hace el vinculo real vive en
     api_librero.py:vincular_qr."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
     return templates.TemplateResponse(
         request,
         "vincular_qr.html",
         {
             "libreria": libreria,
-            "url_atras": f"/{slug}/panel/{token}",
-            "url_vincular_api": f"/api/{slug}/{token}/vincular-qr",
+            "url_atras": acc.panel,
+            "url_vincular_api": f"{acc.api}/vincular-qr",
         },
     )
 
 
-@router.get("/{slug}/panel/{token}/manifest.webmanifest")
-async def panel_manifest(slug: str, token: str):
+@router.get("/manifest.webmanifest")
+async def panel_manifest(slug: str, acc: Acceso = Depends(acceso)):
     """Manifest de la PWA. Dinamico por libreria: start_url lleva el token, asi
     el icono del inicio abre directo el panel de ESTE librero."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
-    raiz = f"/{slug}/panel/{token}"
+    libreria = acc.libreria
+    raiz = acc.panel
     manifest = {
         "name": f"Funes — {libreria['nombre']}",
         "short_name": "Funes",
@@ -294,32 +299,31 @@ self.addEventListener('fetch', (ev) => {
 """
 
 
-@router.get("/{slug}/panel/{token}/sw.js")
-async def panel_sw(slug: str, token: str):
-    await _libreria_por_slug_y_token(slug, token)
+@router.get("/sw.js")
+async def panel_sw(slug: str, acc: Acceso = Depends(acceso)):
     return Response(
         _SW_JS,
         media_type="text/javascript",
         headers={
-            "Service-Worker-Allowed": f"/{slug}/panel/{token}",
+            "Service-Worker-Allowed": acc.panel,
             "Cache-Control": "no-cache",
         },
     )
 
 
-@router.get("/{slug}/panel/{token}/guia", response_class=HTMLResponse)
-async def panel_guia(request: Request, slug: str, token: str):
+@router.get("/guia", response_class=HTMLResponse)
+async def panel_guia(request: Request, slug: str, acc: Acceso = Depends(acceso)):
     """P2b — guia de carga en 2 pasos (estante completo / libro particular),
     pantalla propia que termina abriendo el selector de fotos."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
     return templates.TemplateResponse(
         request, "guia.html", {"libreria": libreria, "et": etiquetas(libreria["tipo_catalogo"])}
     )
 
 
-@router.get("/{slug}/panel/{token}/lote/{lote_id}", response_class=HTMLResponse)
-async def panel_revision(request: Request, slug: str, token: str, lote_id: int):
-    libreria = await _libreria_por_slug_y_token(slug, token)
+@router.get("/lote/{lote_id}", response_class=HTMLResponse)
+async def panel_revision(request: Request, slug: str, lote_id: int, acc: Acceso = Depends(acceso)):
+    libreria = acc.libreria
 
     lote = await db.pool().fetchrow(
         "SELECT * FROM lotes WHERE id = $1 AND libreria_id = $2 AND archivado_en IS NULL",
@@ -370,12 +374,12 @@ async def panel_revision(request: Request, slug: str, token: str, lote_id: int):
     )
 
 
-@router.get("/{slug}/panel/{token}/vender", response_class=HTMLResponse)
-async def panel_vender(request: Request, slug: str, token: str):
+@router.get("/vender", response_class=HTMLResponse)
+async def panel_vender(request: Request, slug: str, acc: Acceso = Depends(acceso)):
     """P6 — marcar vendidos: por foto en lote (detectar-vendidos +
     vendidos/confirmar) o buscando un libro puntual (mismo PATCH de
     estado que usa el inventario)."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
     libros = await db.pool().fetch(
         "SELECT id, titulo, autor FROM libros "
         "WHERE libreria_id = $1 AND estado = 'publicado' AND archivado_en IS NULL ORDER BY titulo",
@@ -389,11 +393,11 @@ async def panel_vender(request: Request, slug: str, token: str):
     )
 
 
-@router.get("/{slug}/panel/{token}/lote/{lote_id}/catalogo", response_class=HTMLResponse)
-async def panel_lote_catalogo(request: Request, slug: str, token: str, lote_id: int):
+@router.get("/lote/{lote_id}/catalogo", response_class=HTMLResponse)
+async def panel_lote_catalogo(request: Request, slug: str, lote_id: int, acc: Acceso = Depends(acceso)):
     """P6b — pantalla posterior a "Publicar" en revision.html: elegir a que
     catalogo pertenecen los libros que se acaban de publicar."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     lote = await db.pool().fetchrow(
         "SELECT id, estado FROM lotes WHERE id = $1 AND libreria_id = $2 AND archivado_en IS NULL",
@@ -426,14 +430,15 @@ async def panel_lote_catalogo(request: Request, slug: str, token: str, lote_id: 
     )
 
 
-@router.get("/{slug}/panel/{token}/libros/{libro_id}/catalogo", response_class=HTMLResponse)
+@router.get("/libros/{libro_id}/catalogo", response_class=HTMLResponse)
 async def panel_libro_catalogo(
-    request: Request, slug: str, token: str, libro_id: int, volver: str | None = None
+    request: Request, slug: str, libro_id: int, volver: str | None = None,
+    acc: Acceso = Depends(acceso),
 ):
     """Pantalla para reasignar el catalogo de UN libro puntual (se abre desde
     el badge de catalogo en Inventario) — a diferencia de catalogo_asignar.html,
     que es para el lote recien publicado completo."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     libro = await db.pool().fetchrow(
         "SELECT id, titulo, autor, catalogo_id FROM libros WHERE id = $1 AND libreria_id = $2",
@@ -458,8 +463,8 @@ async def panel_libro_catalogo(
     )
 
     # Solo se acepta volver a una URL propia de este panel (evita open-redirect).
-    if not volver or not volver.startswith(f"/{slug}/panel/{token}"):
-        volver = f"/{slug}/panel/{token}/libros"
+    if not volver or not volver.startswith(acc.panel):
+        volver = f"{acc.panel}/libros"
 
     return templates.TemplateResponse(
         request,
@@ -474,11 +479,11 @@ async def panel_libro_catalogo(
     )
 
 
-@router.get("/{slug}/panel/{token}/libros", response_class=HTMLResponse)
-async def panel_inventario(request: Request, slug: str, token: str):
+@router.get("/libros", response_class=HTMLResponse)
+async def panel_inventario(request: Request, slug: str, acc: Acceso = Depends(acceso)):
     """P4 — inventario: lista de libros con busqueda, edicion y reasignacion
     de catalogo por libro, mas el compartir del catalogo general."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     libros = await db.pool().fetch(
         """
@@ -493,7 +498,7 @@ async def panel_inventario(request: Request, slug: str, token: str):
         [
             {
                 **{k: v for k, v in dict(l).items() if k != "foto_portada_id"},
-                "imagen_url": f"/api/{slug}/{token}/fotos/{l['foto_portada_id']}" if l["foto_portada_id"] else None,
+                "imagen_url": f"{acc.api}/fotos/{l['foto_portada_id']}" if l["foto_portada_id"] else None,
             }
             for l in libros
         ]
@@ -523,15 +528,15 @@ async def panel_inventario(request: Request, slug: str, token: str):
             "cant_libros": len(libros),
             "catalogos_json": catalogos_json,
             "url_publica": f"{base}/{slug}",
-            "url_qr": f"/api/{slug}/{token}/qr.png",
+            "url_qr": f"{acc.api}/qr.png",
         },
     )
 
 
-@router.get("/{slug}/panel/{token}/catalogos", response_class=HTMLResponse)
-async def panel_catalogos(request: Request, slug: str, token: str):
+@router.get("/catalogos", response_class=HTMLResponse)
+async def panel_catalogos(request: Request, slug: str, acc: Acceso = Depends(acceso)):
     """P7 — "Ver mis catálogos": listar, compartir, editar y borrar."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     filas = await db.pool().fetch(
         """
@@ -555,8 +560,8 @@ async def panel_catalogos(request: Request, slug: str, token: str):
             "color_clave": f["color"] or PALETA_CATALOGOS[f["id"] % len(PALETA_CATALOGOS)]["clave"],
             "color": color_catalogo(f["id"], f["color"]),
             "url": f"{base}/{slug}/c/{f['slug']}",
-            "url_qr": f"/api/{slug}/{token}/qr.png?catalogo={f['slug']}",
-            "url_libros": f"{base}/{slug}/panel/{token}/libros?catalogo={f['id']}",
+            "url_qr": f"{acc.api}/qr.png?catalogo={f['slug']}",
+            "url_libros": f"{base}{acc.panel}/libros?catalogo={f['id']}",
         }
         for f in filas
     ]
@@ -582,19 +587,19 @@ async def panel_catalogos(request: Request, slug: str, token: str):
             "catalogos": catalogos,
             "catalogos_padres": catalogos_padres,
             "url_publica": f"{base}/{slug}",
-            "url_qr": f"/api/{slug}/{token}/qr.png",
+            "url_qr": f"{acc.api}/qr.png",
             "paleta": PALETA_CATALOGOS,
         },
     )
 
 
-@router.get("/{slug}/panel/{token}/funes-qr.png")
-async def panel_funes_qr(request: Request, slug: str, token: str):
+@router.get("/funes-qr.png")
+async def panel_funes_qr(request: Request, slug: str, acc: Acceso = Depends(acceso)):
     """El QR de folleto para el Funes acotado a esta libreria
     (routers/funes_chat.py:pagina_libreria). Mismo generador que el QR general
     de Funes (funes/funes_chat/qr.py) — mas grande, mas redundancia, pensado
     para imprenta — y no el mas simple de /api/.../qr.png."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
     if not libreria["funes_habilitado"] or libreria["tipo_catalogo"] != "libros":
         raise HTTPException(status_code=404)
 
@@ -612,11 +617,11 @@ async def panel_funes_qr(request: Request, slug: str, token: str):
     )
 
 
-@router.get("/{slug}/panel/{token}/funes-metricas", response_class=HTMLResponse)
-async def panel_funes_metricas(request: Request, slug: str, token: str):
+@router.get("/funes-metricas", response_class=HTMLResponse)
+async def panel_funes_metricas(request: Request, slug: str, acc: Acceso = Depends(acceso)):
     """El dashboard de Funes para el dueño de la libreria. Mismo gate 404
     (no 401) que panel_funes_qr: no confirmamos que la ruta existe."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
     if not libreria["funes_habilitado"] or libreria["tipo_catalogo"] != "libros":
         raise HTTPException(status_code=404)
 
@@ -629,6 +634,6 @@ async def panel_funes_metricas(request: Request, slug: str, token: str):
             "libreria": libreria,
             "dashboard": dashboard,
             "cobertura": cobertura,
-            "url_atras": f"/{slug}/panel/{token}",
+            "url_atras": acc.panel,
         },
     )

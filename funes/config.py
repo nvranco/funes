@@ -81,6 +81,12 @@ FUNES_CONTACTO = os.environ.get("FUNES_CONTACTO", "")
 # "Consultar por WhatsApp".
 FUNES_SLUG_DEMO = os.environ.get("FUNES_SLUG_DEMO", "demo-libreros").strip().lower()
 
+# Clerk (login con Google). La publishable key es publica: viaja en el fuente de
+# la pagina y de ella sale el host de la Frontend API, que a su vez publica las
+# claves con las que se verifica la sesion. Por eso no hace falta la secret key.
+# Vacia = registro e ingreso desactivados (el panel con token sigue andando).
+CLERK_PUBLISHABLE_KEY = os.environ.get("CLERK_PUBLISHABLE_KEY", "").strip()
+
 ML_CLIENT_ID = os.environ.get("ML_CLIENT_ID", "")
 ML_CLIENT_SECRET = os.environ.get("ML_CLIENT_SECRET", "")
 ML_REDIRECT_URI = os.environ.get("ML_REDIRECT_URI", "")

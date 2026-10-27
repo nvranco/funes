@@ -642,3 +642,12 @@ CREATE INDEX IF NOT EXISTS idx_qr_codigos_historial_codigo ON qr_codigos_histori
 -- vuelve a FALSE porque deja de ser generica.
 ALTER TABLE qr_codigos ADD COLUMN IF NOT EXISTS destino_generico BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE qr_codigos_historial ADD COLUMN IF NOT EXISTS destino_generico BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Login con Clerk (Google). clerk_user_id es el "sub" de la sesion: una
+-- libreria por usuario. NULL = libreria creada por admin, que entra solo con su
+-- link secreto (token_panel) y no tiene login. onboarding_completo arranca en
+-- TRUE para todas las existentes; el registro propio crea la fila en FALSE para
+-- que el panel muestre las slides de bienvenida una vez.
+ALTER TABLE librerias ADD COLUMN IF NOT EXISTS clerk_user_id TEXT;
+ALTER TABLE librerias ADD COLUMN IF NOT EXISTS onboarding_completo BOOLEAN NOT NULL DEFAULT TRUE;
+CREATE UNIQUE INDEX IF NOT EXISTS librerias_clerk_user_id_idx ON librerias (clerk_user_id) WHERE clerk_user_id IS NOT NULL;

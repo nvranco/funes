@@ -10,7 +10,7 @@
 <div class="max-w-6xl mx-auto px-5 pt-3 pb-10">
 <div id="panel-todo">
 <div class="max-w-6xl mx-auto">
-  <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
+  <a href="{{ request.state.panel_raiz }}" class="text-tinta text-sm font-medium">← Volver</a>
   <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Revisar estante</h1>
 
   <main id="contenido-fotos" class="flex-1 pt-5 pb-32">
@@ -34,8 +34,8 @@
     <div class="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
     {% for foto in fotos %}
     <div>
-      <a href="/api/{{ libreria.slug }}/{{ libreria.token_panel }}/fotos/{{ foto.id }}" target="_blank" rel="noopener">
-        <img src="/api/{{ libreria.slug }}/{{ libreria.token_panel }}/fotos/{{ foto.id }}"
+      <a href="{{ request.state.api_raiz }}/fotos/{{ foto.id }}" target="_blank" rel="noopener">
+        <img src="{{ request.state.api_raiz }}/fotos/{{ foto.id }}"
              loading="lazy" alt="Foto del estante"
              class="w-full rounded-xl2 border border-borde object-cover max-h-72">
       </a>
@@ -60,12 +60,13 @@
 </div>
 <script>
   const LIBRERO_SLUG = "{{ libreria.slug }}";
-  const LIBRERO_TOKEN = "{{ libreria.token_panel }}";
+  const PANEL_RAIZ = "{{ request.state.panel_raiz }}";
+  const API_RAIZ = "{{ request.state.api_raiz }}";
   const ET_LIBRO = "{{ et.libro }}", ET_LIBROS = "{{ et.libros }}";
   const ET_AUTOR_CAP = "{{ et.Autor }}";
   const LOTE_ID = {{ lote.id }};
   const UMBRAL_CONFIANZA = 0.7;
-  const API_BASE = `/api/${LIBRERO_SLUG}/${LIBRERO_TOKEN}`;
+  const API_BASE = `${API_RAIZ}`;
 
   const estado = {{ libros_json | safe }}.map((libro) => ({
     ...libro,
@@ -150,7 +151,7 @@
       fila.className = `bg-papel border ${bajaConfianza ? 'border-ambar' : 'border-borde'} rounded-xl2 overflow-hidden`;
       fila.innerHTML = `
         <div class="flex">
-          <img src="/api/${LIBRERO_SLUG}/${LIBRERO_TOKEN}/fotos/${libro.foto_portada_id}" alt=""
+          <img src="${API_RAIZ}/fotos/${libro.foto_portada_id}" alt=""
             class="w-24 shrink-0 object-cover">
           <div class="min-w-0 flex-1 p-3">
             <div class="cursor-text" data-rol="texto">
@@ -289,9 +290,9 @@
       // Si no quedó ningún libro publicado (lote entero de duplicados) no hay
       // nada para asignar a un catálogo — se vuelve directo al panel.
       if (datos.publicados > 0) {
-        window.location.href = `/${LIBRERO_SLUG}/panel/${LIBRERO_TOKEN}/lote/${LOTE_ID}/catalogo`;
+        window.location.href = `${PANEL_RAIZ}/lote/${LOTE_ID}/catalogo`;
       } else {
-        window.location.href = `/${LIBRERO_SLUG}/panel/${LIBRERO_TOKEN}`;
+        window.location.href = `${PANEL_RAIZ}`;
       }
     } catch (err) {
       alert('No se pudo publicar. Probá de nuevo.');
@@ -309,7 +310,7 @@
     try {
       await guardarTodo('descartado');
       await fetch(`${API_BASE}/lotes/${LOTE_ID}/descartar`, { method: 'POST' });
-      window.location.href = `/${LIBRERO_SLUG}/panel/${LIBRERO_TOKEN}`;
+      window.location.href = `${PANEL_RAIZ}`;
     } catch (err) {
       alert('No se pudo descartar. Probá de nuevo.');
       btnPublicar.disabled = false;

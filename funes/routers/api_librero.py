@@ -13,11 +13,12 @@ from pathlib import Path
 
 import asyncpg
 import qrcode
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from funes import db, vision
+from funes.acceso import Acceso, acceso
 from funes.colores import PALETA_CATALOGOS
 from funes.config import DATA_DIR
 from funes.funes_chat import nucleo as funes_nucleo
@@ -71,20 +72,12 @@ class VincularQr(BaseModel):
     qr_token: str
 
 
-async def _libreria_por_slug_y_token(slug: str, token: str):
-    fila = await db.pool().fetchrow(
-        "SELECT * FROM librerias WHERE slug = $1 AND activa", slug
-    )
-    if fila is None or not secrets.compare_digest(fila["token_panel"], token):
-        raise HTTPException(status_code=404)
-    return fila
-
-
-@router.post("/api/{slug}/{token}/lotes", status_code=202)
+@router.post("/lotes", status_code=202)
 async def crear_lote(
-    slug: str, token: str, fotos: list[UploadFile], background_tasks: BackgroundTasks
+    slug: str, fotos: list[UploadFile], background_tasks: BackgroundTasks,
+    acc: Acceso = Depends(acceso),
 ):
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     if not fotos:
         raise HTTPException(status_code=400, detail="Mandá entre 1 y 10 fotos.")
@@ -116,9 +109,9 @@ async def crear_lote(
     return {"lote_id": lote_id}
 
 
-@router.get("/api/{slug}/{token}/lotes/{lote_id}")
-async def estado_lote(slug: str, token: str, lote_id: int):
-    libreria = await _libreria_por_slug_y_token(slug, token)
+@router.get("/lotes/{lote_id}")
+async def estado_lote(slug: str, lote_id: int, acc: Acceso = Depends(acceso)):
+    libreria = acc.libreria
 
     lote = await db.pool().fetchrow(
         "SELECT * FROM lotes WHERE id = $1 AND libreria_id = $2", lote_id, libreria["id"]
@@ -154,7 +147,7 @@ async def estado_lote(slug: str, token: str, lote_id: int):
     )
 
 
-async def _analizar_una(foto_id: int, path: Path, lote_id: int, tipo_catalogo: str = "libros"):
+async def _analizar_una(foto_id: int, path: Path, lote_id: int, tipo_catalogo: str = "libros", acc: Acceso = Depends(acceso)):
     """Envuelve el analisis de una foto para poder correr todas en paralelo
     sin que una fallida tumbe al resto (requisito §7: nunca tirar el lote)."""
     try:
@@ -177,7 +170,7 @@ def _indexar(indice: dict, titulo: str, autor: str, libro_id: int) -> None:
         indice.setdefault(principal, []).append((clave_autor, libro_id, False))
 
 
-async def _indice_catalogo(libreria_id: int) -> dict[str, list[tuple[str, int, bool]]]:
+async def _indice_catalogo(libreria_id: int, acc: Acceso = Depends(acceso)) -> dict[str, list[tuple[str, int, bool]]]:
     """Indice {clave_de_titulo: [(autor, libro_id, es_titulo_completo), ...]} de
     lo que la libreria ya tiene cargado, para no volver a subir el mismo libro.
 
@@ -233,7 +226,7 @@ def _buscar_duplicado(indice, titulo: str, autor: str) -> int | None:
     return None
 
 
-async def _procesar_lote(libreria_id: int, lote_id: int, fotos: list[tuple[int, Path]], tipo_catalogo: str = "libros"):
+async def _procesar_lote(libreria_id: int, lote_id: int, fotos: list[tuple[int, Path]], tipo_catalogo: str = "libros", acc: Acceso = Depends(acceso)):
     """Corre en background: resize -> OpenRouter -> parse -> dedupe -> insert.
 
     Las fotos se analizan EN PARALELO (una llamada al modelo por foto): 6 fotos
@@ -322,11 +315,11 @@ async def _procesar_lote(libreria_id: int, lote_id: int, fotos: list[tuple[int, 
     )
 
 
-@router.get("/api/{slug}/{token}/fotos/{foto_id}")
-async def servir_foto(slug: str, token: str, foto_id: int):
+@router.get("/fotos/{foto_id}")
+async def servir_foto(slug: str, foto_id: int, acc: Acceso = Depends(acceso)):
     """Sirve la foto original para que el librero la vea al lado de la lista
     durante la revision (requisitos §3.2: 'foto arriba, tocable para ampliar')."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     fila = await db.pool().fetchrow(
         "SELECT path FROM fotos WHERE id = $1 AND libreria_id = $2",
@@ -341,9 +334,9 @@ async def servir_foto(slug: str, token: str, foto_id: int):
     return FileResponse(path, media_type="image/jpeg")
 
 
-@router.patch("/api/{slug}/{token}/libros/{libro_id}")
-async def actualizar_libro(slug: str, token: str, libro_id: int, cambios: ActualizarLibro):
-    libreria = await _libreria_por_slug_y_token(slug, token)
+@router.patch("/libros/{libro_id}")
+async def actualizar_libro(slug: str, libro_id: int, cambios: ActualizarLibro, acc: Acceso = Depends(acceso)):
+    libreria = acc.libreria
 
     if cambios.estado not in ESTADOS_VALIDOS:
         raise HTTPException(status_code=400, detail=f"Estado invalido: {cambios.estado}")
@@ -369,12 +362,12 @@ async def actualizar_libro(slug: str, token: str, libro_id: int, cambios: Actual
     return {"ok": True}
 
 
-@router.post("/api/{slug}/{token}/lotes/{lote_id}/publicar")
-async def publicar_lote(slug: str, token: str, lote_id: int):
+@router.post("/lotes/{lote_id}/publicar")
+async def publicar_lote(slug: str, lote_id: int, acc: Acceso = Depends(acceso)):
     """Los libros que el front ya marco explicitamente (publicado/descartado)
     quedan como estan; cualquier 'pendiente' que haya quedado sin tocar se
     publica igual — nunca se pierde silenciosamente un libro por un fallo de red."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     lote = await db.pool().fetchrow(
         "SELECT id FROM lotes WHERE id = $1 AND libreria_id = $2", lote_id, libreria["id"]
@@ -401,9 +394,9 @@ async def publicar_lote(slug: str, token: str, lote_id: int):
     return {"ok": True, "publicados": cant_publicados}
 
 
-@router.post("/api/{slug}/{token}/lotes/{lote_id}/descartar")
-async def descartar_lote(slug: str, token: str, lote_id: int):
-    libreria = await _libreria_por_slug_y_token(slug, token)
+@router.post("/lotes/{lote_id}/descartar")
+async def descartar_lote(slug: str, lote_id: int, acc: Acceso = Depends(acceso)):
+    libreria = acc.libreria
 
     lote = await db.pool().fetchrow(
         "SELECT id FROM lotes WHERE id = $1 AND libreria_id = $2", lote_id, libreria["id"]
@@ -419,9 +412,9 @@ async def descartar_lote(slug: str, token: str, lote_id: int):
     return {"ok": True}
 
 
-@router.delete("/api/{slug}/{token}/libros/{libro_id}")
-async def eliminar_libro(slug: str, token: str, libro_id: int):
-    libreria = await _libreria_por_slug_y_token(slug, token)
+@router.delete("/libros/{libro_id}")
+async def eliminar_libro(slug: str, libro_id: int, acc: Acceso = Depends(acceso)):
+    libreria = acc.libreria
     resultado = await db.pool().execute(
         "DELETE FROM libros WHERE id = $1 AND libreria_id = $2", libro_id, libreria["id"]
     )
@@ -431,11 +424,11 @@ async def eliminar_libro(slug: str, token: str, libro_id: int):
     return {"ok": True}
 
 
-@router.post("/api/{slug}/{token}/libros/{libro_id}/foto")
-async def agregar_foto_libro(slug: str, token: str, libro_id: int, foto: UploadFile):
+@router.post("/libros/{libro_id}/foto")
+async def agregar_foto_libro(slug: str, libro_id: int, foto: UploadFile, acc: Acceso = Depends(acceso)):
     """Agrega o reemplaza la foto de tapa de un libro YA cargado, sin pasar
     por vision/OCR — titulo y autor ya existen, esto es pura foto + guardado."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
     existe = await db.pool().fetchval(
         "SELECT 1 FROM libros WHERE id = $1 AND libreria_id = $2", libro_id, libreria["id"]
     )
@@ -457,14 +450,14 @@ async def agregar_foto_libro(slug: str, token: str, libro_id: int, foto: UploadF
         "UPDATE libros SET foto_portada_id = $1, mostrar_foto = TRUE WHERE id = $2",
         foto_id, libro_id,
     )
-    return {"ok": True, "imagen_url": f"/api/{slug}/{token}/fotos/{foto_id}"}
+    return {"ok": True, "imagen_url": f"{acc.api}/fotos/{foto_id}"}
 
 
-@router.delete("/api/{slug}/{token}/libros/{libro_id}/foto")
-async def quitar_foto_libro(slug: str, token: str, libro_id: int):
+@router.delete("/libros/{libro_id}/foto")
+async def quitar_foto_libro(slug: str, libro_id: int, acc: Acceso = Depends(acceso)):
     """No borra el archivo ni la fila de fotos, solo desvincula — mismo
     criterio de 'nunca borrar de verdad' que reiniciar_inventario."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
     resultado = await db.pool().execute(
         "UPDATE libros SET foto_portada_id = NULL WHERE id = $1 AND libreria_id = $2",
         libro_id, libreria["id"],
@@ -474,8 +467,8 @@ async def quitar_foto_libro(slug: str, token: str, libro_id: int):
     return {"ok": True}
 
 
-@router.post("/api/{slug}/{token}/reiniciar")
-async def reiniciar_inventario(slug: str, token: str):
+@router.post("/reiniciar")
+async def reiniciar_inventario(slug: str, acc: Acceso = Depends(acceso)):
     """Vacia el catalogo del librero para arrancar un ciclo nuevo.
 
     Borrado LOGICO: se marca archivado_en y nada se borra de verdad. Para el
@@ -484,7 +477,7 @@ async def reiniciar_inventario(slug: str, token: str):
     que permite comparar un ciclo contra el siguiente y no perder el dataset
     con el que se evalua el OCR.
     """
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     cant = await db.pool().fetchval(
         "SELECT COUNT(*) FROM libros WHERE libreria_id = $1 AND archivado_en IS NULL",
@@ -507,7 +500,7 @@ async def reiniciar_inventario(slug: str, token: str):
     return {"ok": True, "archivados": cant}
 
 
-async def _catalogo_publicado(libreria_id: int):
+async def _catalogo_publicado(libreria_id: int, acc: Acceso = Depends(acceso)):
     """Filas hoy visibles en el catalogo publico — el universo contra el que
     tiene sentido matchear una venta (no lo pendiente de revision, no lo ya
     vendido, no lo descartado)."""
@@ -520,8 +513,8 @@ async def _catalogo_publicado(libreria_id: int):
     )
 
 
-@router.post("/api/{slug}/{token}/detectar-vendidos")
-async def detectar_vendidos(slug: str, token: str, fotos: list[UploadFile]):
+@router.post("/detectar-vendidos")
+async def detectar_vendidos(slug: str, fotos: list[UploadFile], acc: Acceso = Depends(acceso)):
     """Flujo inverso a la carga: fotografiar los libros que se estan por
     entregar y matchearlos contra el catalogo YA publicado, para proponerle
     al librero una lista de "esto es lo que parece que vendiste".
@@ -533,7 +526,7 @@ async def detectar_vendidos(slug: str, token: str, fotos: list[UploadFile]):
     asi una venta con una lectura de lomo un poco distinta a la original
     (mas o menos subtitulo, autor completado a mano) igual encuentra su
     libro."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     if not fotos:
         raise HTTPException(status_code=400, detail="Mandá entre 1 y 10 fotos.")
@@ -548,7 +541,7 @@ async def detectar_vendidos(slug: str, token: str, fotos: list[UploadFile]):
     for f in filas_catalogo:
         _indexar(indice, f["titulo"], f["autor"], f["id"])
 
-    async def _analizar(contenido: bytes):
+    async def _analizar(contenido: bytes, acc: Acceso = Depends(acceso)):
         try:
             return await vision.analizar_foto(contenido, libreria["tipo_catalogo"])
         except Exception as exc:  # noqa: BLE001
@@ -576,9 +569,9 @@ async def detectar_vendidos(slug: str, token: str, fotos: list[UploadFile]):
     return {"encontrados": list(encontrados.values()), "no_encontrados": no_encontrados}
 
 
-@router.post("/api/{slug}/{token}/vendidos/confirmar")
-async def confirmar_vendidos(slug: str, token: str, datos: ConfirmarVentas):
-    libreria = await _libreria_por_slug_y_token(slug, token)
+@router.post("/vendidos/confirmar")
+async def confirmar_vendidos(slug: str, datos: ConfirmarVentas, acc: Acceso = Depends(acceso)):
+    libreria = acc.libreria
     if not datos.libro_ids:
         raise HTTPException(status_code=400, detail="No hay libros para confirmar.")
 
@@ -599,9 +592,9 @@ async def confirmar_vendidos(slug: str, token: str, datos: ConfirmarVentas):
     return {"ok": True, "vendidos": cant}
 
 
-@router.get("/api/{slug}/{token}/catalogos")
-async def listar_catalogos(slug: str, token: str):
-    libreria = await _libreria_por_slug_y_token(slug, token)
+@router.get("/catalogos")
+async def listar_catalogos(slug: str, acc: Acceso = Depends(acceso)):
+    libreria = acc.libreria
     filas = await db.pool().fetch(
         """
         SELECT c.id, c.slug, c.nombre, c.descripcion, c.padre_id,
@@ -619,9 +612,9 @@ async def listar_catalogos(slug: str, token: str):
     return [dict(f) for f in filas]
 
 
-@router.post("/api/{slug}/{token}/catalogos")
-async def crear_catalogo(slug: str, token: str, datos: DatosCatalogoNuevo):
-    libreria = await _libreria_por_slug_y_token(slug, token)
+@router.post("/catalogos")
+async def crear_catalogo(slug: str, datos: DatosCatalogoNuevo, acc: Acceso = Depends(acceso)):
+    libreria = acc.libreria
     nombre = datos.nombre.strip()
     if not nombre:
         raise HTTPException(status_code=400, detail="El catálogo necesita un nombre.")
@@ -669,9 +662,9 @@ async def crear_catalogo(slug: str, token: str, datos: DatosCatalogoNuevo):
     }
 
 
-@router.patch("/api/{slug}/{token}/catalogos/{catalogo_id}")
-async def editar_catalogo(slug: str, token: str, catalogo_id: int, datos: DatosCatalogo):
-    libreria = await _libreria_por_slug_y_token(slug, token)
+@router.patch("/catalogos/{catalogo_id}")
+async def editar_catalogo(slug: str, catalogo_id: int, datos: DatosCatalogo, acc: Acceso = Depends(acceso)):
+    libreria = acc.libreria
     nombre = datos.nombre.strip()
     if not nombre:
         raise HTTPException(status_code=400, detail="El catálogo necesita un nombre.")
@@ -694,14 +687,14 @@ async def editar_catalogo(slug: str, token: str, catalogo_id: int, datos: DatosC
     return {"ok": True}
 
 
-@router.patch("/api/{slug}/{token}/catalogos/{catalogo_id}/padre")
-async def mover_catalogo(slug: str, token: str, catalogo_id: int, datos: AsignarPadre):
+@router.patch("/catalogos/{catalogo_id}/padre")
+async def mover_catalogo(slug: str, catalogo_id: int, datos: AsignarPadre, acc: Acceso = Depends(acceso)):
     """Anida o desanida un catalogo. Separado de editar_catalogo porque acá
     None ("sacalo de su padre") es un valor valido, no un "no lo cambies".
     Los guards de la regla de 2 niveles van tambien dentro del UPDATE (no solo
     en los pre-checks) para que dos PATCH simultaneos no puedan dejar 3
     niveles ni un ciclo."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     hijo = await db.pool().fetchrow(
         "SELECT id, nombre FROM catalogos WHERE id = $1 AND libreria_id = $2",
@@ -753,15 +746,15 @@ async def mover_catalogo(slug: str, token: str, catalogo_id: int, datos: Asignar
     return {"ok": True}
 
 
-@router.delete("/api/{slug}/{token}/catalogos/{catalogo_id}")
-async def borrar_catalogo(slug: str, token: str, catalogo_id: int):
+@router.delete("/catalogos/{catalogo_id}")
+async def borrar_catalogo(slug: str, catalogo_id: int, acc: Acceso = Depends(acceso)):
     """Borrado duro. Si el catalogo tenia libros propios, antes de borrar se
     reasignan a su padre (o al catalogo general si era de primer nivel, via
     el propio padre_id que en ese caso ya es NULL) — asi borrar un
     subcatalogo no saca sus libros del catalogo padre, que es la regla
     central de la feature de subcatalogos. Los que ya no tenian padre siguen
     el comportamiento de siempre (ON DELETE SET NULL en libros.catalogo_id)."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     await db.pool().execute(
         """
@@ -787,11 +780,11 @@ async def borrar_catalogo(slug: str, token: str, catalogo_id: int):
     return {"ok": True}
 
 
-@router.patch("/api/{slug}/{token}/lotes/{lote_id}/catalogo")
-async def asignar_catalogo_lote(slug: str, token: str, lote_id: int, datos: AsignarCatalogo):
+@router.patch("/lotes/{lote_id}/catalogo")
+async def asignar_catalogo_lote(slug: str, lote_id: int, datos: AsignarCatalogo, acc: Acceso = Depends(acceso)):
     """Aplica el catalogo elegido por el librero a los libros que quedaron
     publicados de este lote (pantalla posterior a "Publicar" en revision.html)."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     lote = await db.pool().fetchrow(
         "SELECT id FROM lotes WHERE id = $1 AND libreria_id = $2", lote_id, libreria["id"]
@@ -818,11 +811,11 @@ async def asignar_catalogo_lote(slug: str, token: str, lote_id: int, datos: Asig
     return {"ok": True}
 
 
-@router.patch("/api/{slug}/{token}/libros/{libro_id}/catalogo")
-async def asignar_catalogo_libro(slug: str, token: str, libro_id: int, datos: AsignarCatalogo):
+@router.patch("/libros/{libro_id}/catalogo")
+async def asignar_catalogo_libro(slug: str, libro_id: int, datos: AsignarCatalogo, acc: Acceso = Depends(acceso)):
     """Reasigna el catalogo de un libro puntual (independiente del lote), para
     mover libros entre catalogos despues de publicados."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     if datos.catalogo_id is not None:
         existe = await db.pool().fetchval(
@@ -840,11 +833,11 @@ async def asignar_catalogo_libro(slug: str, token: str, libro_id: int, datos: As
     return {"ok": True}
 
 
-@router.get("/api/{slug}/{token}/qr.png")
-async def qr_png(slug: str, token: str, request: Request, catalogo: str | None = None):
+@router.get("/qr.png")
+async def qr_png(slug: str, request: Request, catalogo: str | None = None, acc: Acceso = Depends(acceso)):
     """QR con /{slug}?src=qr — separa trafico local (mostrador) de redes (§5 requisitos).
     Con ?catalogo=<slug> apunta al QR de ese catalogo puntual en vez del general."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     base = str(request.base_url).rstrip("/")
     if catalogo:
@@ -863,15 +856,15 @@ async def qr_png(slug: str, token: str, request: Request, catalogo: str | None =
     return Response(content=buffer.getvalue(), media_type="image/png")
 
 
-@router.post("/api/{slug}/{token}/vincular-qr")
-async def vincular_qr(slug: str, token: str, datos: VincularQr):
+@router.post("/vincular-qr")
+async def vincular_qr(slug: str, datos: VincularQr, acc: Acceso = Depends(acceso)):
     """Vincula una carpita (codigo qr_codigos, impreso con /qr/<token>) a esta
     libreria. Un librero solo puede tomar un codigo LIBRE (o que ya sea
     suyo) -pisar el de otra libreria es exclusivo de /admin (ver
     routers/admin.py:qr_reasignar)-, para que reasignar una carpita ya en
     uso siempre quede en manos de una sola persona y trazado en el
     historial."""
-    libreria = await _libreria_por_slug_y_token(slug, token)
+    libreria = acc.libreria
 
     codigo = await db.pool().fetchrow(
         "SELECT id, libreria_id FROM qr_codigos WHERE token = $1", datos.qr_token

@@ -37,9 +37,10 @@
 </div>
 <script>
   const LIBRERO_SLUG = "{{ libreria.slug }}";
-  const LIBRERO_TOKEN = "{{ libreria.token_panel }}";
+  const PANEL_RAIZ = "{{ request.state.panel_raiz }}";
+  const API_RAIZ = "{{ request.state.api_raiz }}";
   const LIBRO_ID = {{ libro.id }};
-  const API_BASE = `/api/${LIBRERO_SLUG}/${LIBRERO_TOKEN}`;
+  const API_BASE = `${API_RAIZ}`;
   const VOLVER = {{ volver|tojson }};
 
   document.querySelectorAll('[data-catalogo-id]').forEach((btn) => {

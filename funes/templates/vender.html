@@ -10,7 +10,7 @@
 <div class="max-w-6xl mx-auto px-5 pt-3 pb-10">
 <div id="panel-todo">
 <div class="max-w-2xl mx-auto">
-  <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
+  <a href="{{ request.state.panel_raiz }}" class="text-tinta text-sm font-medium">← Volver</a>
   <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Remover {{ et.libros }}</h1>
 
   <main class="flex-1 pt-5 pb-10">
@@ -81,10 +81,11 @@
 </div>
 <script>
   const LIBRERO_SLUG = "{{ libreria.slug }}";
-  const LIBRERO_TOKEN = "{{ libreria.token_panel }}";
+  const PANEL_RAIZ = "{{ request.state.panel_raiz }}";
+  const API_RAIZ = "{{ request.state.api_raiz }}";
   const ET_LIBRO = "{{ et.libro }}", ET_LIBROS = "{{ et.libros }}";
   const ET_AUTOR_CAP = "{{ et.Autor }}", ET_AUTORES = "{{ et.autores }}";
-  const API_BASE = `/api/${LIBRERO_SLUG}/${LIBRERO_TOKEN}`;
+  const API_BASE = `${API_RAIZ}`;
 
   let libros = {{ libros_json | safe }};
 
@@ -383,7 +384,7 @@
 
   btnReintentar.addEventListener('click', () => {
     if (btnReintentar.textContent === 'Volver al panel') {
-      window.location.href = `/${LIBRERO_SLUG}/panel/${LIBRERO_TOKEN}`;
+      window.location.href = `${PANEL_RAIZ}`;
       return;
     }
     pasoVacio.classList.add('hidden');

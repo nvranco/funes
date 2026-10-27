@@ -10,7 +10,7 @@
 {% include "_estilo_panel.html" %}
 {# PWA: manifest propio de esta libreria (el token va en start_url). iOS ignora
    parte del manifest, de ahi las metas apple-* y el apple-touch-icon. #}
-<link rel="manifest" href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}/manifest.webmanifest">
+<link rel="manifest" href="{{ request.state.panel_raiz }}/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/static/funes-apple-touch-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -100,7 +100,7 @@
           <p id="carga-contador" class="text-sm font-medium mt-2 hidden"></p>
         </div>
         {% for lote in lotes_pendientes %}
-        <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}/lote/{{ lote.id }}"
+        <a href="{{ request.state.panel_raiz }}/lote/{{ lote.id }}"
           class="tap btn-secundario w-full flex items-center justify-between px-4 rounded-xl2 font-medium"
           style="border: 1px solid rgb(var(--borde))">
           <span>Lote de {{ lote.cant_fotos }} foto{{ 's' if lote.cant_fotos != 1 else '' }}</span>
@@ -212,6 +212,12 @@
           style="border: 1px solid rgb(var(--borde))">
           Instalar aplicación 📲
         </button>
+        {% if request.state.por_sesion %}
+        <button type="button" class="js-ver-intro tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+          style="border: 1px solid rgb(var(--borde))">Cómo funciona Funes 💡</button>
+        <button type="button" class="js-salir tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+          style="border: 1px solid rgb(var(--borde))">Cerrar sesión 🚪</button>
+        {% endif %}
       </div>
     </div>
 
@@ -270,6 +276,18 @@
           Instalar aplicación 📲
         </button>
       </div>
+
+      {% if request.state.por_sesion %}
+      <div>
+        <p class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5">Cuenta</p>
+        <div class="space-y-1.5">
+          <button type="button" class="js-ver-intro tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+            style="border: 1px solid rgb(var(--borde))">Cómo funciona Funes 💡</button>
+          <button type="button" class="js-salir tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+            style="border: 1px solid rgb(var(--borde))">Cerrar sesión 🚪</button>
+        </div>
+      </div>
+      {% endif %}
     </div>
 
     {% if eventos_combinados %}
@@ -498,12 +516,15 @@
   </div>
 </div>
 
+{% if request.state.por_sesion %}{% include "_onboarding.html" %}{% endif %}
+
 <script>
   const LIBRERO_SLUG = "{{ libreria.slug }}";
-  const LIBRERO_TOKEN = "{{ libreria.token_panel }}";
+  const PANEL_RAIZ = "{{ request.state.panel_raiz }}";
+  const API_RAIZ = "{{ request.state.api_raiz }}";
   const ET_LIBRO = "{{ et.libro }}", ET_LIBROS = "{{ et.libros }}";
   const ET_AUTORES = "{{ et.autores }}";
-  const API_LOTES = `/api/${LIBRERO_SLUG}/${LIBRERO_TOKEN}/lotes`;
+  const API_LOTES = `${API_RAIZ}/lotes`;
   const URL_GUIA = "{{ url_guia }}";
   // Libreria que cataloga CDs: siempre carga fotos unitarias (nunca un
   // estante con varios lomos), asi que la guia de "2 pasos" no le sirve —
@@ -808,7 +829,7 @@
       // Pequeño delay para que se alcance a ver la barra llena y el mensaje
       // final antes de saltar a la pantalla de revisión.
       setTimeout(() => {
-        window.location.href = `/${LIBRERO_SLUG}/panel/${LIBRERO_TOKEN}/lote/${loteId}`;
+        window.location.href = `${PANEL_RAIZ}/lote/${loteId}`;
       }, 600);
     } catch (err) {
       frenarProgreso();
@@ -834,7 +855,7 @@
       navigator.standalone === true;
 
     if ('serviceWorker' in navigator) {
-      const raiz = `/${LIBRERO_SLUG}/panel/${LIBRERO_TOKEN}`;
+      const raiz = `${PANEL_RAIZ}`;
       navigator.serviceWorker.register(`${raiz}/sw.js`, { scope: raiz }).catch(() => {});
     }
 

@@ -31,7 +31,7 @@
 
 <div class="max-w-6xl mx-auto px-5 pt-3 pb-10">
 <div id="panel-todo">
-  <a href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}" class="text-tinta text-sm font-medium">← Volver</a>
+  <a href="{{ request.state.panel_raiz }}" class="text-tinta text-sm font-medium">← Volver</a>
   <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1">Mis catálogos</h1>
   <main class="flex-1 pt-5">
     <div class="space-y-2 lg:max-w-xl">
@@ -188,9 +188,10 @@
 
 <script>
   const LIBRERO_SLUG = "{{ libreria.slug }}";
-  const LIBRERO_TOKEN = "{{ libreria.token_panel }}";
+  const PANEL_RAIZ = "{{ request.state.panel_raiz }}";
+  const API_RAIZ = "{{ request.state.api_raiz }}";
   const ET_LIBROS = "{{ et.libros }}";
-  const API_BASE = `/api/${LIBRERO_SLUG}/${LIBRERO_TOKEN}`;
+  const API_BASE = `${API_RAIZ}`;
   const PALETA = {{ paleta | tojson }};
 
   function copiar(texto, btn) {

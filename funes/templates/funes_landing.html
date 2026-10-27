@@ -220,6 +220,12 @@
           <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
         </svg>
       </a>
+      <div class="flex items-center gap-2">
+      {% if registro_habilitado %}
+      <a href="/ingresar" data-evento="ingresar" data-origen="barra"
+         class="boton boton-principal" style="min-height:36px; padding: 0 .8rem; font-size:.8rem; border-radius:10px; border-width:1px">Ingresar</a>
+      {% endif %}
+      {% if not registro_habilitado %}
       <a href="{{ wa('Hola, tengo una librería y quiero saber más de Funes.') }}" target="_blank" rel="noopener"
          id="wa-barra" data-evento="whatsapp" data-origen="barra"
          class="boton boton-lava boton-barra" style="min-height:36px; padding: 0 .8rem; font-size:.8rem; gap:.4rem; border-radius:10px; border-width:1px">
@@ -228,6 +234,8 @@
           <path d="M20.5 3.5A11.8 11.8 0 0 0 12 0C5.4 0 0 5.4 0 12c0 2.1.6 4.200 1.600 6L0 24l6.200-1.600A12 12 0 0 0 12 24c6.600 0 12-5.400 12-12 0-3.200-1.300-6.200-3.500-8.500zM12 22a10 10 0 0 1-5.100-1.400l-.4-.2-3.700 1 1-3.600-.2-.4A10 10 0 1 1 12 22zm5.500-7.500c-.3-.2-1.800-.9-2-1-.3-.1-.5-.2-.7.200-.2.300-.8 1-1 1.200-.2.200-.4.200-.7.100-.3-.2-1.300-.5-2.400-1.500-.9-.8-1.500-1.800-1.700-2.100-.2-.3 0-.5.100-.6l.5-.5.300-.5c.1-.2 0-.4 0-.5l-.9-2.200c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.100-.8.400-.3.300-1 1-1 2.500s1.100 2.900 1.200 3.100c.2.200 2.100 3.200 5.100 4.500.7.300 1.300.5 1.700.6.700.2 1.400.2 1.900.1.600-.1 1.800-.7 2-1.400.3-.7.300-1.300.2-1.400-.1-.1-.3-.2-.6-.3z"/>
         </svg>
       </a>
+      {% endif %}
+      </div>
     </div>
   </header>
 
@@ -243,6 +251,9 @@
             o un <a href="#recomendador" class="enlace-seccion">recomendador conversacional</a>, únicamente sacando fotos a tus libros o estanterías.
           </p>
           <div class="flex flex-col sm:flex-row gap-3 mt-8">
+            {% if registro_habilitado %}
+            <a href="/registro" data-evento="registro" data-origen="hero" class="boton boton-principal">Registrá tu librería</a>
+            {% endif %}
             <a href="{{ wa('Hola, tengo una librería y quiero saber más de Funes.') }}" target="_blank" rel="noopener"
                id="wa-hero" data-evento="whatsapp" data-origen="hero" class="boton boton-lava">
               Consultar por WhatsApp
@@ -390,7 +401,10 @@
         <div class="max-w-3xl mx-auto text-center">
         <h2 class="text-3xl md:text-5xl leading-tight">Hablemos de tu librería.</h2>
         <p class="text-[1.2rem] md:text-[1.4rem] mt-5 leading-relaxed">Contanos qué vendés y te mostramos cómo quedaría tu catálogo.</p>
-        <div class="flex justify-center mt-8">
+        <div class="flex flex-col sm:flex-row gap-3 justify-center mt-8">
+          {% if registro_habilitado %}
+          <a href="/registro" data-evento="registro" data-origen="cierre" class="boton boton-principal">Registrá tu librería</a>
+          {% endif %}
           <a href="{{ wa('Hola, tengo una librería y quiero saber más de Funes.') }}" target="_blank" rel="noopener"
              data-evento="whatsapp" data-origen="cierre" class="boton boton-secundario" style="border-color: rgb(var(--tinta))">
             Consultar por WhatsApp

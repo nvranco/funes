@@ -22,7 +22,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
-from funes import db
+from funes import auth_clerk, db
 from funes.config import (
     ADMIN_TOKEN, DOMINIO_FUNES, FUNES_CONTACTO, FUNES_SLUG_DEMO, POSTHOG_HOST, POSTHOG_KEY,
 )
@@ -391,6 +391,8 @@ async def pagina_landing(request: Request):
         "og_version": _version_og(),
         # El boton "Probalo vos" de la landing lleva a /funes/{slug_demo}.
         "slug_demo": FUNES_SLUG_DEMO,
+        # Sin Clerk configurado no hay a donde mandar el registro: no se muestran los botones.
+        "registro_habilitado": auth_clerk.habilitado(),
     })
 
 

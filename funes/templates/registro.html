@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block titulo %}Registrá tu librería · Funes{% endblock %}
+{% block head %}
+{% include "_estilo_panel.html" %}
+{# Banderas cuadradas y minimalistas (flag-icons, clase "fis"). #}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css">
+<style>
+  .pais-btn { display: inline-flex; align-items: center; gap: .4rem; padding: 0 .6rem; background: #fff;
+    border: 1px solid var(--borde-panel); border-radius: .5rem; font-size: 16px; }
+  .pais-btn .fi { width: 1.25rem; height: 1.25rem; border-radius: 9999px; background-size: cover; flex: none; }
+  .pais-lista { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; width: 15rem; max-height: 15rem; overflow-y: auto;
+    background: #fff; border: 1px solid var(--borde-panel); border-radius: .75rem; box-shadow: 0 8px 24px rgba(46,33,22,.14); padding: .25rem; }
+  .pais-lista li { display: flex; align-items: center; gap: .6rem; padding: .55rem .6rem; border-radius: .5rem; cursor: pointer; font-size: 15px; }
+  .pais-lista li .fi { width: 1.25rem; height: 1.25rem; border-radius: 9999px; background-size: cover; flex: none; }
+  .pais-lista li .cod { margin-left: auto; color: rgb(var(--gris)); font-size: 13px; }
+  .pais-lista li:hover, .pais-lista li.activo { background: rgba(122,158,120,.16); }
+</style>
+{% endblock %}
+{% block contenido %}
+{% set rotulo_banner = '' %}
+{% include "_banner_panel.html" %}
+
+<div class="max-w-md mx-auto flex flex-col">
+  <main class="flex-1 px-5 pt-6 pb-10">
+    <div id="panel-todo">
+      <p class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5">Paso 1 de 2</p>
+      <h1 class="text-2xl font-bold text-tinta mb-1">Contanos de tu librería</h1>
+      <p class="text-gris mb-5 leading-snug">Con estos datos armamos tu panel. Después seguís con tu cuenta de Google.</p>
+
+      <form id="form-registro" class="space-y-4" novalidate>
+        <div>
+          <label class="block text-sm font-medium mb-1" for="nombre">Nombre de la librería</label>
+          <input id="nombre" name="nombre" required maxlength="80" autocomplete="organization"
+            class="tap w-full rounded-lg border border-borde px-3 py-2" placeholder="Ej: El Anticuario">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1" for="whatsapp">WhatsApp</label>
+          <div class="flex gap-2">
+            <div class="relative shrink-0">
+              <button type="button" id="pais-btn" class="tap pais-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="País">
+                <span id="pais-bandera" class="fi fis fi-ar"></span><span id="pais-corto">+54 9</span>
+                <svg viewBox="0 0 20 20" width="14" height="14" class="opacity-60" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg>
+              </button>
+              <ul id="pais-lista" class="pais-lista hidden" role="listbox" tabindex="-1">
+                <li role="option" data-cod="549" data-iso="ar" data-corto="+54 9"><span class="fi fis fi-ar"></span>Argentina<span class="cod">+54 9</span></li>
+                <li role="option" data-cod="598" data-iso="uy" data-corto="+598"><span class="fi fis fi-uy"></span>Uruguay<span class="cod">+598</span></li>
+                <li role="option" data-cod="56" data-iso="cl" data-corto="+56"><span class="fi fis fi-cl"></span>Chile<span class="cod">+56</span></li>
+                <li role="option" data-cod="595" data-iso="py" data-corto="+595"><span class="fi fis fi-py"></span>Paraguay<span class="cod">+595</span></li>
+                <li role="option" data-cod="591" data-iso="bo" data-corto="+591"><span class="fi fis fi-bo"></span>Bolivia<span class="cod">+591</span></li>
+                <li role="option" data-cod="55" data-iso="br" data-corto="+55"><span class="fi fis fi-br"></span>Brasil<span class="cod">+55</span></li>
+                <li role="option" data-cod="51" data-iso="pe" data-corto="+51"><span class="fi fis fi-pe"></span>Perú<span class="cod">+51</span></li>
+                <li role="option" data-cod="57" data-iso="co" data-corto="+57"><span class="fi fis fi-co"></span>Colombia<span class="cod">+57</span></li>
+                <li role="option" data-cod="52" data-iso="mx" data-corto="+52"><span class="fi fis fi-mx"></span>México<span class="cod">+52</span></li>
+                <li role="option" data-cod="34" data-iso="es" data-corto="+34"><span class="fi fis fi-es"></span>España<span class="cod">+34</span></li>
+              </ul>
+              <input type="hidden" id="pais" name="pais" value="549">
+            </div>
+            <input id="whatsapp" name="whatsapp" required inputmode="numeric" autocomplete="tel-national"
+              class="tap w-full min-w-0 rounded-lg border border-borde px-3 py-2" placeholder="11 2691 1499">
+          </div>
+          <p class="text-xs text-gris mt-1">Código de área y número, sin el 0 ni el 15. Es adonde te escriben tus clientes.</p>
+        </div>
+
+        <p id="error" class="hidden text-sm font-medium text-terracota" role="alert"></p>
+
+        <button id="btn-google" type="submit" class="tap btn-primario w-full rounded-xl2" style="gap:.75rem; font-size: 1rem; font-weight: 500">
+          <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
+            <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3A12 12 0 0 1 12 24a12 12 0 0 1 12-12c3.1 0 5.8 1.200 8 3l5.700-5.700A20 20 0 0 0 24 4a20 20 0 1 0 19.600 16.100z"/>
+            <path fill="#FF3D00" d="m6.300 14.700 6.600 4.800A12 12 0 0 1 24 12c3.100 0 5.800 1.200 8 3l5.700-5.700A20 20 0 0 0 24 4 20 20 0 0 0 6.300 14.700z"/>
+            <path fill="#4CAF50" d="M24 44c5.200 0 9.900-2 13.400-5.200l-6.200-5.200A12 12 0 0 1 24 36a12 12 0 0 1-11.300-8l-6.500 5A20 20 0 0 0 24 44z"/>
+            <path fill="#1976D2" d="M43.600 20.100H42V20H24v8h11.300a12 12 0 0 1-4.100 5.600l6.200 5.200C37 39.200 44 34 44 24c0-1.300-.1-2.600-.4-3.900z"/>
+          </svg>
+          <span id="btn-texto">Continuar con Google</span>
+        </button>
+      </form>
+
+      <p class="text-sm text-gris mt-5 text-center">¿Ya tenés cuenta? <a href="/ingresar" class="text-tinta font-semibold underline">Ingresá</a></p>
+    </div>
+  </main>
+</div>
+
+{% include "_clerk_js.html" %}
+<script>
+  const form = document.getElementById('form-registro');
+  const error = document.getElementById('error');
+  const btn = document.getElementById('btn-google');
+
+  // Si vuelve atras desde el paso 2, recupera lo que ya había escrito.
+  try {
+    const borrador = JSON.parse(sessionStorage.getItem('funes_registro') || 'null');
+    if (borrador) { if (borrador.nombre) form.elements.nombre.value = borrador.nombre; if (borrador.pais) form.elements.pais.value = borrador.pais; if (borrador.local) form.elements.whatsapp.value = borrador.local; }
+  } catch (e) {}
+
+  // Selector de país propio: un <select> nativo no puede mostrar banderas.
+  const paisBtn = document.getElementById('pais-btn'), paisLista = document.getElementById('pais-lista');
+  const paisInput = document.getElementById('pais');
+  function elegirPais(li) {
+    paisInput.value = li.dataset.cod;
+    document.getElementById('pais-bandera').className = 'fi fis fi-' + li.dataset.iso;
+    document.getElementById('pais-corto').textContent = li.dataset.corto;
+    paisLista.querySelectorAll('li').forEach(x => x.setAttribute('aria-selected', x === li ? 'true' : 'false'));
+  }
+  function abrirPais(abrir) {
+    paisLista.classList.toggle('hidden', !abrir);
+    paisBtn.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+  }
+  paisBtn.addEventListener('click', () => abrirPais(paisLista.classList.contains('hidden')));
+  paisLista.addEventListener('click', (ev) => { const li = ev.target.closest('li'); if (li) { elegirPais(li); abrirPais(false); form.elements.whatsapp.focus(); } });
+  document.addEventListener('click', (ev) => { if (!ev.target.closest('#pais-btn, #pais-lista')) abrirPais(false); });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') abrirPais(false); });
+  const inicial = paisLista.querySelector('li[data-cod="' + paisInput.value + '"]');
+  if (inicial) elegirPais(inicial);
+
+  function mostrarError(msg) { error.textContent = msg; error.classList.remove('hidden'); }
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    error.classList.add('hidden');
+    const nombre = form.elements.nombre.value.replace(/\s+/g, ' ').trim();
+    const pais = form.elements.pais.value;
+    let local = form.elements.whatsapp.value.replace(/\D/g, '').replace(/^0+/, '');
+    // Si pegó el número entero con el código de país, no se lo duplicamos.
+    if (local.startsWith(pais)) local = local.slice(pais.length);
+    else if (pais === '549' && local.startsWith('54')) local = local.slice(2).replace(/^9/, '');
+    const whatsapp = pais + local;
+    if (nombre.length < 2) return mostrarError('Falta el nombre de tu librería.');
+    if (local.length < 6 || !/^[0-9]{10,15}$/.test(whatsapp)) return mostrarError('Revisá el WhatsApp: código de área y número, solo dígitos.');
+    try {
+      sessionStorage.setItem('funes_registro', JSON.stringify({ nombre, whatsapp, pais, local }));
+    } catch (e) {
+      return mostrarError('Tu navegador bloquea el almacenamiento y no podemos seguir. Probá en una ventana normal.');
+    }
+    btn.disabled = true;
+    document.getElementById('btn-texto').textContent = 'Abriendo Google…';
+    try {
+      const clerk = await clerkListo();
+      // Sesión ya abierta (volvió desde el paso 2): no hace falta pasar por Google otra vez.
+      if (clerk.user) { location.href = '/registro/continuar'; return; }
+      await continuarConGoogle('/registro/continuar');
+    } catch (e) {
+      btn.disabled = false;
+      document.getElementById('btn-texto').textContent = 'Continuar con Google';
+      mostrarError('No pudimos conectar con Google. Probá de nuevo en un momento.');
+    }
+  });
+</script>
+{% endblock %}
