@@ -5,6 +5,60 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{% block titulo %}Funes{% endblock %}</title>
 <meta name="theme-color" content="#7A9E78">
+{# Splash de la PWA: solo cuando la app se abrio desde el icono del inicio. Va
+   ANTES de cualquier script o hoja externa para pintarse apenas hay HTML. En
+   la PWA Tailwind se carga async (no bloquea el parseo: el splash tapa el
+   instante sin estilos); en el navegador comun sigue sincrono como siempre. #}
+<script>
+  (function () {
+    var pwa = window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    if (pwa) document.documentElement.classList.add('pwa');
+    var src = 'https://cdn.tailwindcss.com';
+    if (pwa) {
+      var s = document.createElement('script');
+      s.src = src; s.async = true;
+      s.onload = function () {
+        if (window.__configTailwind) window.tailwind.config = window.__configTailwind;
+      };
+      document.head.appendChild(s);
+    } else {
+      document.write('<script src="' + src + '"><\/script>');
+    }
+    if (!pwa) return;
+    var cerrado = false;
+    function cerrarSplash() {
+      if (cerrado) return;
+      cerrado = true;
+      var el = document.getElementById('splash');
+      if (!el) return;
+      el.classList.add('splash-fuera');
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
+    }
+    // Dos frames despues de "load" (que espera al Tailwind async): da tiempo a
+    // que genere sus clases. El tope evita dejar la app tapada si algo no llega.
+    window.addEventListener('load', function () {
+      requestAnimationFrame(function () { requestAnimationFrame(cerrarSplash); });
+    });
+    setTimeout(cerrarSplash, 10000);
+  })();
+</script>
+<style>
+  html.pwa, html.pwa body { background: #EDE3D0; }
+  #splash { display: none; }
+  .pwa #splash {
+    display: flex; position: fixed; inset: 0; z-index: 99999; align-items: center; justify-content: center;
+    background: #EDE3D0; transition: opacity .35s ease;
+  }
+  #splash.splash-fuera { opacity: 0; pointer-events: none; }
+  #splash svg { width: 88px; height: 88px; color: #2E2116; overflow: visible; }
+  /* Cada anillo gira sobre su centro, a su ritmo y en sentidos alternados. */
+  #splash .anillo { transform-box: view-box; transform-origin: 16px 16px; animation: splash-giro 2.6s linear infinite; }
+  #splash .anillo-2 { animation-duration: 1.9s; animation-direction: reverse; }
+  #splash .anillo-3 { animation-duration: 1.3s; }
+  @keyframes splash-giro { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { #splash .anillo { animation-duration: 8s; } }
+</style>
 {# Toda pagina de la app pisa esto con el favicon de Funes -queda como
    fallback para paginas nuevas que se olviden de hacerlo. No se agrega un
    segundo <link rel="icon">: cual gana cuando hay varios no esta
@@ -13,9 +67,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
 <script>
-  tailwind.config = {
+  // En la PWA Tailwind llega async: si todavia no esta, la config se le aplica
+  // cuando carga (ver el <script> del splash, arriba).
+  window.__configTailwind = {
     theme: {
       extend: {
         colors: {
@@ -40,6 +95,7 @@
       },
     },
   };
+  if (window.tailwind) window.tailwind.config = window.__configTailwind;
 </script>
 <style>
   /* Look and feel definitivo: "Kraft Suave" — libreria de usados, papel
@@ -130,6 +186,14 @@
 {% block head %}{% endblock %}
 </head>
 <body class="font-sans text-texto-papel bg-fondo min-h-screen antialiased">
+<div id="splash" aria-hidden="true">
+  <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+    <g class="anillo anillo-1"><circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/></g>
+    <g class="anillo anillo-2"><circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/></g>
+    <g class="anillo anillo-3"><circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/></g>
+    <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
+  </svg>
+</div>
 {% block contenido %}{% endblock %}
 {% block emoji %}{% endblock %}
 </body>

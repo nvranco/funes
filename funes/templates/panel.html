@@ -8,6 +8,14 @@
    guia: no hay un emoji que combine las dos cosas. #}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.46.0/tabler-icons.min.css">
 {% include "_estilo_panel.html" %}
+{# PWA: manifest propio de esta libreria (el token va en start_url). iOS ignora
+   parte del manifest, de ahi las metas apple-* y el apple-touch-icon. #}
+<link rel="manifest" href="/{{ libreria.slug }}/panel/{{ libreria.token_panel }}/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/static/funes-apple-touch-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Funes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 {% endblock %}
 {% block contenido %}
 {# <header>, no <div>: escapa a `body > div { max-width: 480px }` de base.html para que el banner
@@ -197,6 +205,13 @@
           style="border: 1px solid rgb(var(--borde))">
           Remover {{ et.libros }} 🏷️
         </a>
+        {# Oculto hasta que el JS confirma iOS/Android y que no esta ya
+           instalada (ver "Instalar como app" al final del script). #}
+        <button id="btn-instalar" type="button"
+          class="hidden tap btn-secundario w-full items-center justify-start px-4 rounded-xl2 font-medium"
+          style="border: 1px solid rgb(var(--borde))">
+          Instalar aplicación 📲
+        </button>
       </div>
     </div>
 
@@ -244,6 +259,17 @@
         </div>
       </div>
       {% endif %}
+
+      {# Solo Chrome/Edge de escritorio (el JS lo muestra): en mobile el mismo
+         boton vive dentro de la lista Gestión de arriba. #}
+      <div id="bloque-instalar-desktop" class="hidden">
+        <p class="text-sm font-bold text-gris uppercase tracking-wide mb-1.5">Aplicación</p>
+        <button id="btn-instalar-desktop" type="button"
+          class="tap btn-secundario w-full flex items-center justify-start px-4 rounded-xl2 font-medium"
+          style="border: 1px solid rgb(var(--borde))">
+          Instalar aplicación 📲
+        </button>
+      </div>
     </div>
 
     {% if eventos_combinados %}
@@ -421,6 +447,55 @@
 
 
   <input id="input-fotos" type="file" accept="image/*" multiple class="hidden">
+</div>
+
+{# Dialog a pantalla completa: ocupa todo sin salir de la pagina. Los dos
+   bloques de pasos van renderizados y el JS muestra el de la plataforma. #}
+<div id="dialogo-instalar" class="hidden fixed inset-0 z-50 bg-fondo overflow-y-auto" style="max-width: none"
+  role="dialog" aria-modal="true" aria-labelledby="instalar-titulo">
+  <div class="min-h-full max-w-md mx-auto px-6 py-10 flex flex-col" style="padding-bottom: max(env(safe-area-inset-bottom), 2.5rem)">
+    <div class="flex-1 flex flex-col justify-center">
+      <h2 id="instalar-titulo" class="text-2xl font-bold text-tinta mb-4">Instalar Funes</h2>
+      <p class="text-lg leading-snug">Agregá Funes a tu <strong class="text-celeste">pantalla de inicio</strong> para abrir tu panel con un toque, sin buscar el link de WhatsApp.</p>
+
+      <ol id="pasos-ios" class="hidden mt-6 space-y-4 text-lg leading-snug">
+        <li><span class="text-gris">1.</span> Tocá el botón <strong>Compartir</strong>
+          <svg viewBox="0 0 24 24" class="inline w-5 h-5 -mt-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M8 7l4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg></li>
+        <li><span class="text-gris">2.</span> Elegí <strong>«Agregar a inicio»</strong>
+          <svg viewBox="0 0 24 24" class="inline w-5 h-5 -mt-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/></svg></li>
+        <li><span class="text-gris">3.</span> Confirmá tocando <strong>«Agregar»</strong>.</li>
+        <li><span class="text-gris">4.</span> Abrí Funes desde tu pantalla de inicio.</li>
+      </ol>
+
+      <ol id="pasos-android" class="hidden mt-6 space-y-4 text-lg leading-snug">
+        <li><span class="text-gris">1.</span> Abrí el <strong>menú</strong>
+          <svg viewBox="0 0 24 24" class="inline w-5 h-5 -mt-1" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></li>
+        <li><span class="text-gris">2.</span> Elegí <strong>«Agregar a la pantalla principal»</strong> (o «Instalar aplicación»).</li>
+        <li><span class="text-gris">3.</span> Confirmá tocando <strong>«Agregar»</strong>.</li>
+        <li><span class="text-gris">4.</span> Abrí Funes desde tu pantalla de inicio.</li>
+      </ol>
+
+      <ol id="pasos-desktop" class="hidden mt-6 space-y-4 text-lg leading-snug">
+        <li><span class="text-gris">1.</span> En Chrome, buscá el ícono <strong>«Instalar»</strong>
+          <svg viewBox="0 0 24 24" class="inline w-5 h-5 -mt-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 7v5M9.5 10 12 12.5 14.5 10M8 20h8"/></svg>
+          a la derecha de la barra de direcciones.</li>
+        <li><span class="text-gris">2.</span> Si no aparece, abrí el <strong>menú</strong>
+          <svg viewBox="0 0 24 24" class="inline w-5 h-5 -mt-1" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+          y elegí <strong>«Instalar Funes»</strong> (puede estar en «Enviar, guardar y compartir»).</li>
+        <li><span class="text-gris">3.</span> Confirmá tocando <strong>«Instalar»</strong>.</li>
+        <li><span class="text-gris">4.</span> Abrí Funes desde tu escritorio o el menú de inicio.</li>
+      </ol>
+
+      <p id="aviso-ios" class="hidden mt-5 text-sm text-gris">En iPhone tiene que ser desde Safari.</p>
+      <p class="mt-6 text-sm text-gris">No descargás nada, tu navegador sigue corriendo de fondo pero en pantalla completa.</p>
+    </div>
+    {# Mismo boton secundario de la landing (funes_landing.html: .boton-secundario). #}
+    <div class="mt-8">
+      <button id="btn-instalar-cerrar" type="button"
+        class="w-full inline-flex items-center justify-center font-semibold text-tinta hover:bg-tinta/5 transition-colors"
+        style="min-height: 52px; padding: 0 1.5rem; border-radius: 12px; border: 2px solid rgba(46,33,22,.35); background: transparent">Entendido</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -747,6 +822,63 @@
     btnCargar.disabled = false;
     btnCargar.classList.remove('opacity-60');
   }
+
+  // Instalar como app (PWA). El boton solo aparece en iOS/Android/Chrome de escritorio y si no se
+  // abrio ya desde el icono del inicio (standalone).
+  (function () {
+    const ua = navigator.userAgent;
+    const esIOS = /iPad|iPhone|iPod/.test(ua) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS
+    const esAndroid = /Android/.test(ua);
+    const instalada = window.matchMedia('(display-mode: standalone)').matches ||
+      navigator.standalone === true;
+
+    if ('serviceWorker' in navigator) {
+      const raiz = `/${LIBRERO_SLUG}/panel/${LIBRERO_TOKEN}`;
+      navigator.serviceWorker.register(`${raiz}/sw.js`, { scope: raiz }).catch(() => {});
+    }
+
+    // Chrome/Edge de escritorio: instalables igual que en Android. Firefox y
+    // Safari de escritorio no, y ahi el boton no tiene que aparecer.
+    const esChromiumDesktop = !esIOS && !esAndroid && /Chrome\/|Edg\//.test(ua) && !/OPR\//.test(ua);
+    // Chrome en iPhone (CriOS) tambien agrega a inicio desde Compartir: el
+    // aviso de "solo Safari" no le corresponde.
+    const esChromeIOS = /CriOS/.test(ua);
+
+    const btnMobile = document.getElementById('btn-instalar');
+    const btnDesktop = document.getElementById('btn-instalar-desktop');
+    const dialogo = document.getElementById('dialogo-instalar');
+    if (!btnMobile || instalada || !(esIOS || esAndroid || esChromiumDesktop)) return;
+
+    const pasos = esIOS ? 'pasos-ios' : esAndroid ? 'pasos-android' : 'pasos-desktop';
+    document.getElementById(pasos).classList.remove('hidden');
+    if (esIOS && !esChromeIOS) document.getElementById('aviso-ios').classList.remove('hidden');
+    if (esChromiumDesktop) {
+      document.getElementById('bloque-instalar-desktop').classList.remove('hidden');
+    } else {
+      btnMobile.classList.remove('hidden');
+      btnMobile.classList.add('flex');
+    }
+    const btn = esChromiumDesktop ? btnDesktop : btnMobile;
+
+    function abrir() {
+      dialogo.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+    function cerrar() {
+      dialogo.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+    btn.addEventListener('click', abrir);
+    document.getElementById('btn-instalar-cerrar').addEventListener('click', cerrar);
+    document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') cerrar(); });
+    window.addEventListener('appinstalled', () => {
+      cerrar();
+      btnMobile.classList.add('hidden');
+      btnMobile.classList.remove('flex');
+      document.getElementById('bloque-instalar-desktop').classList.add('hidden');
+    });
+  })();
 </script>
 {% endblock %}
 {% block emoji %}{% include "_twemoji.html" %}{% endblock %}
