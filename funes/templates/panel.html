@@ -489,12 +489,11 @@
       <p id="aviso-ios" class="hidden mt-5 text-sm text-gris">En iPhone tiene que ser desde Safari.</p>
       <p class="mt-6 text-sm text-gris">No descargás nada, tu navegador sigue corriendo de fondo pero en pantalla completa.</p>
     </div>
-    <div class="mt-8 space-y-1.5">
-      <button id="btn-instalar-ahora" type="button"
-        class="hidden tap btn-primario border-celeste w-full rounded-xl2 font-medium">Instalar ahora</button>
+    {# Mismo boton secundario de la landing (funes_landing.html: .boton-secundario). #}
+    <div class="mt-8">
       <button id="btn-instalar-cerrar" type="button"
-        class="tap btn-secundario w-full rounded-xl2 font-medium"
-        style="border: 1px solid rgb(var(--borde))">Entendido</button>
+        class="w-full inline-flex items-center justify-center font-semibold text-tinta hover:bg-tinta/5 transition-colors"
+        style="min-height: 52px; padding: 0 1.5rem; border-radius: 12px; border: 2px solid rgba(46,33,22,.35); background: transparent">Entendido</button>
     </div>
   </div>
 </div>
@@ -849,7 +848,6 @@
     const btnMobile = document.getElementById('btn-instalar');
     const btnDesktop = document.getElementById('btn-instalar-desktop');
     const dialogo = document.getElementById('dialogo-instalar');
-    const btnAhora = document.getElementById('btn-instalar-ahora');
     if (!btnMobile || instalada || !(esIOS || esAndroid || esChromiumDesktop)) return;
 
     const pasos = esIOS ? 'pasos-ios' : esAndroid ? 'pasos-android' : 'pasos-desktop';
@@ -862,22 +860,6 @@
       btnMobile.classList.add('flex');
     }
     const btn = esChromiumDesktop ? btnDesktop : btnMobile;
-
-    // Android/Chrome: si ofrece el prompt nativo, "Instalar ahora" lo dispara;
-    // si no, quedan solo los pasos manuales.
-    let promptDiferido = null;
-    window.addEventListener('beforeinstallprompt', (ev) => {
-      ev.preventDefault();
-      promptDiferido = ev;
-      btnAhora.classList.remove('hidden');
-    });
-    btnAhora.addEventListener('click', async () => {
-      if (!promptDiferido) return;
-      promptDiferido.prompt();
-      await promptDiferido.userChoice;
-      promptDiferido = null;
-      cerrar();
-    });
 
     function abrir() {
       dialogo.classList.remove('hidden');
