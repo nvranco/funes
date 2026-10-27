@@ -226,6 +226,50 @@ async def panel_vincular_qr(request: Request, slug: str, token: str):
     )
 
 
+@router.get("/{slug}/panel/{token}/manifest.webmanifest")
+async def panel_manifest(slug: str, token: str):
+    """Manifest de la PWA. Dinamico por libreria: start_url lleva el token, asi
+    el icono del inicio abre directo el panel de ESTE librero."""
+    libreria = await _libreria_por_slug_y_token(slug, token)
+    raiz = f"/{slug}/panel/{token}"
+    manifest = {
+        "name": f"Funes — {libreria['nombre']}",
+        "short_name": "Funes",
+        "lang": "es-AR",
+        "start_url": raiz,
+        "scope": raiz,
+        "display": "standalone",
+        "theme_color": "#7A9E78",
+        "background_color": "#EDE3D0",
+        "icons": [
+            {"src": "/static/funes-pwa-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/static/funes-pwa-512.png", "sizes": "512x512", "type": "image/png"},
+            {"src": "/static/funes-pwa-maskable-512.png", "sizes": "512x512",
+             "type": "image/png", "purpose": "maskable"},
+        ],
+    }
+    return Response(json.dumps(manifest), media_type="application/manifest+json")
+
+
+# Sin cache offline a proposito: el panel depende de la red y de la API. Solo
+# existe porque algunos navegadores piden un service worker con fetch handler
+# para ofrecer la instalacion.
+_SW_JS = "self.addEventListener('fetch', () => {});\n"
+
+
+@router.get("/{slug}/panel/{token}/sw.js")
+async def panel_sw(slug: str, token: str):
+    await _libreria_por_slug_y_token(slug, token)
+    return Response(
+        _SW_JS,
+        media_type="text/javascript",
+        headers={
+            "Service-Worker-Allowed": f"/{slug}/panel/{token}",
+            "Cache-Control": "no-cache",
+        },
+    )
+
+
 @router.get("/{slug}/panel/{token}/guia", response_class=HTMLResponse)
 async def panel_guia(request: Request, slug: str, token: str):
     """P2b — guia de carga en 2 pasos (estante completo / libro particular),
