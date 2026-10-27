@@ -251,10 +251,47 @@ async def panel_manifest(slug: str, token: str):
     return Response(json.dumps(manifest), media_type="application/manifest+json")
 
 
-# Sin cache offline a proposito: el panel depende de la red y de la API. Solo
-# existe porque algunos navegadores piden un service worker con fetch handler
-# para ofrecer la instalacion.
-_SW_JS = "self.addEventListener('fetch', () => {});\n"
+# Cachea solo el "cascaron" (estaticos propios y CDNs de scripts, hojas, fuentes
+# y emoji) con stale-while-revalidate: al abrir la app salen del disco y se
+# refrescan en segundo plano. Las paginas (HTML) y la API NO se tocan: llevan
+# datos del librero y tienen que venir siempre frescos de la red. Subir
+# VERSION_CACHE fuerza a descartar lo guardado.
+_SW_JS = """\
+const VERSION_CACHE = 'funes-cascaron-v1';
+const HOSTS_CDN = [
+  'cdn.tailwindcss.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net',
+  'fonts.googleapis.com', 'fonts.gstatic.com',
+];
+
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (ev) => {
+  ev.waitUntil((async () => {
+    for (const k of await caches.keys()) {
+      if (k !== VERSION_CACHE) await caches.delete(k);
+    }
+    await self.clients.claim();
+  })());
+});
+
+self.addEventListener('fetch', (ev) => {
+  const req = ev.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  const propio = url.origin === self.location.origin && url.pathname.startsWith('/static/');
+  if (!propio && !HOSTS_CDN.includes(url.hostname)) return;
+  ev.respondWith((async () => {
+    const cache = await caches.open(VERSION_CACHE);
+    const guardado = await cache.match(req);
+    const red = fetch(req).then((resp) => {
+      // type 'opaque' (status 0): hoja o script cross-origin sin CORS, igual sirve.
+      if (resp.ok || resp.type === 'opaque') cache.put(req, resp.clone());
+      return resp;
+    }).catch((err) => { if (guardado) return guardado; throw err; });
+    if (guardado) { ev.waitUntil(red); return guardado; }
+    return red;
+  })());
+});
+"""
 
 
 @router.get("/{slug}/panel/{token}/sw.js")
