@@ -1,0 +1,344 @@
+{# Celular de la landing, animado en bucle: la galeria de fotos de la libreria, se seleccionan todas, Funes las
+   procesa en otra pantalla (cuenta libros y autores), se toca "Compartir catalogo" y aparece el catalogo de dos
+   columnas, que se recorre con scroll. Las tres pantallas pasan con un deslizamiento horizontal (entran por la derecha, salen por la izquierda)
+   y despues del catalogo vuelve la galeria, en bucle. Todo se dibuja desde una funcion del tiempo, asi que se puede buscar
+   cualquier instante: el.__catalogo.seek(ms). Con prefers-reduced-motion se muestra el catalogo armado y quieto.
+   Las fotos son ejemplares reales. #}
+{% set libros = [
+  ("rayuela", "Rayuela", "Julio Cortázar"),
+  ("cien-anos", "Cien años de soledad", "Gabriel García Márquez"),
+  ("nombre-rosa", "El nombre de la rosa", "Umberto Eco"),
+  ("naranja", "La naranja mecánica", "Anthony Burgess"),
+  ("obra-poetica", "Obra poética, 3", "Jorge Luis Borges"),
+  ("gatsby", "El gran Gatsby", "Francis Scott Fitzgerald"),
+  ("rebelion", "Rebelión en la granja", "George Orwell"),
+  ("conjura", "La conjura de los necios", "John Kennedy Toole"),
+  ("sangre-fria", "A sangre fría", "Truman Capote"),
+  ("ciudad-cristal", "La ciudad de cristal", "Paul Auster"),
+  ("orgullo", "Orgullo y prejuicio", "Jane Austen"),
+  ("fantastica", "Antología de la literatura fantástica", "Jorge Luis Borges"),
+  ("jekyll", "El extraño caso del Dr. Jekyll", "Robert Louis Stevenson"),
+  ("adios-armas", "Adiós a las armas", "Ernest Hemingway"),
+  ("viaje-centro", "Viaje al centro de la Tierra", "Jules Verne"),
+  ("divina-comedia", "La divina comedia", "Dante Alighieri"),
+  ("mosqueteros", "Los tres mosqueteros", "Alejandro Dumas"),
+  ("todos-fuegos", "Todos los fuegos el fuego", "Julio Cortázar"),
+  ("niebla", "La niebla", "Stephen King"),
+  ("vuelta-tuerca", "Otra vuelta de tuerca", "Henry James"),
+  ("querido-remoto", "Querido y remoto muchacho", "Ernesto Sábato"),
+  ("garp", "El mundo según Garp", "John Irving"),
+  ("it", "It", "Stephen King"),
+  ("dalloway", "La señora Dalloway", "Virginia Woolf"),
+  ("aira", "La guerra de los gimnasios", "César Aira"),
+  ("faulkner", "Mientras agonizo", "William Faulkner"),
+  ("piglia", "La ciudad ausente", "Ricardo Piglia"),
+  ("bulgakov", "La guardia blanca", "Mijaíl Bulgákov"),
+  ("follett", "El invierno del mundo", "Ken Follett"),
+  ("kundera", "El libro de los amores ridículos", "Milan Kundera"),
+  ("lovecraft", "Los mitos de Cthulhu", "H. P. Lovecraft"),
+  ("golem", "El Golem", "Gustav Meyrink"),
+] %}
+{# Los numeros de la pantalla salen de la lista: una foto es un libro, y los autores se cuentan sin repetir. #}
+{% set autores_vistos = [] %}
+{% for k, t, a in libros %}{% if a not in autores_vistos %}{% set _ = autores_vistos.append(a) %}{% endif %}{% endfor %}
+{% set n_libros = libros|length %}
+{% set n_autores = autores_vistos|length %}
+{% set fotos = ["rayuela", "cien-anos", "aira", "nombre-rosa", "naranja", "faulkner", "obra-poetica", "gatsby", "piglia", "rebelion", "conjura", "sangre-fria", "bulgakov", "ciudad-cristal", "orgullo", "follett", "fantastica", "jekyll", "kundera", "adios-armas", "viaje-centro", "divina-comedia", "lovecraft", "mosqueteros", "todos-fuegos", "golem", "niebla", "vuelta-tuerca", "querido-remoto", "garp", "it", "dalloway"] %}
+<style>
+  .lp .cat-anim { position: relative; width: 100%; max-width: 300px; margin: 0 auto; aspect-ratio: 400 / 720; }
+  .lp .cat-anim .lienzo { position: absolute; left: 0; top: 0; width: 400px; height: 720px; transform-origin: 0 0; }
+  .lp .cat-anim .marco { position: absolute; inset: 0; border-radius: 46px; background: linear-gradient(135deg, #4A3A2C, #241A11);
+    box-shadow: 0 18px 30px -12px rgba(46,33,22,.38); }
+  .lp .cat-anim .pantalla { position: absolute; left: 12px; top: 12px; width: 376px; height: 696px; border-radius: 34px;
+    overflow: hidden; background: #FBF7EE; font-family: Inter, Arial, sans-serif; color: #2E2116; }
+  .lp .cat-anim .p-cat { position: absolute; inset: 0; background: #FBF7EE; will-change: transform; }
+  .lp .cat-anim .contenido { will-change: transform; }
+  .lp .cat-anim .galeria, .lp .cat-anim .proceso { will-change: transform; }
+  .lp .cat-anim .cab { height: 171px; padding: 30px 20px 0; border-bottom: 1px solid #9BAD8A; background-color: #EDE3D0;
+    background-image:
+      radial-gradient(circle 260px at 92% 8%, rgba(122,158,120,.26), transparent),
+      radial-gradient(circle 200px at 4% 96%, rgba(122,158,120,.15), transparent),
+      radial-gradient(circle 170px at 56% 112%, rgba(122,158,120,.12), transparent); }
+  .lp .cat-anim .cab h4 { font-family: "Inter Tight", Inter, Arial, sans-serif; font-size: 28px; line-height: 32px; font-weight: 700; letter-spacing: -.5px; margin: 0; }
+  .lp .cat-anim .cab p { margin: 8px 0 0; font-size: 13px; line-height: 17px; color: #5F5545; }
+  .lp .cat-anim .chips { display: flex; gap: 8px; margin: 15px -20px 0; padding: 0 20px; white-space: nowrap; }
+  .lp .cat-anim .chip { flex: none; height: 40px; padding: 0 16px; border-radius: 12px; display: inline-flex; align-items: center;
+    font-size: 13.5px; font-weight: 500; border: 1px solid rgba(46,33,22,.2); background: rgba(255,255,255,.4); box-sizing: border-box; }
+  .lp .cat-anim .chip.on { background: #2E2116; border-color: #2E2116; color: #F3ECDC; font-weight: 600; }
+  .lp .cat-anim .barra { position: relative; z-index: 3; padding: 16px 20px 12px; will-change: transform; }
+  .lp .cat-anim .buscador { height: 52px; border-radius: 14px; background: #fff; border: 1px solid #E2DED4; box-sizing: border-box;
+    display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 14.5px; color: #5F5545;
+    box-shadow: 0 1px 3px rgba(46,33,22,.1), 0 5px 12px -6px rgba(46,33,22,.16); }
+  .lp .cat-anim .conteo { padding: 6px 20px 0; font-size: 12.8px; line-height: 18px; color: #5F5545; }
+  .lp .cat-anim .lista { display: flex; gap: 12px; padding: 12px 20px 40px; align-items: flex-start; }
+  .lp .cat-anim .col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  .lp .cat-anim .libro { position: relative; border-radius: 3px; }
+  .lp .cat-anim .libro .fondo { position: absolute; inset: 0; border-radius: 3px; border: 1px solid #D8C9AC; background: rgba(255,255,255,.26);
+    box-shadow: 0 1.5px 4.4px rgba(46,33,22,.16); opacity: 0; }
+  .lp .cat-anim .libro .tapa { position: relative; display: block; width: 100%; height: auto; border-radius: 3px 3px 0 0; opacity: 0; }
+  .lp .cat-anim .libro .cuerpo { position: relative; padding: 11px 11px 12px; opacity: 0; }
+  .lp .cat-anim .libro .titulo { font-family: "Inter Tight", Inter, Arial, sans-serif; font-size: 14.5px; line-height: 17px; font-weight: 600; letter-spacing: -.2px; margin: 0; }
+  .lp .cat-anim .libro .autor { margin: 4px 0 0; font-size: 12px; line-height: 15px; color: #5F5545; }
+  .lp .cat-anim .libro .consultar { margin-top: 12px; height: 43px; border-radius: 10px; border: 1.5px solid #44744F; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; font-weight: 600; color: #44744F; }
+
+  /* Galeria de fotos del celular */
+  .lp .cat-anim .galeria { position: absolute; inset: 0; z-index: 4; }
+  .lp .cat-anim .g-fondo { position: absolute; inset: 0; background: #fff; }
+  .lp .cat-anim .g-cab { position: absolute; left: 0; right: 0; top: 0; z-index: 2; height: 76px; padding: 36px 16px 0; box-sizing: border-box; background: #fff;
+    border-bottom: 1px solid rgba(46,33,22,.16); display: flex; align-items: baseline; justify-content: space-between; }
+  .lp .cat-anim .g-cab b { font-family: "Inter Tight", Inter, Arial, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
+  .lp .cat-anim .g-cab span { font-size: 13px; color: #8A8478; }
+  .lp .cat-anim .g-vista { position: absolute; left: 0; right: 0; top: 76px; bottom: 0; overflow: hidden; }
+  .lp .cat-anim .g-grilla { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: rgba(46,33,22,.16); border-bottom: 1px solid rgba(46,33,22,.16); will-change: transform; }
+  .lp .cat-anim .g-celda { position: relative; aspect-ratio: 1; overflow: hidden; background: #E8E4DB; }
+  .lp .cat-anim .g-celda img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .lp .cat-anim .g-tilde { position: absolute; right: 4px; bottom: 4px; width: 20px; height: 20px; border-radius: 50%; background: #44744F; color: #fff;
+    display: flex; align-items: center; justify-content: center; opacity: 0; box-shadow: 0 0 0 1.5px #fff; }
+
+  /* Pantalla de procesamiento: la misma carga del panel (mensaje, barra con el avance y detalle) */
+  .lp .cat-anim .proceso { position: absolute; inset: 0; z-index: 3; background: #FBF7EE; }
+  .lp .cat-anim .p-tarjeta { position: absolute; left: 30px; right: 30px; top: 262px; }
+  .lp .cat-anim .p-mensaje { position: relative; height: 24px; font-size: 17px; font-weight: 600; letter-spacing: -.1px; }
+  .lp .cat-anim .p-mensaje span { position: absolute; left: 0; right: 0; top: 0; white-space: nowrap; }
+  .lp .cat-anim .p-pista { margin-top: 22px; position: relative; height: 8px; border-radius: 4px; background: #E4D9C2; }
+  .lp .cat-anim .p-relleno { position: absolute; left: 0; top: 0; bottom: 0; width: 4%; border-radius: 4px; background-color: #7A9E78;
+    background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.3) 0 6px, rgba(255,255,255,0) 6px 12px); background-size: 17px 17px; }
+  .lp .cat-anim .p-detalle { margin-top: 22px; font-size: 13px; color: #5F5545; }
+  .lp .cat-anim .p-boton { position: absolute; left: 20px; right: 20px; bottom: 44px; height: 58px; border-radius: 18px; box-sizing: border-box; background: transparent; color: #44744F;
+    border: 1.5px solid #44744F; display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 17px; font-weight: 600;
+    letter-spacing: -.1px; opacity: 0; }
+  .lp .cat-anim .p-boton svg { width: 22px; height: 22px; flex: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .lp .cat-anim .galeria, .lp .cat-anim .proceso { display: none; }
+    .lp .cat-anim .p-cat { transform: none !important; }
+  }
+</style>
+
+<div class="cat-anim" id="cat-anim" role="img"
+     aria-label="Celular que muestra la galería de fotos de una librería: se seleccionan las fotos, Funes cuenta los libros y los autores, y al compartir aparece un catálogo de la categoría Clásicos, con libros en dos columnas y un botón Consultar en cada uno">
+  <div class="lienzo" aria-hidden="true">
+    <div class="marco"></div>
+    <div class="pantalla">
+      <div class="p-cat">
+      <div class="contenido">
+        <div class="cab">
+          <h4>Tu librería</h4>
+          <p>Las imágenes pueden ser ilustrativas;<br>consultá estado y disponibilidad por WhatsApp.</p>
+          <div class="chips"><span class="chip">Todo</span><span class="chip on">Clásicos</span><span class="chip">Filosofía</span><span class="chip">Psicología</span></div>
+        </div>
+        <div class="barra">
+          <div class="buscador">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#5F5545" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+            Buscar por título o autor…
+          </div>
+        </div>
+        <div class="conteo"><span data-rol="conteo">{{ n_libros }} libros · {{ n_autores }} autores</span></div>
+        <div class="lista">
+          <div class="col"></div><div class="col"></div>
+        </div>
+        <template data-rol="libros">
+          {% for k, t, a in libros %}
+          <div class="libro">
+            <span class="fondo"></span>
+            <img class="tapa" src="/static/tapas/{{ k }}.jpg?v=2" width="324" height="454" alt="" decoding="async">
+            <div class="cuerpo">
+              <p class="titulo">{{ t }}</p>
+              <p class="autor">{{ a }}</p>
+              <div class="consultar">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M20.5 3.5A11.8 11.8 0 0 0 12 0C5.4 0 0 5.4 0 12c0 2.1.6 4.2 1.6 6L0 24l6.2-1.6A12 12 0 0 0 12 24c6.6 0 12-5.4 12-12 0-3.2-1.3-6.2-3.5-8.5zM12 22a10 10 0 0 1-5.1-1.4l-.4-.2-3.7 1 1-3.6-.2-.4A10 10 0 1 1 12 22zm5.5-7.5c-.3-.2-1.8-.9-2-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-.3-.2-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.5.3-.5c.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.2.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.3-.7.3-1.3.2-1.4-.1-.1-.3-.2-.6-.3z"/></svg>
+                Consultar
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </template>
+      </div>
+      </div>
+
+      <div class="proceso">
+        <div class="p-tarjeta">
+          <div class="p-mensaje">
+            <span data-rol="msg">Mirando las fotos…</span><span data-rol="msg" style="opacity:0">Leyendo títulos y autores…</span>
+            <span data-rol="msg" style="opacity:0">Corrigiendo mayúsculas y acentos…</span><span data-rol="msg" style="opacity:0">Comparando con tu catálogo…</span>
+            <span data-rol="msg" style="opacity:0">Descartando repetidos…</span><span data-rol="msg" style="opacity:0">Armando la lista para que revises…</span>
+            <span data-rol="msg" style="opacity:0">Catálogo listo</span>
+          </div>
+          <div class="p-pista">
+            <div class="p-relleno" data-rol="relleno"></div>
+          </div>
+          <p class="p-detalle" data-rol="detalle">&nbsp;</p>
+        </div>
+        <div class="p-boton" data-rol="boton">
+          Compartir
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/></svg>
+        </div>
+      </div>
+
+      <div class="galeria">
+        <div class="g-fondo"></div>
+        <div class="g-cab"><b>Recientes</b><span data-rol="g-total">{{ n_libros }} fotos</span></div>
+        <div class="g-vista"><div class="g-grilla">
+          {% for k in fotos %}
+          <div class="g-celda"><img src="/static/tapas/f-{{ k }}.jpg?v=3" width="200" height="200" alt="" decoding="async">
+            <span class="g-tilde"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>
+          {% endfor %}
+        </div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var raiz = document.getElementById('cat-anim');
+  if (!raiz) return;
+  var lienzo = raiz.querySelector('.lienzo'), pagCat = raiz.querySelector('.p-cat'), contenido = raiz.querySelector('.contenido'), barra = raiz.querySelector('.barra');
+  var cols = raiz.querySelectorAll('.col'), conteoEl = raiz.querySelector('[data-rol="conteo"]');
+  var galeria = raiz.querySelector('.galeria'), grilla = raiz.querySelector('.g-grilla'), gTotal = raiz.querySelector('[data-rol="g-total"]');
+  var proceso = raiz.querySelector('.proceso');
+  var msgs = [].slice.call(raiz.querySelectorAll('[data-rol="msg"]')), relleno = raiz.querySelector('[data-rol="relleno"]');
+  var detalle = raiz.querySelector('[data-rol="detalle"]');
+  var boton = raiz.querySelector('[data-rol="boton"]');
+  var celdas = [].slice.call(raiz.querySelectorAll('.g-celda'));
+  var quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Tarjetas del catalogo: cada una va a la columna mas corta, como en la pagina publica.
+  var plantilla = raiz.querySelector('[data-rol="libros"]');
+  var tarjetas = [].slice.call(plantilla.content.querySelectorAll('.libro')).map(function (t) {
+    var c = cols[0].offsetHeight <= cols[1].offsetHeight ? cols[0] : cols[1];
+    c.appendChild(t); return t;
+  });
+  var L = tarjetas.length, N = celdas.length, maxScroll = 0, maxGal = 0, escala = 1;
+  var LIBROS = {{ n_libros }}, AUTORES = {{ n_autores }};
+
+  // Tiempos (ms)
+  var W = 376, T_DESLIZA = 700,             // ancho de la pantalla y duracion del deslizamiento
+      T_TILDE = 2500, T_TILDE_PASO = 42,    // se seleccionan todas; la galeria baja sola para llegar a las ultimas
+      T_GAL = 3300, T_GAL_DUR = 1700,       // scroll de la galeria
+      T_PASA = 5300,                        // galeria -> pantalla de Funes (desliza)
+      T_CUENTA = 6200, T_CUENTA_DUR = 4800, // la barra avanza y rotan los mensajes
+      T_LISTO = 11200,                      // "Catalogo listo"
+      T_BOTON = 11700,                      // aparece Compartir
+      T_TOCA = 12700,                       // se aprieta el boton
+      T_ABRE = 13300,                       // pantalla de Funes -> catalogo (desliza)
+      T_TARJ = 14100, T_TARJ_PASO = 130,    // las tarjetas visibles aparecen
+      T_SCROLL = 16200, T_SCROLL_DUR = 14000,
+      T_VUELVE = 31600,                     // catalogo -> galeria (desliza), y el bucle recomienza
+      T_TOTAL = 33200;
+
+  // Curvas de avance irregulares: tramos de salto separados por pausas. Cada una (barra, libros, autores) tiene el suyo.
+  var C_BARRA = [[0, 0], [.09, .34], [.15, .37], [.23, .56], [.29, .58], [.37, .7], [.41, .71], [.78, .91], [.83, .92], [.9, 1], [1, 1]];
+  var C_LIBROS = [[0, 0], [.11, .22], [.19, .25], [.29, .5], [.35, .52], [.45, .68], [.49, .69], [.8, .9], [.86, .91], [.94, 1], [1, 1]];
+  var C_AUTORES = [[0, 0], [.13, .16], [.22, .18], [.33, .43], [.4, .45], [.5, .66], [.55, .67], [.82, .88], [.88, .9], [.95, 1], [1, 1]];
+  var CORTES = [0, .17, .34, .52, .7, .86];
+  function curva(x, pts) {
+    for (var k = 1; k < pts.length; k++) {
+      if (x <= pts[k][0]) {
+        var a0 = pts[k - 1], b0 = pts[k], q = (x - a0[0]) / (b0[0] - a0[0]);
+        return a0[1] + (b0[1] - a0[1]) * (q * q * (3 - 2 * q));
+      }
+    }
+    return 1;
+  }
+  function cubic(p) { return p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; }
+  function salida(p) { return 1 - Math.pow(1 - p, 3); }
+  // Recorrido del catalogo: arranca suave, va rapido en el medio y frena de a poco hasta el final (velocidad trapezoidal)
+  function recorrido(p) {
+    var a = .1, d = .4, v = 1 / (1 - a / 2 - d / 2);
+    if (p <= 0) return 0;
+    if (p >= 1) return 1;
+    if (p < a) return v * p * p / (2 * a);
+    if (p < 1 - d) return v * (a / 2 + (p - a));
+    var q = 1 - p;
+    return 1 - v * q * q / (2 * d);
+  }
+  function suave(p) { return .5 - Math.cos(Math.PI * p) / 2; }
+  function cl(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+
+  function medir() {
+    escala = raiz.clientWidth / 400;
+    lienzo.style.transform = 'scale(' + escala + ')';
+    contenido.style.transform = 'none'; barra.style.transform = 'none';
+    maxScroll = Math.max(0, contenido.offsetHeight - 696);
+    medir.barraTop = barra.offsetTop;
+    maxGal = Math.max(0, grilla.offsetHeight - (696 - 76));
+  }
+
+  function dibuja(t) {
+    t = ((t % T_TOTAL) + T_TOTAL) % T_TOTAL;
+
+    // Desliza: cada pantalla sale por la izquierda y la siguiente entra por la derecha
+    var d1 = cubic(cl((t - T_PASA) / T_DESLIZA)), d2 = cubic(cl((t - T_ABRE) / T_DESLIZA)), d3 = cubic(cl((t - T_VUELVE) / T_DESLIZA));
+    galeria.style.transform = 'translateX(' + (t < T_VUELVE ? -W * d1 : W - W * d3).toFixed(1) + 'px)';
+    proceso.style.transform = 'translateX(' + (t < T_ABRE ? W - W * d1 : -W * d2).toFixed(1) + 'px)';
+    pagCat.style.transform = 'translateX(' + (t < T_VUELVE ? W - W * d2 : -W * d3).toFixed(1) + 'px)';
+
+    // 1 y 2. Galeria: se seleccionan todas las fotos y baja hasta las ultimas (al volver, queda sin seleccionar)
+    var tg = t < T_VUELVE ? t : 0;
+    var todas = tg > T_TILDE + (N - 1) * T_TILDE_PASO + 200;
+    grilla.style.transform = 'translateY(' + (-maxGal * suave(cl((tg - T_GAL) / T_GAL_DUR))).toFixed(1) + 'px)';
+    gTotal.textContent = todas ? LIBROS + ' seleccionadas' : LIBROS + ' fotos';
+    for (var i = 0; i < N; i++) {
+      var tk = celdas[i].querySelector('.g-tilde'), q0 = cl((tg - (T_TILDE + i * T_TILDE_PASO)) / 260);
+      tk.style.opacity = q0; tk.style.transform = 'scale(' + (.4 + .6 * q0).toFixed(3) + ')';
+    }
+
+    // 3. Pantalla de Funes: la barra avanza a tirones (con pausas), el conteo sube con otro ritmo, y los mensajes del panel rotan
+    var fr = cl((t - T_CUENTA) / T_CUENTA_DUR);
+    var pct = 4 + 96 * curva(fr, C_BARRA);
+    relleno.style.width = pct.toFixed(2) + '%';
+    relleno.style.backgroundPosition = (t * .035).toFixed(1) + 'px 0';
+    var ok = cl((t - T_LISTO) / 300), av = (pct - 4) / 96, paso = 0;
+    for (var u = 1; u < CORTES.length; u++) if (av >= CORTES[u]) paso = u;
+    for (var m = 0; m < 6; m++) {
+      var ent = m === 0 ? 1 : cl((av - CORTES[m]) / .03), sal = m === 5 ? 1 : 1 - cl((av - CORTES[m + 1] + .03) / .03);
+      msgs[m].style.opacity = t >= T_LISTO ? 0 : Math.min(ent, sal);
+    }
+    msgs[6].style.opacity = ok;
+    detalle.innerHTML = t < T_CUENTA ? '&nbsp;' : Math.round(LIBROS * curva(fr, C_LIBROS)) + ' libros · ' + Math.round(AUTORES * curva(fr, C_AUTORES)) + ' autores';
+
+    // 4. Compartir: aparece y se aprieta (se hunde y cambia de color)
+    var bo = salida(cl((t - T_BOTON) / 400));
+    var toque = cl((t - T_TOCA) / 130) * (1 - cl((t - (T_TOCA + 130)) / 260));   // 0 -> 1 -> 0
+    boton.style.opacity = bo;
+    boton.style.transform = 'translateY(' + ((1 - bo) * 14 + 4 * toque).toFixed(1) + 'px)';
+
+    // 5. Catalogo: aparecen las tarjetas visibles y se recorre con scroll
+    for (var j = 0; j < L; j++) {
+      var q = t < T_TARJ ? 0 : cl((t - (T_TARJ + j * T_TARJ_PASO)) / 420);
+      if (j > 5 && t >= T_TARJ) q = 1;
+      var cd = tarjetas[j];
+      cd.querySelector('.tapa').style.opacity = q; cd.querySelector('.fondo').style.opacity = q; cd.querySelector('.cuerpo').style.opacity = q;
+      cd.style.transform = q < 1 ? 'translateY(' + ((1 - q) * 10).toFixed(1) + 'px)' : 'none';
+    }
+    var sy = maxScroll * recorrido(cl((t - T_SCROLL) / T_SCROLL_DUR));
+    contenido.style.transform = 'translateY(' + (-sy).toFixed(1) + 'px)';
+    barra.style.transform = 'translateY(' + Math.max(0, sy - medir.barraTop).toFixed(1) + 'px)';
+  }
+
+  function estatico() {
+    tarjetas.forEach(function (c) {
+      c.querySelector('.tapa').style.opacity = 1; c.querySelector('.fondo').style.opacity = 1; c.querySelector('.cuerpo').style.opacity = 1;
+    });
+  }
+
+  var inicio = null, corre = false, visible = false, raf = 0;
+  function cuadro(ahora) {
+    if (inicio === null) inicio = ahora;
+    dibuja(ahora - inicio);
+    raf = requestAnimationFrame(cuadro);
+  }
+  function arranca() { if (corre || quieto || !visible || document.hidden) return; corre = true; inicio = null; raf = requestAnimationFrame(cuadro); }
+  function frena() { corre = false; cancelAnimationFrame(raf); }
+
+  medir(); if (quieto) estatico(); else dibuja(0);
+  window.addEventListener('load', function () { medir(); if (quieto) estatico(); });
+  window.addEventListener('resize', function () { medir(); if (quieto) estatico(); });
+  document.addEventListener('visibilitychange', function () { document.hidden ? frena() : arranca(); });
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (es) { visible = es[0].isIntersecting; visible ? arranca() : frena(); }, {threshold: .1}).observe(raiz);
+  } else { visible = true; arranca(); }
+  raiz.__catalogo = {seek: function (ms) { frena(); medir(); dibuja(ms); }, total: T_TOTAL};
+})();
+</script>
