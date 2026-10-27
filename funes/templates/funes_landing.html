@@ -99,48 +99,76 @@
   .lp .burbuja-funes { background: rgb(var(--papel)); border: 1px solid rgb(var(--borde)); border-radius: 14px 14px 14px 4px; }
   .lp .burbuja-lector { background: rgb(var(--celeste-claro)); border-radius: 14px 14px 4px 14px; }
 
-  /* Celular del recomendador: mismas proporciones que el de catalogos (400x720). Todo se mide en
-     cqw para que la conversacion escale con el ancho del celular. */
-  .lp .cel-caja { container-type: inline-size; }
+  /* Celular del recomendador: replica de /funes en produccion (funes_chat.html). Mide en --u, que es
+     1px de un celular de 360px de ancho, asi que cada medida de aca es la de la pagina real y todo
+     escala con el ancho del celular. */
+  .lp .cel-caja { container-type: inline-size; --u: .261cqw; }
   .lp .cel { aspect-ratio: 400 / 720; padding: 3cqw; border-radius: 11.5cqw; background: linear-gradient(135deg, #4A3A2C, #241A11);
     filter: drop-shadow(0 18px 22px rgba(46,33,22,.24)); }
-  .lp .cel-pantalla { height: 100%; border-radius: 8.5cqw; overflow: hidden; background: rgb(var(--fondo)); display: flex; flex-direction: column; }
-  .lp .cel-top { flex: none; display: flex; align-items: center; justify-content: center; gap: 2cqw; padding: 5.5cqw 0 4.5cqw;
-    background: rgb(var(--celeste)); border-bottom: .6cqw solid rgb(var(--tinta)); }
-  .lp .cel-top span { font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 6.4cqw; line-height: 1; color: rgb(var(--tinta)); }
-  .lp .cel-top svg { width: 6.4cqw; height: 6.4cqw; color: rgb(var(--tinta)); }
-  .lp .cel-chat { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 2.4cqw;
-    padding: 3.5cqw 3.5cqw 2.5cqw; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7cqw); mask-image: linear-gradient(to bottom, transparent 0, #000 7cqw); }
-  .lp .cel .m { font-size: 4.1cqw; line-height: 1.38; padding: 2.5cqw 3.2cqw; max-width: 86%; flex: none; }
-  .lp .cel .m.f { align-self: flex-start; background: rgb(var(--papel)); border: 1px solid rgb(var(--borde)); border-radius: 3.6cqw 3.6cqw 3.6cqw 1cqw; }
-  .lp .cel .m.l { align-self: flex-end; background: rgb(var(--celeste-claro)); border: 1px solid rgb(var(--celeste)); border-radius: 3.6cqw 3.6cqw 1cqw 3.6cqw; }
-  .lp .cel .m.pensando { display: flex; gap: 1.2cqw; padding: 3.2cqw 3.6cqw; }
-  .lp .cel .m.pensando i { width: 1.8cqw; height: 1.8cqw; border-radius: 50%; background: rgb(var(--gris-lp)); opacity: .4; }
-  .lp .cel .zona { flex: none; display: flex; flex-direction: column; gap: 2cqw; padding: 0 3.5cqw 4cqw; }
-  .lp .cel .zona .fila { display: flex; gap: 2cqw; }
-  .lp .cel .zona .caja { flex: 1; font-size: 3.9cqw; line-height: 1.35; min-height: 12.5cqw; padding: 2.2cqw 3cqw; border-radius: 3cqw;
-    background: rgb(var(--papel)); border: 1.5px solid rgb(var(--borde)); color: rgb(var(--tinta)); }
-  .lp .cel .zona .caja:empty::before { content: attr(data-ph); color: rgb(var(--gris-lp)); opacity: .7; }
-  .lp .cel .zona .bot { font-size: 3.9cqw; font-weight: 600; text-align: center; padding: 2.6cqw 3cqw; border-radius: 3cqw; border: 1.5px solid rgb(var(--celeste));
-    background: rgb(var(--celeste-claro)); color: rgb(var(--tinta)); transition: background-color .2s ease, transform .2s ease, color .2s ease; }
-  .lp .cel .zona .envia { flex: none; align-self: stretch; display: flex; align-items: center; padding: 0 4cqw; }
-  .lp .cel .zona .votos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2cqw; }
-  .lp .cel .zona .votos .bot { padding: 2.6cqw 0; }
-  .lp .cel .zona .v-floja { background: #F4DEDA; border-color: #B8453A; }
-  .lp .cel .zona .v-dudosa { background: #F6E6C8; border-color: #C98A1E; }
-  .lp .cel .zona .v-precisa { background: #DCE9D6; border-color: rgb(var(--celeste)); }
-  .lp .cel .zona .bot.sel { background: rgb(var(--verde-texto)); border-color: rgb(var(--verde-texto)); color: rgb(var(--crema)); transform: scale(.97); }
-  .lp .cel .zona .caret::after { content: ""; display: inline-block; width: .35cqw; height: 4cqw; margin-left: .3cqw; vertical-align: -.7cqw; background: rgb(var(--tinta)); }
+  .lp .cel-pantalla { height: 100%; border-radius: 8.5cqw; overflow: hidden; background: rgb(var(--fondo)); display: flex; flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: calc(16 * var(--u)); line-height: 1.5; font-weight: 400; text-align: left; color: rgb(var(--texto-papel)); }
+  .lp .cel-top { flex: none; display: flex; align-items: center; justify-content: center; gap: calc(8 * var(--u)); padding: calc(16 * var(--u)) calc(20 * var(--u)); background: rgb(var(--celeste)); }
+  .lp .cel-top span { font-family: var(--font-display); font-weight: 700; font-size: calc(24 * var(--u)); line-height: 1.25; color: rgb(var(--tinta)); }
+  .lp .cel-top svg { width: calc(24 * var(--u)); height: calc(24 * var(--u)); flex: none; color: rgb(var(--tinta)); }
+  .lp .cel-top .anillo { transform-box: view-box; transform-origin: 16px 16px; transition: transform 700ms ease-out; }
+  .lp .cel-riel { flex: none; padding: calc(12 * var(--u)) calc(16 * var(--u)); background: rgb(var(--fondo)); position: relative; z-index: 2; }
+  .lp .cel-pista { height: calc(12 * var(--u)); border-radius: 999px; overflow: hidden; background: rgb(var(--borde)); }
+  .lp .cel-barra { height: 100%; border-radius: 999px; background: rgb(var(--celeste)); transition: width .7s ease-out; }
+  /* Sin JS (o con menos movimiento) la charla queda en su ultimo estado, pegada abajo. Con JS el
+     script la mueve con translateY, como el scroll de la pagina real. */
+  .lp .cel-chat { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+  .lp .cel-chat.vivo { display: block; }
+  .lp .cel-hoja { position: relative; padding: calc(24 * var(--u)) calc(16 * var(--u)) calc(24 * var(--u)); transition: transform .45s ease; }
+  .lp .cel-chat:not(.vivo) .cel-hoja { flex: none; }
+  .lp .cel-hilo { display: flex; flex-direction: column; gap: calc(12 * var(--u)); }
+  .lp .cel .m { flex: none; padding: calc(12 * var(--u)) calc(16 * var(--u)); border: calc(2 * var(--u)) solid; border-radius: calc(12 * var(--u)); }
+  .lp .cel .m.f { align-self: flex-start; max-width: 90%; background: rgb(var(--papel)); border-color: rgb(var(--borde)); }
+  .lp .cel .m.l { align-self: flex-end; max-width: 85%; background: rgb(var(--celeste-claro)); border-color: rgb(var(--celeste)); }
+  .lp .cel .m.t { align-self: flex-start; padding: calc(4 * var(--u)); background: rgb(var(--papel)); border-color: rgb(var(--borde)); }
+  .lp .cel .m.t img { display: block; width: calc(192 * var(--u)); max-width: 100%; height: auto; border-radius: calc(8 * var(--u)); }
+  .lp .cel .m b { font-weight: 600; }
+  .lp .cel .m u { text-decoration: underline; }
+  .lp .cel .pens { align-self: flex-start; display: inline-flex; align-items: center; gap: calc(8 * var(--u)); color: rgb(var(--gris)); }
+  .lp .cel .pens svg { width: calc(20 * var(--u)); height: calc(20 * var(--u)); flex: none; }
+  .lp .cel .pens .arco { transform-box: view-box; transform-origin: 16px 16px; }
+  .lp .cel .pens .punto { opacity: 0; }
+  .lp .cel-zona { margin-top: calc(16 * var(--u)); }
+  .lp .cel .opts { display: flex; flex-direction: column; gap: calc(8 * var(--u)); }
+  .lp .cel .op { min-height: calc(48 * var(--u)); display: flex; align-items: center; padding: calc(12 * var(--u)) calc(16 * var(--u)); border: calc(2 * var(--u)) solid rgb(var(--celeste));
+    border-radius: calc(12 * var(--u)); background: rgb(var(--celeste-claro)); transition: transform .2s ease, background-color .2s ease; }
+  .lp .cel .form { display: flex; gap: calc(8 * var(--u)); align-items: flex-end; }
+  .lp .cel .caja { flex: 1; min-width: 0; min-height: calc(52 * var(--u)); padding: calc(12 * var(--u)); border: calc(2 * var(--u)) solid rgba(46,33,22,.3); border-radius: calc(12 * var(--u));
+    background: rgb(var(--papel)); color: rgb(var(--texto-papel)); }
+  .lp .cel .caja:empty::before { content: attr(data-ph); color: #757575; }
+  .lp .cel .caret::after { content: ""; display: inline-block; width: .35cqw; height: calc(18 * var(--u)); margin-left: .3cqw; vertical-align: -.5cqw; background: rgb(var(--tinta)); }
+  .lp .cel .env { min-height: calc(52 * var(--u)); display: flex; align-items: center; padding: calc(12 * var(--u)) calc(16 * var(--u)); font-weight: 600; border: calc(2 * var(--u)) solid rgb(var(--celeste));
+    border-radius: calc(12 * var(--u)); background: rgb(224 232 220); color: rgb(58 92 56); transition: transform .2s ease; }
+  .lp .cel .votos { display: flex; gap: calc(8 * var(--u)); }
+  .lp .cel .vt { flex: 1; min-height: calc(48 * var(--u)); display: flex; align-items: center; justify-content: center; padding: calc(12 * var(--u)) calc(8 * var(--u)); text-align: center;
+    font-size: calc(14 * var(--u)); line-height: 1.43; border: calc(2 * var(--u)) solid; border-radius: calc(12 * var(--u)); transition: transform .2s ease; }
+  .lp .cel .v-verde { background: rgb(var(--celeste-claro)); border-color: rgb(var(--celeste)); }
+  .lp .cel .v-ambar { background: rgb(242 231 203); border-color: rgb(var(--ambar)); }
+  .lp .cel .v-rojo { background: rgb(240 218 213); border-color: rgb(var(--terracota)); }
+  .lp .cel .toca { transform: scale(.96); }
+  .lp .cel-chat.sale { transition: opacity .5s ease; opacity: 0; }
   @media (prefers-reduced-motion: no-preference) {
-    .lp .cel .m.entra { animation: m-entra .35s ease both; }
-    .lp .cel .m.pensando i { animation: m-punto 1s ease-in-out infinite; }
-    .lp .cel .m.pensando i:nth-child(2) { animation-delay: .15s; }
-    .lp .cel .m.pensando i:nth-child(3) { animation-delay: .3s; }
-    .lp .cel .zona .caret::after { animation: m-caret 1s steps(1) infinite; }
-    .lp .cel-chat.sale { transition: opacity .5s ease; opacity: 0; }
+    .lp .cel .entra { animation: m-entra .3s ease-out; }
+    .lp .cel .aparece-op { opacity: 0; transform: translateY(6px); animation: m-op .5s ease-out forwards; }
+    .lp .cel .pens .arco { animation: m-arco 1.5s ease-in-out infinite alternate; }
+    .lp .cel .pens .arco-2 { animation-delay: -.4s; animation-direction: alternate-reverse; }
+    .lp .cel .pens .arco-3 { animation-delay: -.8s; }
+    .lp .cel .pens .punto { animation: m-punto 1.4s steps(1, end) infinite; }
+    .lp .cel .pens .punto + .punto { animation-delay: .2s; }
+    .lp .cel .pens .punto + .punto + .punto { animation-delay: .4s; }
+    .lp .cel .pens .verbo { display: inline-block; animation: m-verbo .4s ease-out; }
+    .lp .cel .caret::after { animation: m-caret 1s steps(1) infinite; }
   }
-  @keyframes m-entra { from { opacity: 0; transform: translateY(1.6cqw); } to { opacity: 1; transform: none; } }
-  @keyframes m-punto { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+  @keyframes m-entra { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes m-op { to { opacity: 1; transform: none; } }
+  @keyframes m-arco { from { transform: rotate(-60deg); } to { transform: rotate(60deg); } }
+  @keyframes m-punto { 0%, 15% { opacity: 0; } 30%, 80% { opacity: 1; } 95%, 100% { opacity: 0; } }
+  @keyframes m-verbo { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
   @keyframes m-caret { 50% { opacity: 0; } }
 
   /* Enlaces del hero a sus secciones: scroll suave, con margen para el banner fijo. */
@@ -215,15 +243,6 @@
             o un <a href="#recomendador" class="enlace-seccion">recomendador conversacional</a>, únicamente sacando fotos a tus libros o estanterías.
           </p>
           <div class="flex flex-col sm:flex-row gap-3 mt-8">
-            <a href="/funes/{{ slug_demo }}?src=landing" data-evento="demo" data-origen="hero" class="boton boton-principal">
-              Conversar con Funes
-              <svg viewBox="0 0 32 32" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-                <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
-                <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
-                <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
-                <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
-              </svg>
-            </a>
             <a href="{{ wa('Hola, tengo una librería y quiero saber más de Funes.') }}" target="_blank" rel="noopener"
                id="wa-hero" data-evento="whatsapp" data-origen="hero" class="boton boton-lava">
               Consultar por WhatsApp
@@ -265,7 +284,7 @@
     </section>
 
     {# 4. Recomendador -------------------------------------------------------- #}
-    <section class="seccion" id="recomendador">
+    <section class="seccion" id="recomendador" style="background: #F6F0E2;">
       <div class="contenedor grid md:grid-cols-2 gap-12 items-center">
         {# Conversacion de ejemplo en un celular del mismo tamano que el de catalogos. El marcado es el
            estado final (lo que ve quien no corre JS o pide menos movimiento); el script lo vacia y lo
@@ -274,29 +293,46 @@
         <div class="order-2 md:order-1 mx-auto w-full" style="max-width: 300px;">
           <div class="cel-caja">
             <div class="cel" id="cel-demo" role="img"
-                 aria-label="Conversación de ejemplo: Funes pregunta por una referencia, el lector nombra a Sherlock Holmes, y Funes le recomienda Los crímenes de Oxford, de Guillermo Martínez.">
+                 aria-label="Conversación de ejemplo: Funes pregunta por una referencia, el lector nombra a Sherlock Holmes, Funes le recomienda El nombre de la rosa, de Umberto Eco, el lector lo marca como dudoso y explica por qué, y Funes le recomienda Ciudad de cristal, de Paul Auster, que el lector marca como precisa.">
               <div class="cel-pantalla" aria-hidden="true">
                 <div class="cel-top"><span>Funes</span>
                   <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
-                    <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
-                    <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
-                    <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
+                    <g class="anillo"><circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/></g>
+                    <g class="anillo"><circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/></g>
+                    <g class="anillo"><circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/></g>
                     <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
                   </svg></div>
+                <div class="cel-riel"><div class="cel-pista"><div class="cel-barra" id="cel-barra" style="width: 100%"></div></div></div>
                 <div class="cel-chat" id="cel-chat">
-                  <div class="m f">¿Tenés algún libro o autor que se parezca a lo que buscás hoy?</div>
-                  <div class="m l" data-escribe="Sherlock Holmes, de Conan Doyle">Sherlock Holmes, de Conan Doyle</div>
-                  <div class="m f">¿Qué nivel de desafío y longitud sentís que buscás en este momento?</div>
-                  <div class="m l" data-opcion="0">Algo corto y conciso, directo al punto</div>
-                  <div class="m f">¿Y qué hay en esa elección que te gustaría repetir en tu próxima lectura?</div>
-                  <div class="m l" data-escribe="Me gustó mucho que el misterio se resuelva razonando.">Me gustó mucho que el misterio se resuelva razonando.</div>
-                  <div class="m f" data-espera="1900">Entonces, te recomiendo <strong>Los crímenes de Oxford</strong>, de Guillermo Martínez.</div>
-                  <div class="m f">En Oxford, un joven estudiante argentino investiga una serie de muertes que siguen un patrón lógico.</div>
-                  <div class="m f">Es breve y se resuelve razonando, igual que en Sherlock Holmes.</div>
-                  <div class="m f">¿Qué te parece esta recomendación?</div>
-                </div>
-                <div class="zona" id="cel-zona">
-                  <div class="votos"><span class="bot v-floja">Floja 👎</span><span class="bot v-dudosa">Dudosa 🤏</span><span class="bot v-precisa sel">Precisa 👍</span></div>
+                  <div class="cel-hoja" id="cel-hoja">
+                    <div class="cel-hilo" id="cel-hilo">
+                      <div class="m f">¿Tenés algún libro o autor que se parezca a lo que buscás hoy?</div>
+                      <div class="m l" data-escribe="1">Sherlock Holmes, de Conan Doyle</div>
+                      <div class="m f">¿Qué nivel de desafío y longitud sentís que buscás en este momento?</div>
+                      <div class="m l" data-opcion="2">Algo largo y profundo, inmersión total</div>
+                      <div class="m f">¿Y qué hay en esa elección que te gustaría repetir en tu próxima lectura?</div>
+                      <div class="m l" data-escribe="1">Me encanta cuando el detective deduce toda una historia a partir de un detalle mínimo, como un reloj o una huella.</div>
+                      <div class="m f">Entonces, te recomiendo <u>El nombre de la rosa</u>, de <u>Umberto Eco</u>.</div>
+                      <div class="m t" data-tapa="1"><img src="/static/tapas/nombre-rosa.jpg?v=6" width="324" height="454" alt="" decoding="async"></div>
+                      <div class="m f">En una abadía medieval, un fraile franciscano investiga una serie de muertes con la lógica de un detective.</div>
+                      <div class="m f">Es largo y el protagonista deduce quién es cada persona mirando detalles mínimos, igual que Sherlock Holmes.</div>
+                      <div class="m f" data-voto="Dudosa">¿Qué te parece esta recomendación?</div>
+                      <div class="m l">Dudosa 🤏</div>
+                      <div class="m f">Entiendo, busquemos otro libro entonces.</div>
+                      <div class="m f">¿Qué estabas esperando en mi recomendación? ¿Qué creés que le faltó o podemos ajustar?</div>
+                      <div class="m l" data-escribe="1" data-sin-barra="1" data-ph="Lo que no te cerró...">Quería algo más actual, que pase en una ciudad de hoy.</div>
+                      <div class="m f">Entonces, te recomiendo <u>Ciudad de cristal</u>, de <u>Paul Auster</u>.</div>
+                      <div class="m t" data-tapa="1"><img src="/static/tapas/ciudad-cristal.jpg?v=3" width="324" height="454" alt="" decoding="async"></div>
+                      <div class="m f">En Nueva York, un escritor de novelas policiales recibe una llamada equivocada y termina investigando como detective.</div>
+                      <div class="m f">Tiene intriga y un detective que lee cada detalle como una pista, igual que Sherlock Holmes, pero en la ciudad de hoy.</div>
+                      <div class="m f" data-voto="Precisa">¿Qué te parece esta recomendación?</div>
+                      <div class="m l">Precisa 👍</div>
+                      <div class="m f">¡Buenísimo!</div>
+                      <div class="m f">Es de esos libros que se leen de un tirón. Ojalá te guste.</div>
+                    </div>
+                    <div class="cel-zona" id="cel-zona">
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -306,8 +342,8 @@
         <div class="order-1 md:order-2">
           <h2 class="text-3xl md:text-4xl leading-tight">Un recomendador que conoce tu stock.</h2>
           <p class="mt-4 leading-relaxed" style="color: rgb(var(--gris-lp))">
-            Funes es el personaje del cuento de Borges, el que no podía olvidar nada. Acá abstrae,
-            compara y recomienda un libro de tu catálogo.
+            Funes es el personaje del cuento de Borges que no podía olvidar nada. Acá recuerda cada libro
+            de tu stock, orienta a tus clientes con una charla corta y te pasa consultas calificadas: personas que ya saben qué título quieren.
           </p>
           <ol class="mt-8 space-y-5">
             <li class="flex gap-4"><span class="numero"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg></span>
@@ -347,27 +383,29 @@
     </section>
 
     {# 11. Cierre ---------------------------------------------------------------- #}
-    <section class="seccion" id="contacto" style="background: rgb(var(--celeste)); color: rgb(var(--tinta));">
-      <div class="contenedor text-center" style="max-width: 44rem;">
+    <section id="contacto" style="background: rgb(var(--celeste)); color: rgb(var(--tinta));">
+      <div class="contenedor seccion">
+        <div class="max-w-3xl mx-auto text-center">
         <h2 class="text-3xl md:text-5xl leading-tight">Hablemos de tu librería.</h2>
-        <p class="mt-4 text-lg">Contanos qué vendés y te mostramos cómo quedaría tu catálogo.</p>
+        <p class="text-[1.2rem] md:text-[1.4rem] mt-5 leading-relaxed">Contanos qué vendés y te mostramos cómo quedaría tu catálogo.</p>
         <div class="flex justify-center mt-8">
           <a href="{{ wa('Hola, tengo una librería y quiero saber más de Funes.') }}" target="_blank" rel="noopener"
-             data-evento="whatsapp" data-origen="cierre" class="boton boton-principal">
+             data-evento="whatsapp" data-origen="cierre" class="boton boton-secundario" style="border-color: rgb(var(--tinta))">
             Consultar por WhatsApp
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
           <path d="M20.5 3.5A11.8 11.8 0 0 0 12 0C5.4 0 0 5.4 0 12c0 2.1.6 4.200 1.600 6L0 24l6.200-1.600A12 12 0 0 0 12 24c6.600 0 12-5.400 12-12 0-3.200-1.300-6.200-3.500-8.500zM12 22a10 10 0 0 1-5.100-1.400l-.4-.2-3.700 1 1-3.600-.2-.4A10 10 0 1 1 12 22zm5.500-7.500c-.3-.2-1.800-.9-2-1-.3-.1-.5-.2-.7.200-.2.300-.8 1-1 1.200-.2.200-.4.200-.7.100-.3-.2-1.300-.5-2.400-1.500-.9-.8-1.500-1.800-1.700-2.100-.2-.3 0-.5.100-.6l.5-.5.300-.5c.1-.2 0-.4 0-.5l-.9-2.200c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.100-.8.400-.3.300-1 1-1 2.500s1.100 2.900 1.200 3.100c.2.200 2.100 3.200 5.100 4.500.7.300 1.300.5 1.700.6.700.2 1.400.2 1.900.1.600-.1 1.800-.7 2-1.400.3-.7.300-1.300.2-1.400-.1-.1-.3-.2-.6-.3z"/>
         </svg>
           </a>
         </div>
+        </div>
       </div>
     </section>
 
   </main>
 
-  <footer style="background: rgb(var(--tinta)); color: rgb(var(--crema)); border-top: 8px solid #86AB55;">
+  <footer style="background: #17110B; color: rgb(var(--crema));">
     <div class="contenedor" style="padding-top:2.25rem; padding-bottom:2rem">
-      <div class="flex items-center justify-between gap-4">
+      <div class="flex flex-wrap md:flex-nowrap items-center justify-between gap-x-4 gap-y-8">
         <a href="https://www.linkedin.com/in/nvrancovich/" target="_blank" rel="noopener noreferrer"
            class="flex items-center gap-3" style="transition: opacity .15s" onmouseover="this.style.opacity=.8" onmouseout="this.style.opacity=1">
           <img src="/static/nvranco.jpg" alt="Nicolás Vrancovich" width="44" height="44"
@@ -380,6 +418,10 @@
             </p>
           </div>
         </a>
+        <div class="order-last md:order-none w-full md:w-auto flex flex-wrap items-center justify-center gap-x-1 gap-y-2 text-center text-xs" style="color: rgb(var(--crema)/.65)">
+          <p>Funes 2026. Herramientas para fomentar la lectura.</p>
+          <p><a href="/funes/privacidad" class="underline">Política de privacidad</a></p>
+        </div>
         <a href="/" class="flex items-center gap-2" aria-label="Funes">
           <span class="serif logo-funes text-xl" style="line-height:1">Funes</span>
           <svg viewBox="0 0 32 32" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
@@ -389,10 +431,6 @@
             <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
           </svg>
         </a>
-      </div>
-      <div class="text-center text-xs mt-8" style="color: rgb(var(--crema)/.65)">
-        <p>Funes 2026. Herramientas para fomentar la lectura.</p>
-        <p class="mt-3"><a href="/funes/privacidad" class="underline">Política de privacidad</a></p>
       </div>
     </div>
   </footer>
@@ -415,71 +453,162 @@
       }, { rootMargin: "-76px 0px 0px 0px" }).observe(waHero);
     } else if (waBarra) { waBarra.classList.add("visible"); }
 
-    // Conversacion de ejemplo: arranca al entrar en pantalla, se reinicia al salir y vuelve a empezar al terminar.
-    var cel = document.getElementById("cel-demo"), chat = document.getElementById("cel-chat"), zona = document.getElementById("cel-zona");
+        // Conversacion de ejemplo: replica de Funes en produccion. Arranca al entrar en pantalla, se reinicia al salir y vuelve a empezar al terminar.
+    var cel = document.getElementById("cel-demo"), chat = document.getElementById("cel-chat"), hoja = document.getElementById("cel-hoja");
+    var hilo = document.getElementById("cel-hilo"), zona = document.getElementById("cel-zona"), barra = document.getElementById("cel-barra");
     var reducido = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (cel && chat && zona && "IntersectionObserver" in window && !reducido) {
-      var mensajes = Array.prototype.slice.call(chat.children);
-      var zonaFinal = zona.innerHTML;
-      var corrida = 0, visible = false;
+    if (cel && chat && hoja && hilo && zona && barra && "IntersectionObserver" in window && !reducido) {
+      var mensajes = Array.prototype.slice.call(hilo.children);
+      var htmls = mensajes.map(function (m) { return m.innerHTML; });
+      var VOTOS = '<div class="votos"><span class="vt v-rojo">Floja 👎</span><span class="vt v-ambar">Dudosa 🤏</span><span class="vt v-verde">Precisa 👍</span></div>';
+      var CLASE_VOTO = { Floja: ".v-rojo", Dudosa: ".v-ambar", Precisa: ".v-verde" };
+      var anillos = Array.prototype.slice.call(cel.querySelectorAll(".anillo"));
       var OPCIONES = ["Algo corto y conciso, directo al punto", "Algo intermedio, un desarrollo moderado", "Algo largo y profundo, inmersión total"];
+      var VERBOS = ["Bifurcando", "Podando", "Enhebrando", "Cotejando", "Convergiendo", "Desandando"];
+      var PASOS = 4, corrida = 0, visible = false, desplazado = 0, contestadas = 0, giros = [0, 0, 0], proximoAnillo = 0, bolsa = [];
+      chat.classList.add("vivo");
       function pausa(ms, id) { return new Promise(function (ok) { setTimeout(function () { ok(id === corrida); }, ms); }); }
       function el(tag, clase, texto) { var e = document.createElement(tag); if (clase) e.className = clase; if (texto) e.textContent = texto; return e; }
-      function vaciarZona() { zona.innerHTML = ""; }
-      function puntos() { var p = el("div", "m f pensando entra"); p.innerHTML = "<i></i><i></i><i></i>"; return p; }
-      function reiniciar() {
-        chat.classList.remove("sale"); chat.innerHTML = "";
-        vaciarZona();
+      function unidad() { return chat.clientWidth / 360; }
+      function mover(y) { desplazado = Math.max(0, y); hoja.style.transform = "translateY(" + (-desplazado).toFixed(1) + "px)"; }
+      // Arriba lo nuevo (el turno de Funes que empieza) y abajo lo que sigue (lo que va llegando), como el scroll de la pagina real.
+      function arriba(nodo) { mover(nodo.offsetTop - 6 * unidad()); }
+      function abajo() { mover(Math.max(desplazado, hoja.offsetHeight - chat.clientHeight)); }
+      function sinTransicion(nodo, fn) { nodo.style.transition = "none"; fn(); void nodo.offsetHeight; nodo.style.transition = ""; }
+      function girar() {
+        var i = proximoAnillo % anillos.length;
+        giros[i] += i === 1 ? -110 : 110;
+        anillos[i].style.transform = "rotate(" + giros[i] + "deg)";
+        proximoAnillo++;
       }
-      async function funes(m, id) {
-        var p = puntos(); chat.appendChild(p);
-        var largo = m.textContent.length;
-        if (!(await pausa(m.dataset.espera ? +m.dataset.espera : Math.min(1500, 600 + largo * 12), id))) return false;
-        p.remove(); m.classList.add("entra"); chat.appendChild(m);
-        return pausa(450, id);
+      function ponerBarra(pct) { barra.style.width = pct + "%"; girar(); }
+      function contesto() { contestadas++; ponerBarra(4 + 96 * (contestadas / PASOS)); }
+      function verbo() { if (!bolsa.length) bolsa = VERBOS.slice().sort(function () { return Math.random() - .5; }); return bolsa.pop(); }
+      function pensando() {
+        var p = el("span", "pens entra");
+        p.innerHTML = '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">' +
+          '<g class="arco arco-1"><circle cx="16" cy="16" r="13" stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/></g>' +
+          '<g class="arco arco-2"><circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/></g>' +
+          '<g class="arco arco-3"><circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8" transform="rotate(115 16 16)"/></g>' +
+          '<circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/></svg>' +
+          '<span><span class="verbo">' + verbo() + '</span><span class="punto">.</span><span class="punto">.</span><span class="punto">.</span></span>';
+        var v = p.querySelector(".verbo");
+        p.rotar = setInterval(function () { v.textContent = verbo(); }, 1900);
+        return p;
       }
-      async function escribe(m, id) {
-        vaciarZona();
-        var caja = el("div", "caja caret"); caja.dataset.ph = "Escribí acá...";
-        var bot = el("span", "bot envia v-precisa", "Enviar");
-        var fila = el("div", "fila"); fila.appendChild(caja); fila.appendChild(bot); zona.appendChild(fila);
-        if (!(await pausa(700, id))) return false;
-        var texto = m.dataset.escribe;
-        for (var i = 1; i <= texto.length; i++) {
-          caja.textContent = texto.slice(0, i);
-          if (!(await pausa(48, id))) return false;
+      function quitar(p) { clearInterval(p.rotar); p.remove(); }
+      // Lo que se ve de un html con <b> y <u> despues de n caracteres de texto (las etiquetas no cuentan).
+      function parcial(h, n) {
+        var out = "", vis = 0, abiertas = [], i = 0;
+        while (i < h.length && vis < n) {
+          if (h.charAt(i) === "<") {
+            var j = h.indexOf(">", i), tag = h.slice(i, j + 1);
+            if (tag.charAt(1) === "/") abiertas.pop(); else abiertas.push(tag.slice(1, -1));
+            out += tag; i = j + 1;
+          } else { out += h.charAt(i); vis++; i++; }
+        }
+        while (abiertas.length) out += "</" + abiertas.pop() + ">";
+        return out;
+      }
+      async function funes(i, id, primera) {
+        var m = mensajes[i], h = htmls[i], limpio = h.replace(/<\/?u>/g, "");
+        var largo = limpio.replace(/<[^>]*>/g, "").length;
+        var p = pensando(); hilo.appendChild(p);
+        if (primera) arriba(p); else abajo();
+        if (!(await pausa(primera ? 1400 : 800, id))) { quitar(p); return false; }
+        quitar(p);
+        m.innerHTML = ""; m.classList.add("entra"); hilo.appendChild(m);
+        if (primera) arriba(m);
+        for (var n = 1; n <= largo; n++) {
+          m.innerHTML = parcial(limpio, n);
+          if (!(await pausa(20, id))) return false;
+        }
+        m.innerHTML = h;
+        abajo();
+        return pausa(500, id);
+      }
+      async function tapa(i, id) {
+        if (!(await pausa(900, id))) return false;
+        mensajes[i].classList.add("entra"); hilo.appendChild(mensajes[i]);
+        abajo();
+        return pausa(900, id);
+      }
+      async function escribe(i, id) {
+        var m = mensajes[i];
+        zona.innerHTML = "";
+        var caja = el("div", "caja caret"); caja.dataset.ph = m.dataset.ph || "Tu respuesta...";
+        var bot = el("span", "env", "Enviar");
+        var form = el("div", "form"); form.appendChild(caja); form.appendChild(bot);
+        if (!(await pausa(1200, id))) return false;
+        zona.appendChild(form); abajo();
+        var texto = htmls[i];
+        for (var n = 1; n <= texto.length; n++) {
+          caja.textContent = texto.slice(0, n);
+          if (!(await pausa(50, id))) return false;
         }
         if (!(await pausa(450, id))) return false;
-        bot.classList.add("sel");
-        if (!(await pausa(350, id))) return false;
-        vaciarZona(); m.classList.add("entra"); chat.appendChild(m);
-        return pausa(500, id);
+        bot.classList.add("toca");
+        if (!(await pausa(300, id))) return false;
+        zona.innerHTML = ""; m.classList.add("entra"); hilo.appendChild(m);
+        if (!m.dataset.sinBarra) contesto();
+        abajo();
+        return pausa(600, id);
       }
-      async function opcion(m, id) {
-        vaciarZona();
-        var botones = OPCIONES.map(function (t) { var b = el("span", "bot v-precisa", t); zona.appendChild(b); return b; });
-        if (!(await pausa(1100, id))) return false;
-        botones[+m.dataset.opcion].classList.add("sel");
+      async function votar(i, id, voto) {
+        zona.innerHTML = VOTOS;
+        Array.prototype.forEach.call(zona.querySelectorAll(".vt"), function (b, k) { b.classList.add("aparece-op"); b.style.animationDelay = (k * 160) + "ms"; });
+        abajo();
+        if (!(await pausa(2000, id))) return false;
+        zona.querySelector(CLASE_VOTO[voto]).classList.add("toca");
         if (!(await pausa(450, id))) return false;
-        vaciarZona(); m.classList.add("entra"); chat.appendChild(m);
-        return pausa(500, id);
+        zona.innerHTML = ""; mensajes[i].classList.add("entra"); hilo.appendChild(mensajes[i]);
+        if (voto === "Precisa") ponerBarra(100);
+        abajo();
+        return pausa(600, id);
+      }
+      async function opcion(i, id) {
+        var m = mensajes[i];
+        zona.innerHTML = "";
+        var cont = el("div", "opts"), botones = OPCIONES.map(function (t, k) {
+          var b = el("span", "op aparece-op", t); b.style.animationDelay = (k * 160) + "ms"; cont.appendChild(b); return b;
+        });
+        zona.appendChild(cont); abajo();
+        if (!(await pausa(1600, id))) return false;
+        botones[+m.dataset.opcion].classList.add("toca");
+        if (!(await pausa(450, id))) return false;
+        zona.innerHTML = ""; m.classList.add("entra"); hilo.appendChild(m);
+        contesto(); abajo();
+        return pausa(600, id);
+      }
+      function reiniciar() {
+        chat.classList.remove("sale");
+        hilo.innerHTML = ""; zona.innerHTML = "";
+        contestadas = 0;
+        sinTransicion(hoja, function () { mover(0); });
+        sinTransicion(barra, function () { barra.style.width = "4%"; });
+        sinTransicion(anillos[0], function () { anillos.forEach(function (a, k) { giros[k] = 0; a.style.transition = "none"; a.style.transform = ""; }); });
+        anillos.forEach(function (a) { a.style.transition = ""; });
+        proximoAnillo = 0;
+        mensajes.forEach(function (m, i) { m.className = m.className.replace(/\bentra\b/g, "").trim(); m.innerHTML = htmls[i]; });
       }
       async function correr(id) {
         reiniciar();
-        if (!(await pausa(500, id))) return;
+        if (!(await pausa(600, id))) return;
+        var primeraDelTurno = true;
         for (var i = 0; i < mensajes.length; i++) {
           var m = mensajes[i], ok;
-          m.classList.remove("entra");
-          if (m.classList.contains("f")) ok = await funes(m, id);
-          else if (m.dataset.opcion) ok = await opcion(m, id);
-          else ok = await escribe(m, id);
+          if (m.dataset.tapa) ok = await tapa(i, id);
+          else if (m.classList.contains("f")) {
+            ok = await funes(i, id, primeraDelTurno);
+            primeraDelTurno = false;
+            if (ok && m.dataset.voto) { i++; ok = await votar(i, id, m.dataset.voto); primeraDelTurno = true; }
+          } else {
+            primeraDelTurno = true;
+            ok = m.dataset.opcion ? await opcion(i, id) : await escribe(i, id);
+          }
           if (!ok) return;
         }
-        zona.innerHTML = zonaFinal;
-        var precisa = zona.querySelector(".v-precisa"); precisa.classList.remove("sel");
-        if (!(await pausa(1300, id))) return;
-        precisa.classList.add("sel");
-        if (!(await pausa(4200, id))) return;
+        if (!(await pausa(4500, id))) return;
         chat.classList.add("sale");
         if (!(await pausa(700, id))) return;
         if (visible) correr(id);
