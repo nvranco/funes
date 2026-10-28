@@ -366,10 +366,12 @@
         <h2 class="text-3xl md:text-4xl leading-tight">Lo que suelen preguntar los libreros.</h2>
         <div class="mt-8 divide-y" style="border-top: 1px solid rgb(var(--borde)); border-bottom: 1px solid rgb(var(--borde));">
           {% for q, a in [
-            ('¿Cuántas fotos necesito?', 'Una por estante alcanza. Podés empezar con una sola categoría y sumar el resto después.'),
-            ('¿Qué pasa si la IA se equivoca con un libro?', 'Revisamos lo que le genera dudas antes de publicar, y después lo corregís vos desde tu panel.'),
-            ('¿Tengo que cambiar mi sistema de ventas?', 'No. Funes convive con lo que uses hoy.'),
-            ('¿Y si no tengo mi catálogo en ningún lado?', 'Para eso está el digitalizador: lo armamos a partir de las fotos de tus estantes.')] %}
+            ('¿Cuántas fotos necesito?', 'Con una foto por estantería alcanza. Podés empezar por una categoría y sumar el resto cuando quieras.'),
+            ('¿Necesito tener mi catálogo cargado en algún lado?', 'No. Funes lo arma a partir de las fotos de tus libros o estanterías, y convive con lo que uses hoy para vender.'),
+            ('¿Qué pasa si la IA lee mal un título?', 'Funes te deja la lista para que la revises antes de compartir, y corregís lo que haga falta.'),
+            ('¿Mis clientes tienen que registrarse?', 'No. Charlan con Funes un par de minutos y reciben una recomendación, sin crear una cuenta.'),
+            ('¿Funes recomienda libros que no tengo?', 'No. Busca sólo entre los libros de tu stock, así cada recomendación es un título que podés ofrecer.'),
+            ('¿Qué me llega cuando a un cliente le gusta una recomendación?', 'Una consulta por WhatsApp con el título elegido: te escribe alguien que ya sabe qué quiere leer.')] %}
           <details class="py-4" style="border-color: rgb(var(--borde));">
             <summary class="flex items-center justify-between gap-4">
               <span class="serif text-lg">{{ q }}</span>
