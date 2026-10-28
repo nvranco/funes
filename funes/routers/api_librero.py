@@ -1,6 +1,6 @@
 """API del librero (requisitos §6): subida de lotes y estado de procesamiento.
 
-POST /api/{slug}/{token}/lotes             multipart, 1-10 imagenes -> {lote_id}
+POST /api/{slug}/{token}/lotes             multipart, 1-50 imagenes -> {lote_id}
 GET  /api/{slug}/{token}/lotes/{id}        estado + libros detectados
 """
 
@@ -29,7 +29,7 @@ _CLAVES_COLOR_VALIDAS = {c["clave"] for c in PALETA_CATALOGOS}
 router = APIRouter()
 logger = logging.getLogger("librero.lotes")
 
-MAX_FOTOS_POR_LOTE = 10
+MAX_FOTOS_POR_LOTE = 50
 ESTADOS_VALIDOS = {"pendiente", "publicado", "descartado", "vendido"}
 
 
@@ -80,7 +80,7 @@ async def crear_lote(
     libreria = acc.libreria
 
     if not fotos:
-        raise HTTPException(status_code=400, detail="Mandá entre 1 y 10 fotos.")
+        raise HTTPException(status_code=400, detail="Mandá entre 1 y 50 fotos.")
     if len(fotos) > MAX_FOTOS_POR_LOTE:
         raise HTTPException(status_code=400, detail=f"Máximo {MAX_FOTOS_POR_LOTE} fotos por lote.")
 
@@ -529,7 +529,7 @@ async def detectar_vendidos(slug: str, fotos: list[UploadFile], acc: Acceso = De
     libreria = acc.libreria
 
     if not fotos:
-        raise HTTPException(status_code=400, detail="Mandá entre 1 y 10 fotos.")
+        raise HTTPException(status_code=400, detail="Mandá entre 1 y 50 fotos.")
     if len(fotos) > MAX_FOTOS_POR_LOTE:
         raise HTTPException(status_code=400, detail=f"Máximo {MAX_FOTOS_POR_LOTE} fotos por lote.")
 

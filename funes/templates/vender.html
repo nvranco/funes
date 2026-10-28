@@ -235,8 +235,8 @@
   inputFotos.addEventListener('change', () => {
     const archivos = Array.from(inputFotos.files || []);
     if (archivos.length === 0) return;
-    if (archivos.length > 10) {
-      alert('Máximo 10 fotos por vez. Elegí menos y probá de nuevo.');
+    if (archivos.length > 50) {
+      alert('Máximo 50 fotos por vez. Elegí menos y probá de nuevo.');
       return;
     }
     detectarVendidos(archivos);

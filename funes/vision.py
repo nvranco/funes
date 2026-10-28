@@ -18,10 +18,12 @@ era completar autores que no estan en el lomo — que es exactamente lo que
 sanear_libro bloquea por ser invencion. Ver _bench.py.
 """
 
+import asyncio
 import base64
 import io
 import json
 import logging
+import random
 import re
 import time
 import unicodedata
@@ -279,6 +281,9 @@ def _parsear_respuesta(texto: str) -> dict:
     return datos
 
 
+_REINTENTOS_LIMITE = 3  # reintentos ante 429/502/503, aparte del reintento de analizar_foto
+
+
 async def _llamar_openrouter(foto_bytes_resized: bytes, tipo_catalogo: str = "libros") -> tuple[str, dict]:
     data_uri = "data:image/jpeg;base64," + base64.b64encode(foto_bytes_resized).decode("ascii")
     body = {
@@ -295,18 +300,37 @@ async def _llamar_openrouter(foto_bytes_resized: bytes, tipo_catalogo: str = "li
         ],
     }
     async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=body,
-        )
+        for espera_n in range(_REINTENTOS_LIMITE + 1):
+            resp = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json=body,
+            )
+            if resp.status_code not in (429, 502, 503) or espera_n == _REINTENTOS_LIMITE:
+                break
+            # Rate limit del proveedor: respetar Retry-After si viene; si no,
+            # backoff exponencial con jitter para que las fotos del lote no
+            # reintenten todas en el mismo instante.
+            try:
+                espera = float(resp.headers.get("retry-after", ""))
+            except ValueError:
+                espera = 2 ** espera_n
+            espera = min(espera, 30) + random.uniform(0, 1)
+            logger.warning("vision_rate_limit status=%s espera_s=%.1f", resp.status_code, espera)
+            await asyncio.sleep(espera)
     resp.raise_for_status()
     payload = resp.json()
     texto = payload["choices"][0]["message"]["content"]
     return texto, payload.get("usage", {})
+
+
+# Tope de llamadas a OpenRouter en vuelo: con lotes de 50 fotos, el gather de
+# api_librero las lanzaria todas juntas y el proveedor devolveria 429. Es global
+# al proceso, asi que tambien reparte el cupo entre lotes simultaneos.
+_semaforo_vision = asyncio.Semaphore(6)
 
 
 async def analizar_foto(foto_bytes: bytes, tipo_catalogo: str = "libros") -> list[dict]:
@@ -325,7 +349,9 @@ async def analizar_foto(foto_bytes: bytes, tipo_catalogo: str = "libros") -> lis
     for intento in (1, 2):
         inicio = time.monotonic()
         try:
-            texto_crudo, uso = await _llamar_openrouter(foto_resized, tipo_catalogo)
+            async with _semaforo_vision:
+                inicio = time.monotonic()
+                texto_crudo, uso = await _llamar_openrouter(foto_resized, tipo_catalogo)
             datos = _parsear_respuesta(texto_crudo)
             latencia_ms = round((time.monotonic() - inicio) * 1000)
             logger.info(
