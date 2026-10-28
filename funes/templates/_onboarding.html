@@ -119,7 +119,7 @@
       b.disabled = true;
       try {
         const clerk = await clerkListo();
-        await clerk.signOut({ redirectUrl: '/ingresar' });
+        await clerk.signOut({ redirectUrl: '/' });
       } catch (e) {
         b.disabled = false;
       }
