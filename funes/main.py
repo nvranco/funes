@@ -38,27 +38,26 @@ app.mount("/static", StaticFiles(directory="funes/static"), name="static")
 templates = Jinja2Templates(directory="funes/templates")
 
 
-# Las paginas de Funes que alguien puede llegar a compartir, y las unicas que se
-# mudan de host. GET nada mas (ver destino_de_funes) mas un prefijo, no una
-# lista de exact-match: /funes/{slug} (el Funes de una libreria puntual, ver
-# routers/funes_chat.py:pagina_libreria) se suma sola sin listar cada slug.
+# Todo lo que se pide por GET a un host que no es DOMINIO_FUNES se muda a ese
+# dominio: las direcciones viejas (*.up.railway.app) ya estan repartidas en
+# links, QR impresos y paginas instaladas como app, y tienen que seguir llevando
+# a donde corresponde. Lo que NO se muda, y por que:
 #
-#   - Los POST del chat (/funes/sesion, /funes/candidato, /funes/recomendar...)
-#     no se redirigen NUNCA. Una pestaña abierta desde antes del cambio sigue
-#     posteando al host viejo; mandarla al nuevo convierte esos fetch en
-#     cross-origin, el navegador pide CORS, no hay, y la conversacion se corta a
-#     la mitad. Contestando en los dos lados no se corta nada, y la proxima
-#     visita ya entra por el dominio nuevo sola. El chequeo de metodo mas abajo
-#     ya los saca a todos: son POST.
-#   - /funes/ml/... tampoco: /funes/ml/callback quedo registrado en la consola
-#     de MercadoLibre y el canje del token exige que coincida exacto.
-#   - /funes/admin/... tampoco: no se comparte con nadie, y ahi viven el tablero
-#     del piloto y el DELETE de una conversacion.
-#
-# El QR si entra: se genera contra el host por el que entro el pedido, asi que
-# redirigirlo es lo que hace que un codigo impreso lleve al dominio nuevo.
-PAGINAS_DE_FUNES = ("/funes", "/funes/privacidad", "/funes/qr.png")
-_PREFIJOS_DE_FUNES_EXCLUIDOS = ("/funes/admin/", "/funes/ml/")
+#   - Todo lo que no es GET (los POST del chat y de la API, PATCH, DELETE). Una
+#     pestaña abierta desde antes del cambio sigue posteando al host viejo;
+#     mandarla al nuevo convierte esos fetch en cross-origin, el navegador pide
+#     CORS, no hay, y la conversacion o la carga de libros se corta a la mitad.
+#     Contestando en los dos lados no se corta nada, y la proxima visita ya
+#     entra por el dominio nuevo sola.
+#   - /health: el healthcheck de Railway llega con su propio Host, y un 302 lo
+#     da por caido.
+#   - /api/ y /static/: son pedidos de una pagina que ya estaba abierta en el
+#     host viejo, por la misma razon cross-origin de arriba.
+#   - /funes/ml/...: /funes/ml/callback quedo registrado en la consola de
+#     MercadoLibre y el canje del token exige que coincida exacto.
+#   - /funes/admin/...: no se comparte con nadie, y ahi viven el tablero del
+#     piloto y el DELETE de una conversacion.
+_RUTAS_QUE_NO_SE_MUDAN = ("/health", "/api/", "/static/", "/funes/ml/", "/funes/admin/")
 
 
 def destino_de_funes(host: str, metodo: str, camino: str, query: str = "") -> str | None:
@@ -76,31 +75,23 @@ def destino_de_funes(host: str, metodo: str, camino: str, query: str = "") -> st
     """
     if not DOMINIO_FUNES:
         return None
-    camino = camino.rstrip("/") or "/"
-    cola = f"?{query}" if query else ""
     if (host or "").lower() == DOMINIO_FUNES:
-        # Nada se mueve dentro del propio dominio: la raiz la sirve directo
-        # pagina_landing (routers/funes_chat.py) y el resto de rutas ya estan
-        # donde tienen que estar. Sin este return temprano, un pedido a
-        # /funes o /funes/{slug} en el propio host caeria en el chequeo de
-        # abajo -pensado para mover paginas desde OTROS hosts- y se
-        # redirigiria a si mismo (loop).
+        # Nada se mueve dentro del propio dominio. Sin este return temprano,
+        # cualquier pedido en el propio host se redirigiria a si mismo (loop).
         return None
-    if metodo == "GET" and (
-        camino in PAGINAS_DE_FUNES
-        or (camino.startswith("/funes/")
-            and not camino.startswith(_PREFIJOS_DE_FUNES_EXCLUIDOS))
-    ):
-        return f"https://{DOMINIO_FUNES}{camino}{cola}"
-    return None
+    if metodo != "GET":
+        return None
+    sin_barra = camino.rstrip("/") or "/"
+    # El camino se compara con barra final para que "/api" tambien quede afuera.
+    if (sin_barra + "/").startswith(_RUTAS_QUE_NO_SE_MUDAN) or sin_barra == "/health":
+        return None
+    cola = f"?{query}" if query else ""
+    return f"https://{DOMINIO_FUNES}{sin_barra}{cola}"
 
 
 @app.middleware("http")
 async def dominio_de_funes(request: Request, call_next):
-    """Manda las paginas publicas de Funes a su propio dominio.
-
-    De LIBRERO no se toca nada: sigue contestando donde siempre, por el host de
-    siempre. Lo unico que se mueve es lo que se reparte.
+    """Manda los GET de los hosts viejos al dominio propio de Funes.
 
     302 y no 301: el 301 se lo guarda el navegador para siempre, y mientras el
     piloto se este moviendo conviene poder volver atras cambiando una variable
