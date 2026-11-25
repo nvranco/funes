@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Funes — Privacidad</title>
+<meta name="theme-color" content="#7A9E78">
+
+<script>
+  (function () {
+    var pwa = window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    if (pwa) document.documentElement.classList.add('pwa');
+    var src = 'https://cdn.tailwindcss.com';
+    if (pwa) {
+      var s = document.createElement('script');
+      s.src = src; s.async = true;
+      s.onload = function () {
+        if (window.__configTailwind) window.tailwind.config = window.__configTailwind;
+      };
+      document.head.appendChild(s);
+    } else {
+      document.write('<script src="' + src + '"><\/script>');
+    }
+    if (!pwa) return;
+    var cerrado = false;
+    function cerrarSplash() {
+      if (cerrado) return;
+      cerrado = true;
+      var el = document.getElementById('splash');
+      if (!el) return;
+      el.classList.add('splash-fuera');
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
+    }
+    // Dos frames despues de "load" (que espera al Tailwind async): da tiempo a
+    // que genere sus clases. El tope evita dejar la app tapada si algo no llega.
+    window.addEventListener('load', function () {
+      requestAnimationFrame(function () { requestAnimationFrame(cerrarSplash); });
+    });
+    setTimeout(cerrarSplash, 10000);
+  })();
+</script>
+<style>
+  html.pwa, html.pwa body { background: #EDE3D0; }
+  #splash { display: none; }
+  .pwa #splash {
+    display: flex; position: fixed; inset: 0; z-index: 99999; align-items: center; justify-content: center;
+    background: #EDE3D0; transition: opacity .35s ease;
+  }
+  #splash.splash-fuera { opacity: 0; pointer-events: none; }
+  #splash svg { width: 88px; height: 88px; color: #2E2116; overflow: visible; }
+  /* Cada anillo gira sobre su centro, a su ritmo y en sentidos alternados. */
+  #splash .anillo { transform-box: view-box; transform-origin: 16px 16px; animation: splash-giro 2.6s linear infinite; }
+  #splash .anillo-2 { animation-duration: 1.9s; animation-direction: reverse; }
+  #splash .anillo-3 { animation-duration: 1.3s; }
+  @keyframes splash-giro { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { #splash .anillo { animation-duration: 8s; } }
+</style>
+
+<link rel="icon" href="/static/funes-favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&display=swap" rel="stylesheet">
+<script>
+  // En la PWA Tailwind llega async: si todavia no esta, la config se le aplica
+  // cuando carga (ver el <script> del splash, arriba).
+  window.__configTailwind = {
+    theme: {
+      extend: {
+        colors: {
+          tinta: 'rgb(var(--tinta) / <alpha-value>)',
+          celeste: 'rgb(var(--celeste) / <alpha-value>)',
+          'celeste-claro': 'rgb(var(--celeste-claro) / <alpha-value>)',
+          crema: 'rgb(var(--crema) / <alpha-value>)',
+          fondo: 'rgb(var(--fondo) / <alpha-value>)',
+          papel: 'rgb(var(--papel) / <alpha-value>)',
+          borde: 'rgb(var(--borde) / <alpha-value>)',
+          gris: 'rgb(var(--gris) / <alpha-value>)',
+          terracota: 'rgb(var(--terracota) / <alpha-value>)',
+          ambar: 'rgb(var(--ambar) / <alpha-value>)',
+          whatsapp: '#25D366',
+          'texto-papel': 'rgb(var(--texto-papel) / <alpha-value>)',
+        },
+        fontFamily: {
+          sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto',
+                 '"Helvetica Neue"', 'Arial', 'sans-serif'],
+        },
+        borderRadius: { xl2: 'var(--radio-xl2)' },
+      },
+    },
+  };
+  if (window.tailwind) window.tailwind.config = window.__configTailwind;
+</script>
+<style>
+  /* Look and feel definitivo: "Kraft Suave" — libreria de usados, papel
+     kraft y tonos tierra, con botones tonales (fondo palido + texto e
+     icono del mismo color) y esquinas redondeadas. Colores en formato RGB
+     (sin "#") para que Tailwind pueda generar tambien las variantes con
+     opacidad (bg-x/50, etc). */
+  :root {
+    --tinta: 46 33 22; --celeste: 122 158 120; --celeste-claro: 215 224 210;
+    --crema: 243 236 220; --fondo: 237 227 208; --papel: 251 247 238; --borde: 216 201 172;
+    --gris: 122 111 92; --terracota: 165 75 63; --ambar: 184 134 58;
+    --texto-papel: 46 33 22; --font-display: 'Lora', serif;
+    --radio-xl2: 12px;
+    --borde-secundario: rgba(46, 33, 22, 0.3);
+
+    /* Cargar estante (border-celeste en el HTML): tonal verde. */
+    --btn-primario-a-bg: rgb(224 232 220); --btn-primario-a-color: rgb(58 92 56); --btn-primario-a-border: rgb(var(--celeste));
+    /* Marcar vendidos (border-ambar en el HTML): tonal dorado. */
+    --btn-primario-b-bg: rgb(242 231 203); --btn-primario-b-color: rgb(122 86 28); --btn-primario-b-border: rgb(var(--ambar));
+  }
+
+  html, body { background: rgb(var(--fondo)); }
+  * { -webkit-tap-highlight-color: transparent; }
+
+  /* Es una app pensada para el celular: en pantallas anchas (compu) no
+     dejamos que el contenido se estire de punta a punta, se lo centra con
+     un ancho maximo tipo "columna de telefono" y buen margen a los costados.
+     Una clase mas especifica (ej. max-w-2xl del admin) sigue ganando. */
+  body > div { max-width: 480px; margin-left: auto; margin-right: auto; }
+  h1 { font-family: var(--font-display); }
+  /* :focus-visible y no :focus. Con :focus el recuadro celeste aparecia
+     tambien al TOCAR o clickear -el elemento queda enfocado igual-, asi que
+     cada boton de la conversacion y la flecha de volver se quedaban con un
+     marco verde alrededor despues de usarlos, sin que nadie lo hubiera
+     pedido. :focus-visible lo deja solo cuando el navegador entiende que la
+     persona esta navegando con teclado, que es para quien el recuadro existe:
+     sacarlo del todo dejaria a esa persona sin saber donde esta parada. */
+  input:focus-visible, button:focus-visible, a:focus-visible {
+    outline: 2px solid rgb(var(--celeste)); outline-offset: 2px;
+  }
+  .safe-b { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+  .tap { min-height: 48px; min-width: 48px; }
+
+  /* Emoji de Twemoji (donde la pagina carga _twemoji.html): del tamaño del texto. */
+  img.emoji { height: 1.15em; width: 1.15em; display: inline-block; vertical-align: -0.2em; margin: 0 .05em 0 .5em; }
+
+  /* iOS hace zoom automatico al enfocar un input con font-size < 16px.
+     Forzamos 16px en todo campo editable, sin importar la clase de Tailwind. */
+  input, textarea, select { font-size: 16px !important; }
+
+  /* Los campos de formulario sin clase de color explícita heredan el fondo
+     nativo del navegador (normalmente blanco). Los fijamos a los tokens de
+     superficie por default; una clase Tailwind explícita puede pisar esto. */
+  input, select, textarea { background-color: rgb(var(--papel)); color: rgb(var(--texto-papel)); }
+
+  /* Botones primarios: tratamiento tonal verde por defecto (fondo pálido,
+     texto e ícono del mismo color, con recuadro) para cualquier
+     .btn-primario suelto — Cargar fotos, Guardar, Publicar, etc. */
+  .btn-primario {
+    background: var(--btn-primario-a-bg); color: var(--btn-primario-a-color);
+    border: 2px solid var(--btn-primario-a-border);
+  }
+
+  /* "Cargar estante" (border-celeste en el HTML) y "Marcar vendidos"
+     (border-ambar) son semánticamente entrada y salida — cada uno con su
+     propio tratamiento. El selector compuesto (mismo peso que
+     .border-celeste/.border-ambar de Tailwind) evita depender del orden
+     de inyección del CDN. */
+  .btn-primario.border-celeste {
+    background: var(--btn-primario-a-bg); color: var(--btn-primario-a-color); border-color: var(--btn-primario-a-border);
+  }
+  .btn-primario.border-ambar {
+    background: var(--btn-primario-b-bg); color: var(--btn-primario-b-color); border-color: var(--btn-primario-b-border);
+  }
+  .btn-secundario {
+    background: rgb(var(--papel)); color: rgb(var(--texto-papel));
+    border: 2px solid var(--borde-secundario);
+  }
+  .btn-whatsapp {
+    background: #25D366; color: #FFFFFF;
+  }
+
+  /* Safari agrega su propio cromado redondeado a type=search, que se ve
+     como un doble borde encima del nuestro. Lo desactivamos. */
+  input[type="search"] { -webkit-appearance: none; appearance: none; }
+  input[type="search"]:focus { outline: none; }
+</style>
+
+
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Mismo lenguaje que la landing y el catalogo publico: fondo crema papel, Inter en el cuerpo e
+     Inter Tight en los numeros, tarjetas con borde fino y la sombra suave de las tarjetas de libros. */
+  /* Mas especificos que las utilidades de Tailwind (bg-fondo / bg-papel), que se inyectan despues. */
+  /* El fondo va en <html> (el lienzo): asi el degradado arranca en el borde de arriba, sin una franja
+     cuando el margen del banner se escapa del body. */
+  @property --a1 { syntax: '<angle>'; inherits: false; initial-value: 112deg; }
+  @property --a2 { syntax: '<angle>'; inherits: false; initial-value: 63deg; }
+  @property --a3 { syntax: '<angle>'; inherits: false; initial-value: 158deg; }
+  @property --a4 { syntax: '<angle>'; inherits: false; initial-value: 31deg; }
+  @property --a5 { syntax: '<angle>'; inherits: false; initial-value: 135deg; }
+  @property --a6 { syntax: '<angle>'; inherits: false; initial-value: 84deg; }
+  @property --p1 { syntax: '<percentage>'; inherits: false; initial-value: 24%; }
+  @property --p2 { syntax: '<percentage>'; inherits: false; initial-value: 47%; }
+  @property --p3 { syntax: '<percentage>'; inherits: false; initial-value: 71%; }
+  html { background-color: rgb(var(--fondo));
+    /* Velos de color muy tenues y superpuestos, cada uno con su angulo, su ancho y su posicion: sin formas
+       definidas, solo cambios suaves de tono (verde del hero, con apenas ambar, azul y terracota).
+       Los angulos y tres de las posiciones derivan despacio (40 a 80 segundos, cada uno con su
+       duracion), asi que el fondo casi no se nota moverse y nunca repite exactamente la misma imagen. */
+    background-image:
+      linear-gradient(var(--a1), transparent 6%, rgba(122,158,120,.17) var(--p1), transparent 47%),
+      linear-gradient(var(--a2), transparent 28%, rgba(184,134,58,.09) var(--p2), transparent 67%),
+      linear-gradient(var(--a3), transparent 50%, rgba(122,158,120,.14) var(--p3), transparent 94%),
+      linear-gradient(var(--a4), transparent 4%, rgba(92,122,138,.10) 21%, transparent 41%),
+      linear-gradient(var(--a5), transparent 57%, rgba(122,158,120,.11) 77%, transparent 100%),
+      linear-gradient(var(--a6), transparent 60%, rgba(165,75,63,.06) 81%, transparent 97%); }
+  @media (prefers-reduced-motion: no-preference) {
+    html { animation: d-a1 43s ease-in-out infinite alternate, d-a2 57s ease-in-out infinite alternate,
+                      d-a3 71s ease-in-out infinite alternate, d-a4 53s ease-in-out infinite alternate,
+                      d-a5 67s ease-in-out infinite alternate, d-a6 79s ease-in-out infinite alternate,
+                      d-p1 49s ease-in-out infinite alternate, d-p2 61s ease-in-out infinite alternate,
+                      d-p3 73s ease-in-out infinite alternate; }
+  }
+  @keyframes d-a1 { to { --a1: 128deg; } }
+  @keyframes d-a2 { to { --a2: 48deg; } }
+  @keyframes d-a3 { to { --a3: 172deg; } }
+  @keyframes d-a4 { to { --a4: 46deg; } }
+  @keyframes d-a5 { to { --a5: 119deg; } }
+  @keyframes d-a6 { to { --a6: 98deg; } }
+  @keyframes d-p1 { to { --p1: 31%; } }
+  @keyframes d-p2 { to { --p2: 40%; } }
+  @keyframes d-p3 { to { --p3: 64%; } }
+  body.bg-fondo { background-color: transparent; padding-top: 10px; }
+  /* body.font-sans: la clase de Tailwind que fija la fuente del sistema le gana a un selector de elemento. */
+  body.font-sans { font-family: Inter, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  /* Los botones secundarios se ven y se comportan como los contenedores: blanco translucido, borde fino y la misma sombra. */
+  :root { --borde-panel: rgba(60,55,45,.13); }
+  /* Bordes en un gris neutro translucido en vez del marron del resto de la app. */
+  body [class*="border-borde"] { border-color: var(--borde-panel); }
+  body .btn-secundario { background-color: rgba(255,255,255,.5); border: 1px solid var(--borde-panel) !important;
+    box-shadow: 0 1px 3px rgba(46,33,22,.1), 0 5px 12px -6px rgba(46,33,22,.16); transition: background-color .15s ease, transform .15s ease; }
+  body .btn-secundario:hover { background-color: rgba(255,255,255,.75); }
+  body .btn-secundario:active { transform: scale(.99); }
+  body .bg-papel { background-color: rgba(255,255,255,.5); box-shadow: 0 1px 3px rgba(46,33,22,.1), 0 5px 12px -6px rgba(46,33,22,.16); }
+
+  /* Todo el panel va dentro de un solo contenedor con el formato del banner (mismo fondo, radio,
+     borde y sombra, y el mismo ancho), y los bloques de adentro son planos: sin sombra propia. */
+  #panel-todo { background: #FCFAF4; border: 1px solid var(--borde-panel); border-radius: 12px; padding: 1rem;
+    box-shadow: 0 6px 20px rgba(46,33,22,.08); }
+  @media (min-width: 640px) { #panel-todo { padding: 1.5rem; } }
+  @media (min-width: 1024px) { #panel-todo { padding: 2rem; } }
+  #panel-todo .bg-papel, #panel-todo .btn-secundario { box-shadow: none; background-color: #fff; }
+  #panel-todo .btn-secundario:hover { background-color: #FCFAF4; }
+  /* Barra de acciones fija abajo (Publicar, Elegir...): una pastilla como el banner, no una franja de borde a borde. */
+  .barra-accion { position: fixed; left: 1.25rem; right: 1.25rem; bottom: 10px; z-index: 30; width: auto;
+    max-width: calc(72rem - 2.5rem); margin: 0 auto; padding: .75rem; background: #FCFAF4; border: 1px solid var(--borde-panel);
+    border-radius: 12px; box-shadow: 0 6px 20px rgba(46,33,22,.12); }
+  /* Si la etiqueta de un acordeon ocupa dos lineas (pantallas angostas), que no toque los bordes. */
+  #panel-todo [data-acordeon] { padding-top: .5rem; padding-bottom: .5rem; }
+
+  /* Botones principales: el boton de la landing (tinta con texto crema, 12px de radio) que vira al verde
+     del hero al pasar el mouse y sube 1px. El de "salida" (border-ambar) conserva su tono ambar. */
+  body .btn-primario, body .btn-primario.border-celeste { background-color: rgb(var(--tinta)); color: rgb(var(--crema));
+    border: 0 !important; border-radius: 12px; font-weight: 600; box-shadow: none;
+    display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+    transition: background-color .15s ease, transform .15s ease; }
+  body .btn-primario:hover, body .btn-primario.border-celeste:hover { background-color: #3F6B4B; transform: translateY(-1px); }
+  body .btn-primario.border-ambar { border-radius: 12px; font-weight: 600; }
+  body .btn-primario:active { transform: scale(.98); }
+  #panel-todo input[type="search"] { border-width: 1px !important; border-color: var(--borde-panel) !important; }
+  #panel-todo h1 { font-family: "Inter Tight", Inter, sans-serif; letter-spacing: -0.02em; }
+  #panel-todo input:not([type="checkbox"]):not([type="radio"]), #panel-todo textarea, #panel-todo select { background-color: #fff; border-color: var(--borde-panel); }
+  .text-2xl.font-bold, .text-4xl.font-bold { font-family: "Inter Tight", Inter, sans-serif; letter-spacing: -0.02em; }
+
+  /* Banner de la landing: pastilla flotante e inset respecto de los bordes, con la marca de Funes
+     a la izquierda y la libreria a la derecha. Scrollea con la pagina. */
+  .banner-panel { position: relative; z-index: 20; width: calc(100% - 2.5rem); max-width: calc(72rem - 2.5rem);
+    margin: 0 auto; border-radius: 12px; background: #FCFAF4; border: 1px solid var(--borde-panel);
+    box-shadow: 0 6px 20px rgba(46,33,22,.08); }
+  .banner-panel .marca { display: inline-flex; align-items: center; gap: .5rem; color: #111; line-height: 1; }
+  .banner-panel .marca span.nombre-marca { font-family: Lora, Georgia, serif; font-weight: 700; letter-spacing: -0.01em; font-size: 1.25rem; }
+  .banner-panel .marca svg { width: 1.25rem; height: 1.25rem; }
+
+  /* El scroll del log de actividad se ve siempre (por default solo aparece al pasar el mouse, o nunca en
+     mac con "mostrar barras: automaticamente"). */
+  .log-actividad-scroll { scrollbar-width: thin; scrollbar-color: rgb(var(--borde)) transparent; }
+  .log-actividad-scroll::-webkit-scrollbar { width: 6px; }
+  .log-actividad-scroll::-webkit-scrollbar-track { background: transparent; }
+  .log-actividad-scroll::-webkit-scrollbar-thumb { background: rgb(var(--borde)); border-radius: 3px; }
+</style>
+
+</head>
+<body class="font-sans text-texto-papel bg-fondo min-h-screen antialiased">
+<div id="splash" aria-hidden="true">
+  <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+    <g class="anillo anillo-1"><circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/></g>
+    <g class="anillo anillo-2"><circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/></g>
+    <g class="anillo anillo-3"><circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/></g>
+    <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
+  </svg>
+</div>
+
+<div class="max-w-2xl mx-auto">
+  
+<header class="banner-panel">
+  <div class="flex flex-wrap items-center justify-between gap-x-8 gap-y-1" style="min-height: 56px; padding: 0 1rem;">
+    <div class="flex items-center gap-2">
+      <span class="marca">
+        <span class="nombre-marca">Funes</span>
+        <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+          <circle cx="16" cy="16" r="13"  stroke-dasharray="65.8 15.9" transform="rotate(-125 16 16)"/>
+          <circle cx="16" cy="16" r="9.3" stroke-dasharray="47.1 11.4" transform="rotate(-5 16 16)"/>
+          <circle cx="16" cy="16" r="5.6" stroke-dasharray="28.4 6.8"  transform="rotate(115 16 16)"/>
+          <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
+        </svg>
+      </span>
+      
+      
+    </div>
+    
+  </div>
+</header>
+  <div class="px-5 pt-3 pb-10">
+  <div id="panel-todo">
+  <a href="/funes" class="text-tinta text-sm font-medium">← Volver</a>
+  <h1 class="font-sans text-2xl font-bold text-tinta leading-tight mt-1 mb-4">Privacidad</h1>
+
+  <div id="texto" class="text-sm leading-relaxed">
+    
+    <h3 class="font-bold mb-1">¿Qué es Funes?</h3>
+    <p class="mb-3">
+      Funes es un sistema de recomendación que combina varias técnicas de
+      procesamiento de información para seleccionar libros dentro de un catálogo
+      curado, accesible en la ciudad de Buenos Aires.
+    </p>
+    <p class="mb-3">
+      Está inspirado en el icónico cuento de Borges, <em>Funes el memorioso</em>,
+      cuyo protagonista recordaba absolutamente todo lo que había visto y no
+      podía olvidar nada.
+    </p>
+    
+    <blockquote class="my-4 pl-4 border-l-2 italic text-gris"
+                style="border-color: var(--borde-secundario)">
+      Pensar es olvidar diferencias, es generalizar, abstraer. En el abarrotado
+      mundo de Funes no había sino detalles, casi inmediatos.
+    </blockquote>
+    <p class="mb-3">
+      Recomendar un libro exige hacer comparaciones, y hacer comparaciones exige
+      abstracción. Es por eso que, en esta antítesis de Ireneo Funes, la
+      capacidad de abstracción es por diseño su principal fortaleza.
+    </p>
+    <h3 class="font-bold mt-5 mb-1">¿Cómo funciona?</h3>
+    <p class="mb-3">
+      A partir de tus respuestas se construye un perfil, el cual se compara con
+      la descripción de cada libro del catálogo para quedarse con una selección
+      de candidatos.
+    </p>
+    <p class="mb-3">
+      Sobre estos candidatos se generan preguntas en profundidad,
+      para discriminar entre ellos y elegir una recomendación final.
+    </p>
+    <p class="mb-3">
+      El proceso puede repetirse. Cada vez que una recomendación se descarta, lo
+      que explicás sobre por qué no funcionó entra como una corrección al perfil,
+      y la búsqueda se rehace sobre los candidatos restantes.
+    </p>
+    <h3 class="font-bold mt-5 mb-1">¿Qué datos recolecta?</h3>
+    <p class="mb-3">
+      En cada conversación, con la única finalidad de medir y mejorar la calidad
+      de las recomendaciones que este hace, almacena de forma anónima los
+      siguientes datos:
+    </p>
+    <ul class="list-disc pl-5 space-y-1">
+      <li>Todo lo que se dice en la charla, lo que elegís, lo que escribís y lo que Funes contesta.</li>
+      <li>Los libros recomendados, qué te pareció cada uno y si te interesó saber dónde conseguirlo.</li>
+    </ul>
+    <p class="mt-3">
+      No almacena datos personales ni requiere registro.
+    </p>
+
+    <h3 class="font-bold mt-5 mb-1">¿Puedo borrar mi conversación?</h3>
+    <p class="mb-3">
+      La ley 25.326 te reconoce el derecho a acceder a tus datos y a pedir que
+      estos se borren.
+    </p>
+    <p>
+      Al no recolectar ningún dato que te identifique, para borrar una
+      conversación es necesario saber la fecha y la hora aproximadas.
+    </p>
+
+    
+    <h3 class="font-bold mt-5 mb-1">¿Contacto?</h3>
+    
+    <p>
+      Podés escribirme directamente a
+      <a class="underline font-medium" href="mailto:nvrancovich@gmail.com">nvrancovich@gmail.com</a>.
+    </p>
+    
+
+    <p class="mt-8 text-right">
+      <a href="/funes" class="tap btn-secundario inline-flex items-center rounded-xl2 px-4 py-3 font-medium">
+        Volver
+      </a>
+    </p>
+  </div>
+
+  </div>
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@twemoji/api@15.1.0/dist/twemoji.min.js"
+  integrity="sha384-o28+zJO3/45GHIy+9TFKGaYnbt0KQcFRzyBrb0WSSrz7bPGwGI1d64worBiXPgXw" crossorigin="anonymous"></script>
+<script>
+  (function () {
+    var opciones = { folder: 'svg', ext: '.svg', base: 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/' };
+    window.parsearEmoji = function (el) { if (window.twemoji) window.twemoji.parse(el || document.body, opciones); };
+    window.parsearEmoji();
+  })();
+</script>
+</body>
+</html>
